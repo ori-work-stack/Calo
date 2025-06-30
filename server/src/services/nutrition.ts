@@ -125,15 +125,14 @@ export class NutritionService {
       const meal = await prisma.meal.create({
         data: {
           userId,
-          name: mealData.name || mealData.description || 'Unknown meal',
           description: mealData.description || 'No description available',
-          calories,
-          protein,
-          carbs,
-          fat,
-          fiber,
-          sugar,
-          healthScore: parseInt(mealData.healthScore) || null,
+          totalCalories: calories,
+          totalProtein: protein,
+          totalCarbs: carbs,
+          totalFat: fat,
+          totalFiber: fiber,
+          totalSugar: sugar,
+          healthScore: parseInt(mealData.healthScore) || 5,
           recommendations: mealData.recommendations || null,
           imageUrl: imageBase64 ? `data:image/jpeg;base64,${imageBase64}` : null,
         }
@@ -177,12 +176,12 @@ export class NutritionService {
       });
 
       const stats = meals.reduce((acc, meal) => ({
-        totalCalories: acc.totalCalories + meal.calories,
-        totalProtein: acc.totalProtein + meal.protein,
-        totalCarbs: acc.totalCarbs + meal.carbs,
-        totalFat: acc.totalFat + meal.fat,
-        totalFiber: acc.totalFiber + (meal.fiber || 0),
-        totalSugar: acc.totalSugar + (meal.sugar || 0),
+        totalCalories: acc.totalCalories + meal.totalCalories,
+        totalProtein: acc.totalProtein + meal.totalProtein,
+        totalCarbs: acc.totalCarbs + meal.totalCarbs,
+        totalFat: acc.totalFat + meal.totalFat,
+        totalFiber: acc.totalFiber + (meal.totalFiber || 0),
+        totalSugar: acc.totalSugar + (meal.totalSugar || 0),
         totalMeals: acc.totalMeals + 1,
       }), {
         totalCalories: 0,

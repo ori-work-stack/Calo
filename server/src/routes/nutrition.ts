@@ -1,7 +1,7 @@
 
 import { Router } from 'express';
 import { NutritionService } from '../services/nutrition';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { mealAnalysisSchema } from '../types/nutrition';
 
 const router = Router();
@@ -10,7 +10,7 @@ const router = Router();
 router.use(authenticateToken);
 
 // Analyze meal endpoint
-router.post('/analyze', async (req, res) => {
+router.post('/analyze', async (req: AuthRequest, res) => {
   try {
     console.log('Analyze meal request received');
     console.log('Request body keys:', Object.keys(req.body));
@@ -57,7 +57,7 @@ router.post('/analyze', async (req, res) => {
 });
 
 // Save meal endpoint
-router.post('/save', async (req, res) => {
+router.post('/save', async (req: AuthRequest, res) => {
   try {
     console.log('Save meal request received');
     
@@ -90,7 +90,7 @@ router.post('/save', async (req, res) => {
 });
 
 // Get user meals
-router.get('/meals', async (req, res) => {
+router.get('/meals', async (req: AuthRequest, res) => {
   try {
     console.log('Get meals request for user:', req.user.id);
     
@@ -111,7 +111,7 @@ router.get('/meals', async (req, res) => {
 });
 
 // Get daily stats
-router.get('/stats/:date', async (req, res) => {
+router.get('/stats/:date', async (req: AuthRequest, res) => {
   try {
     const { date } = req.params;
     
