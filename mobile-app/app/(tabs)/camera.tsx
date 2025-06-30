@@ -1,5 +1,4 @@
-
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,23 +8,38 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
-  TextInput,
-} from 'react-native';
-import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
-import * as ImagePicker from 'expo-image-picker';
-import { useDispatch, useSelector } from 'react-redux';
-import { RootState, AppDispatch } from '@/src/store';
-import { analyzeMeal, postMeal, clearPendingMeal } from '@/src/store/mealSlice';
-import { Ionicons } from '@expo/vector-icons';
+} from "react-native";
+import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
+import * as ImagePicker from "expo-image-picker";
+import { useDispatch, useSelector } from "react-redux";
+import { RootState, AppDispatch } from "@/src/store";
+import {
+  analyzeMeal,
+  postMeal,
+  clearPendingMeal,
+  clearError,
+} from "@/src/store/mealSlice";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function CameraScreen() {
   const dispatch = useDispatch<AppDispatch>();
-  const { pendingMeal, isAnalyzing, isPosting } = useSelector((state: RootState) => state.meal);
-  
+  const { pendingMeal, isAnalyzing, isPosting, error } = useSelector(
+    (state: RootState) => state.meal
+  );
+
   const [permission, requestPermission] = useCameraPermissions();
   const [showCamera, setShowCamera] = useState(false);
-  const [facing, setFacing] = useState<CameraType>('back');
+  const [facing, setFacing] = useState<CameraType>("back");
   const cameraRef = useRef<CameraView>(null);
+
+  // Handle errors
+  useEffect(() => {
+    if (error) {
+      Alert.alert("Error", error, [
+        { text: "OK", onPress: () => dispatch(clearError()) },
+      ]);
+    }
+  }, [error, dispatch]);
 
   if (!permission) {
     return <View />;
@@ -34,7 +48,9 @@ export default function CameraScreen() {
   if (!permission.granted) {
     return (
       <View style={styles.container}>
-        <Text style={styles.message}>We need your permission to show the camera</Text>
+        <Text style={styles.message}>
+          We need your permission to show the camera
+        </Text>
         <TouchableOpacity style={styles.button} onPress={requestPermission}>
           <Text style={styles.buttonText}>Grant Permission</Text>
         </TouchableOpacity>
@@ -51,7 +67,7 @@ export default function CameraScreen() {
           dispatch(analyzeMeal(photo.uri));
         }
       } catch (error) {
-        Alert.alert('Error', 'Failed to take picture');
+        Alert.alert("Error", "Failed to take picture");
       }
     }
   };
@@ -71,18 +87,24 @@ export default function CameraScreen() {
 
   const handlePost = async () => {
     if (pendingMeal) {
-      await dispatch(postMeal());
-      Alert.alert('Success', 'Meal posted successfully!');
+      const result = await dispatch(postMeal());
+      if (postMeal.fulfilled.match(result)) {
+        Alert.alert("Success", "Meal posted successfully!");
+      }
     }
   };
 
   const handleDiscard = () => {
     Alert.alert(
-      'Discard Analysis',
-      'Are you sure you want to discard this analysis?',
+      "Discard Analysis",
+      "Are you sure you want to discard this analysis?",
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Discard', style: 'destructive', onPress: () => dispatch(clearPendingMeal()) },
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Discard",
+          style: "destructive",
+          onPress: () => dispatch(clearPendingMeal()),
+        },
       ]
     );
   };
@@ -98,15 +120,20 @@ export default function CameraScreen() {
             >
               <Ionicons name="close" size={30} color="white" />
             </TouchableOpacity>
-            
+
             <TouchableOpacity
               style={styles.flipButton}
-              onPress={() => setFacing(current => (current === 'back' ? 'front' : 'back'))}
+              onPress={() =>
+                setFacing((current) => (current === "back" ? "front" : "back"))
+              }
             >
               <Ionicons name="camera-reverse" size={30} color="white" />
             </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.captureButton} onPress={takePicture}>
+
+            <TouchableOpacity
+              style={styles.captureButton}
+              onPress={takePicture}
+            >
               <View style={styles.captureButtonInner} />
             </TouchableOpacity>
           </View>
@@ -119,36 +146,55 @@ export default function CameraScreen() {
     return (
       <ScrollView style={styles.container}>
         <View style={styles.analysisContainer}>
-          <Image source={{ uri: pendingMeal.imageUri }} style={styles.analyzedImage} />
-          
+          <Image
+            source={{ uri: pendingMeal.imageUri }}
+            style={styles.analyzedImage}
+            onError={(error) => {
+              console.error("Image load error:", error);
+              Alert.alert("Error", "Failed to load image");
+            }}
+          />
+
           <View style={styles.analysisResults}>
             <Text style={styles.analysisTitle}>Analysis Results</Text>
-            
-            <Text style={styles.mealName}>{pendingMeal.analysis.name}</Text>
-            {pendingMeal.analysis.description && (
-              <Text style={styles.mealDescription}>{pendingMeal.analysis.description}</Text>
+
+            <Text style={styles.mealName}>
+              {pendingMeal.analysis?.name || "Unknown Meal"}
+            </Text>
+            {pendingMeal.analysis?.description && (
+              <Text style={styles.mealDescription}>
+                {pendingMeal.analysis.description}
+              </Text>
             )}
-            
+
             <View style={styles.nutritionGrid}>
               <View style={styles.nutritionItem}>
-                <Text style={styles.nutritionValue}>{Math.round(pendingMeal.analysis.calories)}</Text>
+                <Text style={styles.nutritionValue}>
+                  {Math.round(pendingMeal.analysis?.calories || 0)}
+                </Text>
                 <Text style={styles.nutritionLabel}>Calories</Text>
               </View>
               <View style={styles.nutritionItem}>
-                <Text style={styles.nutritionValue}>{Math.round(pendingMeal.analysis.protein)}g</Text>
+                <Text style={styles.nutritionValue}>
+                  {Math.round(pendingMeal.analysis?.protein || 0)}g
+                </Text>
                 <Text style={styles.nutritionLabel}>Protein</Text>
               </View>
               <View style={styles.nutritionItem}>
-                <Text style={styles.nutritionValue}>{Math.round(pendingMeal.analysis.carbs)}g</Text>
+                <Text style={styles.nutritionValue}>
+                  {Math.round(pendingMeal.analysis?.carbs || 0)}g
+                </Text>
                 <Text style={styles.nutritionLabel}>Carbs</Text>
               </View>
               <View style={styles.nutritionItem}>
-                <Text style={styles.nutritionValue}>{Math.round(pendingMeal.analysis.fat)}g</Text>
+                <Text style={styles.nutritionValue}>
+                  {Math.round(pendingMeal.analysis?.fat || 0)}g
+                </Text>
                 <Text style={styles.nutritionLabel}>Fat</Text>
               </View>
             </View>
           </View>
-          
+
           <View style={styles.actionButtons}>
             <TouchableOpacity
               style={[styles.actionButton, styles.discardButton]}
@@ -157,7 +203,7 @@ export default function CameraScreen() {
             >
               <Text style={styles.discardButtonText}>Discard</Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity
               style={[styles.actionButton, styles.postButton]}
               onPress={handlePost}
@@ -181,14 +227,14 @@ export default function CameraScreen() {
       <Text style={styles.subtitle}>
         Take a photo or select from gallery to get nutrition analysis
       </Text>
-      
+
       {isAnalyzing && (
         <View style={styles.analyzingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
           <Text style={styles.analyzingText}>Analyzing your meal...</Text>
         </View>
       )}
-      
+
       <View style={styles.buttonContainer}>
         <TouchableOpacity
           style={styles.cameraButton}
@@ -198,7 +244,7 @@ export default function CameraScreen() {
           <Ionicons name="camera" size={30} color="white" />
           <Text style={styles.buttonText}>Take Photo</Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={styles.galleryButton}
           onPress={pickImage}
@@ -215,7 +261,7 @@ export default function CameraScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
   cameraContainer: {
     flex: 1,
@@ -225,9 +271,9 @@ const styles = StyleSheet.create({
   },
   cameraControls: {
     flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
     padding: 20,
   },
   closeButton: {
@@ -240,168 +286,168 @@ const styles = StyleSheet.create({
     width: 70,
     height: 70,
     borderRadius: 35,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(255,255,255,0.3)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   captureButtonInner: {
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: 'white',
+    backgroundColor: "white",
   },
   title: {
     fontSize: 28,
-    fontWeight: 'bold',
-    textAlign: 'center',
+    fontWeight: "bold",
+    textAlign: "center",
     marginTop: 50,
     marginBottom: 10,
-    color: '#333',
+    color: "#333",
   },
   subtitle: {
     fontSize: 16,
-    textAlign: 'center',
-    color: '#666',
+    textAlign: "center",
+    color: "#666",
     marginBottom: 40,
     paddingHorizontal: 20,
   },
   message: {
-    textAlign: 'center',
+    textAlign: "center",
     paddingBottom: 10,
   },
   buttonContainer: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     paddingHorizontal: 40,
   },
   button: {
-    backgroundColor: '#007AFF',
+    backgroundColor: "#007AFF",
     padding: 15,
     borderRadius: 8,
-    alignItems: 'center',
+    alignItems: "center",
     margin: 20,
   },
   cameraButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: "#007AFF",
     padding: 20,
     borderRadius: 12,
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 20,
-    flexDirection: 'row',
-    justifyContent: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
   },
   galleryButton: {
     borderWidth: 2,
-    borderColor: '#007AFF',
+    borderColor: "#007AFF",
     padding: 20,
     borderRadius: 12,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
   },
   buttonText: {
-    color: 'white',
+    color: "white",
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginLeft: 10,
   },
   galleryButtonText: {
-    color: '#007AFF',
+    color: "#007AFF",
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginLeft: 10,
   },
   analyzingContainer: {
-    alignItems: 'center',
+    alignItems: "center",
     marginVertical: 40,
   },
   analyzingText: {
     marginTop: 15,
     fontSize: 16,
-    color: '#666',
+    color: "#666",
   },
   analysisContainer: {
     padding: 20,
   },
   analyzedImage: {
-    width: '100%',
+    width: "100%",
     height: 200,
     borderRadius: 12,
     marginBottom: 20,
   },
   analysisResults: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: "#f8f9fa",
     padding: 20,
     borderRadius: 12,
     marginBottom: 20,
   },
   analysisTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 15,
-    color: '#333',
+    color: "#333",
   },
   mealName: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 5,
-    color: '#333',
+    color: "#333",
   },
   mealDescription: {
     fontSize: 14,
-    color: '#666',
+    color: "#666",
     marginBottom: 15,
   },
   nutritionGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
   },
   nutritionItem: {
-    width: '48%',
-    backgroundColor: 'white',
+    width: "48%",
+    backgroundColor: "white",
     padding: 15,
     borderRadius: 8,
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 10,
   },
   nutritionValue: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#007AFF',
+    fontWeight: "bold",
+    color: "#007AFF",
   },
   nutritionLabel: {
     fontSize: 12,
-    color: '#666',
+    color: "#666",
     marginTop: 5,
   },
   actionButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   actionButton: {
     flex: 1,
     padding: 15,
     borderRadius: 8,
-    alignItems: 'center',
+    alignItems: "center",
     marginHorizontal: 5,
   },
   discardButton: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: "#f8f9fa",
     borderWidth: 1,
-    borderColor: '#dc3545',
+    borderColor: "#dc3545",
   },
   postButton: {
-    backgroundColor: '#28a745',
+    backgroundColor: "#28a745",
   },
   discardButtonText: {
-    color: '#dc3545',
+    color: "#dc3545",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   postButtonText: {
-    color: 'white',
+    color: "white",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
 });

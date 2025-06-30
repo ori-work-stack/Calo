@@ -1,8 +1,7 @@
-
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { User, SignUpData, SignInData, AuthResponse } from '../types';
-import { authAPI } from '../services/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
+import { User, SignUpData, SignInData, AuthResponse } from "../types";
+import { authAPI } from "../services/api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 interface AuthState {
   user: User | null;
@@ -21,55 +20,88 @@ const initialState: AuthState = {
 };
 
 export const signUp = createAsyncThunk(
-  'auth/signUp',
+  "auth/signUp",
   async (data: SignUpData, { rejectWithValue }) => {
     try {
       const response = await authAPI.signUp(data);
       if (response.success && response.token) {
-        await AsyncStorage.setItem('token', response.token);
+        await AsyncStorage.setItem("token", response.token);
         return response;
       }
-      return rejectWithValue(response.error || 'Signup failed');
+      return rejectWithValue(response.error || "Signup failed");
     } catch (error) {
-      return rejectWithValue(error instanceof Error ? error.message : 'Signup failed');
+      return rejectWithValue(
+        error instanceof Error ? error.message : "Signup failed"
+      );
     }
   }
 );
 
 export const signIn = createAsyncThunk(
-  'auth/signIn',
+  "auth/signIn",
   async (data: SignInData, { rejectWithValue }) => {
     try {
       const response = await authAPI.signIn(data);
       if (response.success && response.token) {
-        await AsyncStorage.setItem('token', response.token);
+        await AsyncStorage.setItem("token", response.token);
         return response;
       }
-      return rejectWithValue(response.error || 'Login failed');
+      return rejectWithValue(response.error || "Login failed");
     } catch (error) {
-      return rejectWithValue(error instanceof Error ? error.message : 'Login failed');
+      return rejectWithValue(
+        error instanceof Error ? error.message : "Login failed"
+      );
     }
   }
 );
 
-export const signOut = createAsyncThunk('auth/signOut', async () => {
-  await AsyncStorage.removeItem('token');
-});
+// Updated signOut with proper error handling and API call
+export const signOut = createAsyncThunk(
+  "auth/signOut",
+  async (_, { rejectWithValue }) => {
+    try {
+      // Add API call if your server has a signout endpoint
+      // await authAPI.signOut();
 
-export const loadStoredAuth = createAsyncThunk('auth/loadStoredAuth', async () => {
-  const token = await AsyncStorage.getItem('token');
-  if (token) {
-    // You might want to validate the token with the server here
-    return token;
+      // Remove token from AsyncStorage
+      await AsyncStorage.removeItem("token");
+
+      return true;
+    } catch (error) {
+      console.error("SignOut error:", error);
+      // Even if API call fails, we still want to clear local storage
+      await AsyncStorage.removeItem("token");
+      return rejectWithValue(
+        error instanceof Error ? error.message : "SignOut failed"
+      );
+    }
   }
-  return null;
-});
+);
+
+export const loadStoredAuth = createAsyncThunk(
+  "auth/loadStoredAuth",
+  async () => {
+    const token = await AsyncStorage.getItem("token");
+    if (token) {
+      // You might want to validate the token with the server here
+      return token;
+    }
+    return null;
+  }
+);
 
 const authSlice = createSlice({
-  name: 'auth',
+  name: "auth",
   initialState,
   reducers: {
     clearError: (state) => {
+      state.error = null;
+    },
+    // Add manual signout reducer as fallback
+    forceSignOut: (state) => {
+      state.user = null;
+      state.token = null;
+      state.isAuthenticated = false;
       state.error = null;
     },
   },
@@ -105,11 +137,24 @@ const authSlice = createSlice({
         state.isLoading = false;
         state.error = action.payload as string;
       })
+      // Updated signOut cases
+      .addCase(signOut.pending, (state) => {
+        state.isLoading = true;
+      })
       .addCase(signOut.fulfilled, (state) => {
         state.user = null;
         state.token = null;
         state.isAuthenticated = false;
         state.error = null;
+        state.isLoading = false;
+      })
+      .addCase(signOut.rejected, (state, action) => {
+        // Even if signout fails, clear the local state
+        state.user = null;
+        state.token = null;
+        state.isAuthenticated = false;
+        state.isLoading = false;
+        state.error = action.payload as string;
       })
       .addCase(loadStoredAuth.fulfilled, (state, action) => {
         if (action.payload) {
@@ -120,5 +165,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { clearError } = authSlice.actions;
+export const { clearError, forceSignOut } = authSlice.actions;
 export default authSlice.reducer;

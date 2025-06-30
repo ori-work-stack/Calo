@@ -1,5 +1,4 @@
-
-import React, { useEffect } from 'react';
+import React, { useEffect } from "react";
 import {
   View,
   Text,
@@ -8,11 +7,11 @@ import {
   Image,
   RefreshControl,
   ActivityIndicator,
-} from 'react-native';
-import { useDispatch, useSelector } from 'react-redux';
-import { RootState, AppDispatch } from '@/src/store';
-import { fetchMeals } from '@/src/store/mealSlice';
-import { Meal } from '@/src/types';
+} from "react-native";
+import { useDispatch, useSelector } from "react-redux";
+import { RootState, AppDispatch } from "../../src/store";
+import { fetchMeals } from "../../src/store/mealSlice";
+import { Meal } from "../../src/types";
 
 export default function MealsScreen() {
   const dispatch = useDispatch<AppDispatch>();
@@ -37,21 +36,25 @@ export default function MealsScreen() {
           <Text style={styles.mealDescription}>{item.description}</Text>
         )}
         <Text style={styles.mealDate}>
-          {new Date(item.createdAt).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
+          {new Date(item.createdAt).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
           })}
         </Text>
-        
+
         <View style={styles.nutritionRow}>
           <View style={styles.nutritionItem}>
-            <Text style={styles.nutritionValue}>{Math.round(item.calories)}</Text>
+            <Text style={styles.nutritionValue}>
+              {Math.round(item.calories)}
+            </Text>
             <Text style={styles.nutritionLabel}>cal</Text>
           </View>
           <View style={styles.nutritionItem}>
-            <Text style={styles.nutritionValue}>{Math.round(item.protein)}g</Text>
+            <Text style={styles.nutritionValue}>
+              {Math.round(item.protein)}g
+            </Text>
             <Text style={styles.nutritionLabel}>protein</Text>
           </View>
           <View style={styles.nutritionItem}>
@@ -84,7 +87,9 @@ export default function MealsScreen() {
         refreshControl={
           <RefreshControl refreshing={isLoading} onRefresh={onRefresh} />
         }
-        contentContainerStyle={meals.length === 0 ? styles.emptyContainer : styles.listContainer}
+        contentContainerStyle={
+          meals.length === 0 ? styles.emptyContainer : styles.listContainer
+        }
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>No meals yet</Text>
@@ -101,34 +106,34 @@ export default function MealsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: "#f5f5f5",
   },
   centered: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   listContainer: {
     padding: 15,
   },
   emptyContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   mealCard: {
-    backgroundColor: 'white',
+    backgroundColor: "white",
     borderRadius: 12,
     marginBottom: 15,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   mealImage: {
-    width: '100%',
+    width: "100%",
     height: 150,
   },
   mealInfo: {
@@ -136,51 +141,51 @@ const styles = StyleSheet.create({
   },
   mealName: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 5,
-    color: '#333',
+    color: "#333",
   },
   mealDescription: {
     fontSize: 14,
-    color: '#666',
+    color: "#666",
     marginBottom: 8,
   },
   mealDate: {
     fontSize: 12,
-    color: '#999',
+    color: "#999",
     marginBottom: 15,
   },
   nutritionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   nutritionItem: {
-    alignItems: 'center',
+    alignItems: "center",
   },
   nutritionValue: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#007AFF',
+    fontWeight: "bold",
+    color: "#007AFF",
   },
   nutritionLabel: {
     fontSize: 12,
-    color: '#666',
+    color: "#666",
     marginTop: 2,
   },
   emptyState: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingHorizontal: 40,
   },
   emptyTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 15,
-    color: '#333',
+    color: "#333",
   },
   emptyText: {
     fontSize: 16,
-    textAlign: 'center',
-    color: '#666',
+    textAlign: "center",
+    color: "#666",
     lineHeight: 24,
   },
 });

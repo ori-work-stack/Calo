@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -9,63 +8,69 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
-} from 'react-native';
-import { Link, router } from 'expo-router';
-import { useDispatch, useSelector } from 'react-redux';
-import { RootState, AppDispatch } from '@/src/store';
-import { signUp, clearError } from '@/src/store/authSlice';
-import { SignUpSchema } from '@/src/types';
+} from "react-native";
+import { Link, router } from "expo-router";
+import { useDispatch, useSelector } from "react-redux";
+import { RootState, AppDispatch } from "@/src/store";
+import { signUp, clearError } from "@/src/store/authSlice";
+import { SignUpSchema } from "@/src/types";
 
 export default function SignUp() {
   const dispatch = useDispatch<AppDispatch>();
-  const { isLoading, error, isAuthenticated } = useSelector((state: RootState) => state.auth);
-  
+  const { isLoading, error, isAuthenticated } = useSelector(
+    (state: RootState) => state.auth
+  );
+
   const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    name: '',
-    age: '',
-    weight: '',
-    height: '',
+    email: "",
+    password: "",
+    username: "",
+    name: "",
+    age: "",
+    weight: "",
+    height: "",
   });
 
   const handleSignUp = async () => {
     try {
+      console.log("hello world");
       const data = {
         ...formData,
         age: formData.age ? parseInt(formData.age) : undefined,
         weight: formData.weight ? parseFloat(formData.weight) : undefined,
         height: formData.height ? parseFloat(formData.height) : undefined,
       };
-      
+      console.log(data);
+
       const validatedData = SignUpSchema.parse(data);
       const result = await dispatch(signUp(validatedData));
-      
+      console.log(result);
+
       if (signUp.fulfilled.match(result)) {
-        router.replace('/(tabs)');
+        router.replace("/(tabs)");
       }
     } catch (error: any) {
-      Alert.alert('Error', error.issues?.[0]?.message || 'Invalid input');
+      Alert.alert("Error", error.issues?.[0]?.message || "Invalid input");
     }
   };
 
   React.useEffect(() => {
     if (error) {
-      Alert.alert('Error', error);
+      Alert.alert("Error", error);
       dispatch(clearError());
     }
   }, [error, dispatch]);
 
   React.useEffect(() => {
     if (isAuthenticated) {
-      router.replace('/(tabs)');
+      router.replace("/(tabs)");
     }
   }, [isAuthenticated]);
 
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Sign Up</Text>
-      
+
       <TextInput
         style={styles.input}
         placeholder="Email"
@@ -74,7 +79,7 @@ export default function SignUp() {
         keyboardType="email-address"
         autoCapitalize="none"
       />
-      
+
       <TextInput
         style={styles.input}
         placeholder="Password"
@@ -82,14 +87,20 @@ export default function SignUp() {
         onChangeText={(text) => setFormData({ ...formData, password: text })}
         secureTextEntry
       />
-      
+
+      <TextInput
+        style={styles.input}
+        placeholder="Username"
+        value={formData.username}
+        onChangeText={(text) => setFormData({ ...formData, username: text })}
+      />
       <TextInput
         style={styles.input}
         placeholder="Name"
         value={formData.name}
         onChangeText={(text) => setFormData({ ...formData, name: text })}
       />
-      
+
       <TextInput
         style={styles.input}
         placeholder="Age (optional)"
@@ -97,7 +108,7 @@ export default function SignUp() {
         onChangeText={(text) => setFormData({ ...formData, age: text })}
         keyboardType="numeric"
       />
-      
+
       <TextInput
         style={styles.input}
         placeholder="Weight (kg, optional)"
@@ -105,7 +116,7 @@ export default function SignUp() {
         onChangeText={(text) => setFormData({ ...formData, weight: text })}
         keyboardType="numeric"
       />
-      
+
       <TextInput
         style={styles.input}
         placeholder="Height (cm, optional)"
@@ -113,7 +124,7 @@ export default function SignUp() {
         onChangeText={(text) => setFormData({ ...formData, height: text })}
         keyboardType="numeric"
       />
-      
+
       <TouchableOpacity
         style={styles.button}
         onPress={handleSignUp}
@@ -125,7 +136,7 @@ export default function SignUp() {
           <Text style={styles.buttonText}>Sign Up</Text>
         )}
       </TouchableOpacity>
-      
+
       <Link href="/(auth)/signin" style={styles.link}>
         <Text>Already have an account? Sign In</Text>
       </Link>
@@ -137,38 +148,38 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
   title: {
     fontSize: 32,
-    fontWeight: 'bold',
-    textAlign: 'center',
+    fontWeight: "bold",
+    textAlign: "center",
     marginBottom: 40,
     marginTop: 50,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: "#ddd",
     padding: 15,
     borderRadius: 8,
     marginBottom: 15,
     fontSize: 16,
   },
   button: {
-    backgroundColor: '#007AFF',
+    backgroundColor: "#007AFF",
     padding: 15,
     borderRadius: 8,
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 20,
   },
   buttonText: {
-    color: 'white',
+    color: "white",
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   link: {
-    textAlign: 'center',
-    color: '#007AFF',
+    textAlign: "center",
+    color: "#007AFF",
     marginBottom: 40,
   },
 });
