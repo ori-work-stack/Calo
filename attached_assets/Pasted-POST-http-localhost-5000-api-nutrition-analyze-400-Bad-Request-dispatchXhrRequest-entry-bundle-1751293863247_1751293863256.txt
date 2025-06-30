@@ -1,0 +1,45 @@
+POST http://localhost:5000/api/nutrition/analyze 400 (Bad Request)
+dispatchXhrRequest @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:85161
+xhr @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:84999
+dispatchRequest @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:84169
+Promise.then
+_request @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:83569
+request @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:83465
+httpMethod @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:83621
+wrap @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:83417
+analyzeMeal @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:82537
+(anonymous) @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:118362
+await in (anonymous)
+(anonymous) @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:79276
+(anonymous) @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:79295
+(anonymous) @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:82491
+dispatch @ page.bundle.js:6
+pickImage @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:115335
+await in pickImage
+onClick @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:31692
+processDispatchQueue @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:14293
+(anonymous) @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:14590
+batchedUpdates$1 @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:7961
+dispatchEventForPluginEventSystem @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:14373
+dispatchEvent @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:16455
+dispatchDiscreteEvent @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:16437Understand this error
+page.bundle.js:6 Analysis error details: AxiosError {message: 'Request failed with status code 400', name: 'AxiosError', code: 'ERR_BAD_REQUEST', config: {…}, request: XMLHttpRequest, …}code: "ERR_BAD_REQUEST"config: {transitional: {…}, adapter: Array(3), transformRequest: Array(1), transformResponse: Array(1), timeout: 0, …}message: "Request failed with status code 400"name: "AxiosError"request: XMLHttpRequest {onreadystatechange: null, readyState: 4, timeout: 0, withCredentials: false, upload: XMLHttpRequestUpload, …}response: {data: {…}, status: 400, statusText: 'Bad Request', headers: AxiosHeaders, config: {…}, …}status: 400stack: "AxiosError: Request failed with status code 400\n    at settle (http://localhost:8081/node_modules/expo-router/entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:85188:14)\n    at XMLHttpRequest.onloadend (http://localhost:8081/node_modules/expo-router/entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:85038:29)\n    at Axios.request (http://localhost:8081/node_modules/expo-router/entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:83469:43)\n    at async Object.analyzeMeal (http://localhost:8081/node_modules/expo-router/entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:82537:24)\n    at async http://localhost:8081/node_modules/expo-router/entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:118362:24\n    at async http://localhost:8081/node_modules/expo-router/entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:79276:27"[[Prototype]]: Error
+overrideMethod @ hook.js:608
+registerError @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:3595
+console.error @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:3533
+(anonymous) @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:118388
+await in (anonymous)
+(anonymous) @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:79276
+(anonymous) @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:79295
+(anonymous) @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:82491
+dispatch @ page.bundle.js:6
+pickImage @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:115335
+await in pickImage
+onClick @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:31692
+processDispatchQueue @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:14293
+(anonymous) @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:14590
+batchedUpdates$1 @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:7961
+dispatchEventForPluginEventSystem @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:14373
+dispatchEvent @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:16455
+dispatchDiscreteEvent @ entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.routerRoot=app:16437Understand this error
+page.bundle.js:3 Analysis failed: Invalid image data - please try a different image
