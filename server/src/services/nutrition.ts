@@ -1,3 +1,4 @@
+
 import { openAIService } from './openai';
 import { prisma } from '../lib/database';
 import { MealAnalysisInput } from '../types/nutrition';
@@ -6,6 +7,11 @@ import { AuthService } from './auth';
 export class NutritionService {
   static async analyzeMeal(userId: string, data: MealAnalysisInput) {
     const { imageBase64, language, date } = data;
+
+    // Validate base64 data
+    if (!imageBase64 || imageBase64.trim() === '') {
+      throw new Error('Image data is required');
+    }
 
     // Get user and check AI request limits
     const user = await prisma.user.findUnique({
@@ -45,90 +51,151 @@ export class NutritionService {
       // Analyze food with OpenAI
       const analysis = await openAIService.analyzeFood(imageBase64, language);
 
-      // Create meal object - store image as base64 in database
-      const mealId = `meal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const meal = {
-        id: mealId,
-        image: imageBase64, // Store base64 directly in database
-        aiResponse: analysis,
-        calories: parseInt(analysis.totalCalories) || 0,
-        timestamp: new Date(),
-        name: analysis.description || 'Unknown Meal',
-        description: analysis.description,
-        protein: parseInt(analysis.totalProtein) || 0,
-        carbs: parseInt(analysis.totalCarbs) || 0,
-        fat: parseInt(analysis.totalFat) || 0,
-        fiber: parseInt(analysis.totalFiber) || 0,
-        sugar: parseInt(analysis.totalSugar) || 0,
-      };
-
-      // Get current meals data
-      const currentMeals = user.meals as Record<string, any[]> || {};
-      const mealDate = date || now.toISOString().split('T')[0];
-      
-      if (!currentMeals[mealDate]) {
-        currentMeals[mealDate] = [];
-      }
-      
-      currentMeals[mealDate].push(meal);
-
-      // Update user with new meal and increment AI request count
+      // Increment user's AI request count
       await prisma.user.update({
         where: { id: userId },
         data: {
-          meals: currentMeals,
           aiRequestsCount: user.aiRequestsCount + 1,
         }
       });
 
+      // Calculate totals from items
+      let totalCalories = 0;
+      let totalProtein = 0;
+      let totalCarbs = 0;
+      let totalFat = 0;
+      let totalFiber = 0;
+      let totalSugar = 0;
+
+      if (analysis.items && analysis.items.length > 0) {
+        analysis.items.forEach(item => {
+          totalCalories += parseFloat(item.calories) || 0;
+          totalProtein += parseFloat(item.protein) || 0;
+          totalCarbs += parseFloat(item.carbs) || 0;
+          totalFat += parseFloat(item.fat) || 0;
+          totalFiber += parseFloat(item.fiber || '0') || 0;
+          totalSugar += parseFloat(item.sugar || '0') || 0;
+        });
+      }
+
+      // Format the response to match the expected MealAnalysisData structure
+      const formattedAnalysis = {
+        description: analysis.description || 'Unknown meal',
+        items: analysis.items || [],
+        totalCalories: totalCalories.toString(),
+        totalProtein: totalProtein.toString(),
+        totalCarbs: totalCarbs.toString(),
+        totalFat: totalFat.toString(),
+        totalFiber: totalFiber.toString(),
+        totalSugar: totalSugar.toString(),
+        healthScore: analysis.healthScore?.toString() || '0',
+        recommendations: analysis.recommendations || 'No recommendations available',
+        name: analysis.description || 'Unknown meal',
+        calories: totalCalories,
+        protein: totalProtein,
+        carbs: totalCarbs,
+        fat: totalFat,
+        fiber: totalFiber,
+        sugar: totalSugar
+      };
+
       return {
-        meal,
+        success: true,
+        data: formattedAnalysis,
         remainingRequests: permissions.dailyRequests === -1 
           ? -1 
           : permissions.dailyRequests - (user.aiRequestsCount + 1)
       };
     } catch (error) {
       console.error('Error analyzing meal:', error);
-      throw new Error('Failed to analyze meal');
+      throw new Error('Failed to analyze meal: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   }
 
-  static async getUserMeals(userId: string, date?: string) {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { meals: true }
-    });
+  static async saveMeal(userId: string, mealData: any, imageBase64?: string) {
+    try {
+      // Convert string values to numbers for database storage
+      const calories = typeof mealData.calories === 'number' ? mealData.calories : parseFloat(mealData.totalCalories) || 0;
+      const protein = typeof mealData.protein === 'number' ? mealData.protein : parseFloat(mealData.totalProtein) || 0;
+      const carbs = typeof mealData.carbs === 'number' ? mealData.carbs : parseFloat(mealData.totalCarbs) || 0;
+      const fat = typeof mealData.fat === 'number' ? mealData.fat : parseFloat(mealData.totalFat) || 0;
+      const fiber = typeof mealData.fiber === 'number' ? mealData.fiber : parseFloat(mealData.totalFiber || '0') || 0;
+      const sugar = typeof mealData.sugar === 'number' ? mealData.sugar : parseFloat(mealData.totalSugar || '0') || 0;
 
-    if (!user) {
-      throw new Error('User not found');
+      const meal = await prisma.meal.create({
+        data: {
+          userId,
+          name: mealData.name || mealData.description || 'Unknown meal',
+          description: mealData.description,
+          calories,
+          protein,
+          carbs,
+          fat,
+          fiber,
+          sugar,
+          imageUrl: imageBase64 ? `data:image/jpeg;base64,${imageBase64}` : undefined,
+        }
+      });
+
+      return meal;
+    } catch (error) {
+      console.error('Error saving meal:', error);
+      throw new Error('Failed to save meal');
     }
+  }
 
-    const meals = user.meals as Record<string, any[]> || {};
-    
-    if (date) {
-      return meals[date] || [];
+  static async getUserMeals(userId: string) {
+    try {
+      const meals = await prisma.meal.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      return meals;
+    } catch (error) {
+      console.error('Error fetching meals:', error);
+      throw new Error('Failed to fetch meals');
     }
-
-    return meals;
   }
 
   static async getDailyStats(userId: string, date: string) {
-    const meals = await this.getUserMeals(userId, date);
-    
-    const stats = meals.reduce((acc, meal) => ({
-      totalCalories: acc.totalCalories + meal.calories,
-      totalMeals: acc.totalMeals + 1,
-      averageHealthScore: acc.averageHealthScore + parseInt(meal.aiResponse.healthScore),
-    }), {
-      totalCalories: 0,
-      totalMeals: 0,
-      averageHealthScore: 0,
-    });
+    try {
+      const startDate = new Date(date);
+      const endDate = new Date(date);
+      endDate.setDate(endDate.getDate() + 1);
 
-    if (stats.totalMeals > 0) {
-      stats.averageHealthScore = stats.averageHealthScore / stats.totalMeals;
+      const meals = await prisma.meal.findMany({
+        where: {
+          userId,
+          createdAt: {
+            gte: startDate,
+            lt: endDate
+          }
+        }
+      });
+
+      const stats = meals.reduce((acc, meal) => ({
+        totalCalories: acc.totalCalories + meal.calories,
+        totalProtein: acc.totalProtein + meal.protein,
+        totalCarbs: acc.totalCarbs + meal.carbs,
+        totalFat: acc.totalFat + meal.fat,
+        totalFiber: acc.totalFiber + (meal.fiber || 0),
+        totalSugar: acc.totalSugar + (meal.sugar || 0),
+        totalMeals: acc.totalMeals + 1,
+      }), {
+        totalCalories: 0,
+        totalProtein: 0,
+        totalCarbs: 0,
+        totalFat: 0,
+        totalFiber: 0,
+        totalSugar: 0,
+        totalMeals: 0,
+      });
+
+      return { ...stats, meals };
+    } catch (error) {
+      console.error('Error fetching daily stats:', error);
+      throw new Error('Failed to fetch daily stats');
     }
-
-    return { ...stats, meals };
   }
 }

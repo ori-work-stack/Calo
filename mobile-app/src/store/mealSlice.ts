@@ -251,7 +251,7 @@ export const postMeal = createAsyncThunk(
       console.log("Posting meal with analysis:", pendingMeal.analysis);
       const response = await nutritionAPI.saveMeal(
         pendingMeal.analysis,
-        pendingMeal.imageUri
+        pendingMeal.imageBase64
       );
 
       if (response) {
