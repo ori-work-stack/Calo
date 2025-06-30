@@ -1,3 +1,4 @@
+
 import { openAIService } from './openai';
 import { prisma } from '../lib/database';
 import { MealAnalysisInput } from '../types/nutrition';
@@ -45,37 +46,53 @@ export class NutritionService {
       // Analyze food with OpenAI
       const analysis = await openAIService.analyzeFood(imageBase64, language);
 
-      // Create meal object - store image as base64 in database
-      const mealId = `meal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const meal = {
-        id: mealId,
-        image: imageBase64, // Store base64 directly in database
-        aiResponse: analysis,
-        calories: parseInt(analysis.totalCalories) || 0,
-        timestamp: new Date(),
-      };
+      // Create meal in database using Prisma schema
+      const meal = await prisma.meal.create({
+        data: {
+          userId,
+          imageBase64,
+          description: analysis.description,
+          totalCalories: parseInt(analysis.totalCalories) || 0,
+          totalProtein: parseFloat(analysis.totalProtein) || 0,
+          totalCarbs: parseFloat(analysis.totalCarbs) || 0,
+          totalFat: parseFloat(analysis.totalFat) || 0,
+          totalFiber: parseFloat(analysis.totalFiber) || 0,
+          totalSugar: parseFloat(analysis.totalSugar) || 0,
+          healthScore: parseInt(analysis.healthScore) || 5,
+          recommendations: analysis.recommendations,
+          mealType: 'OTHER',
+          consumedAt: date ? new Date(date) : now,
+          foodItems: {
+            create: analysis.items.map(item => ({
+              name: item.name,
+              quantity: item.quantity,
+              calories: parseInt(item.calories) || 0,
+              protein: parseFloat(item.protein) || 0,
+              carbs: parseFloat(item.carbs) || 0,
+              fat: parseFloat(item.fat) || 0,
+              fiber: parseFloat(item.fiber) || 0,
+              sugar: parseFloat(item.sugar) || 0,
+            }))
+          }
+        },
+        include: {
+          foodItems: true
+        }
+      });
 
-      // Get current meals data
-      const currentMeals = user.meals as Record<string, any[]> || {};
-      const mealDate = date || now.toISOString().split('T')[0];
-      
-      if (!currentMeals[mealDate]) {
-        currentMeals[mealDate] = [];
-      }
-      
-      currentMeals[mealDate].push(meal);
-
-      // Update user with new meal and increment AI request count
+      // Update user AI request count
       await prisma.user.update({
         where: { id: userId },
         data: {
-          meals: currentMeals,
           aiRequestsCount: user.aiRequestsCount + 1,
         }
       });
 
       return {
-        meal,
+        meal: {
+          ...meal,
+          aiResponse: analysis
+        },
         remainingRequests: permissions.dailyRequests === -1 
           ? -1 
           : permissions.dailyRequests - (user.aiRequestsCount + 1)
@@ -87,20 +104,28 @@ export class NutritionService {
   }
 
   static async getUserMeals(userId: string, date?: string) {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { meals: true }
-    });
-
-    if (!user) {
-      throw new Error('User not found');
-    }
-
-    const meals = user.meals as Record<string, any[]> || {};
+    const whereClause: any = { userId };
     
     if (date) {
-      return meals[date] || [];
+      const startDate = new Date(date);
+      const endDate = new Date(date);
+      endDate.setDate(endDate.getDate() + 1);
+      
+      whereClause.consumedAt = {
+        gte: startDate,
+        lt: endDate
+      };
     }
+
+    const meals = await prisma.meal.findMany({
+      where: whereClause,
+      include: {
+        foodItems: true
+      },
+      orderBy: {
+        consumedAt: 'desc'
+      }
+    });
 
     return meals;
   }
@@ -109,11 +134,21 @@ export class NutritionService {
     const meals = await this.getUserMeals(userId, date);
     
     const stats = meals.reduce((acc, meal) => ({
-      totalCalories: acc.totalCalories + meal.calories,
+      totalCalories: acc.totalCalories + meal.totalCalories,
+      totalProtein: acc.totalProtein + meal.totalProtein,
+      totalCarbs: acc.totalCarbs + meal.totalCarbs,
+      totalFat: acc.totalFat + meal.totalFat,
+      totalFiber: acc.totalFiber + (meal.totalFiber || 0),
+      totalSugar: acc.totalSugar + (meal.totalSugar || 0),
       totalMeals: acc.totalMeals + 1,
-      averageHealthScore: acc.averageHealthScore + parseInt(meal.aiResponse.healthScore),
+      averageHealthScore: acc.averageHealthScore + meal.healthScore,
     }), {
       totalCalories: 0,
+      totalProtein: 0,
+      totalCarbs: 0,
+      totalFat: 0,
+      totalFiber: 0,
+      totalSugar: 0,
       totalMeals: 0,
       averageHealthScore: 0,
     });
