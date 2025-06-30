@@ -8,9 +8,24 @@ export class NutritionService {
   static async analyzeMeal(userId: string, data: MealAnalysisInput) {
     const { imageBase64, language, date } = data;
 
-    // Validate base64 data
+    // Validate and clean base64 data
     if (!imageBase64 || imageBase64.trim() === '') {
       throw new Error('Image data is required');
+    }
+
+    // Clean the base64 data - remove data URL prefix if present
+    let cleanBase64 = imageBase64.trim();
+    if (cleanBase64.startsWith('data:')) {
+      const base64Index = cleanBase64.indexOf('base64,');
+      if (base64Index !== -1) {
+        cleanBase64 = cleanBase64.substring(base64Index + 7);
+      }
+    }
+
+    // Validate base64 format
+    const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+    if (!base64Regex.test(cleanBase64)) {
+      throw new Error('Invalid base64 image format');
     }
 
     // Get user and check AI request limits
@@ -49,7 +64,7 @@ export class NutritionService {
 
     try {
       // Analyze food with OpenAI
-      const analysis = await openAIService.analyzeFood(imageBase64, language);
+      const analysis = await openAIService.analyzeFood(cleanBase64, language);
 
       // Increment user's AI request count
       await prisma.user.update({
