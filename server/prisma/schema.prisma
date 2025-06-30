@@ -1,5 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
   provider = "prisma-client-js"
@@ -67,18 +65,19 @@ model Session {
 model Meal {
   id          String  @id @default(cuid())
   userId      String
+  name        String
   imageUrl    String? // Supabase Storage URL
   imageBase64 String? // Temporary base64 storage
 
   // AI Analysis Results
-  description     String
-  totalCalories   Int
-  totalProtein    Float
-  totalCarbs      Float
-  totalFat        Float
-  totalFiber      Float?
-  totalSugar      Float?
-  healthScore     Int // 1-10
+  description String
+  calories    Int
+  protein     Float
+  carbs       Float
+  fat         Float
+  fiber       Float?
+  sugar       Float?
+  healthScore Int? // 1-10
   recommendations String?
 
   // Meal metadata

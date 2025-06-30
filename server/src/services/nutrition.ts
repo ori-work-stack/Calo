@@ -126,14 +126,16 @@ export class NutritionService {
         data: {
           userId,
           name: mealData.name || mealData.description || 'Unknown meal',
-          description: mealData.description,
+          description: mealData.description || 'No description available',
           calories,
           protein,
           carbs,
           fat,
           fiber,
           sugar,
-          imageUrl: imageBase64 ? `data:image/jpeg;base64,${imageBase64}` : undefined,
+          healthScore: parseInt(mealData.healthScore) || null,
+          recommendations: mealData.recommendations || null,
+          imageUrl: imageBase64 ? `data:image/jpeg;base64,${imageBase64}` : null,
         }
       });
 
