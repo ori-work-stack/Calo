@@ -53,6 +53,16 @@ export interface AuthResponse {
   error?: string;
 }
 
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  age?: number;
+  weight?: number;
+  height?: number;
+  createdAt: string;
+}
+
 export interface Meal {
   id: string;
   name: string;
@@ -66,6 +76,38 @@ export interface Meal {
   sugar?: number;
   sodium?: number;
   createdAt: string;
+  userId: string;
+}
+
+export interface MealAnalysisData {
+  name: string;
+  description?: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber?: number;
+  sugar?: number;
+  sodium?: number;
+}
+
+export interface AuthResponse {
+  user: User;
+  token: string;
+}
+
+export interface SignUpData {
+  email: string;
+  password: string;
+  name: string;
+  age?: number;
+  weight?: number;
+  height?: number;
+}
+
+export interface SignInData {
+  email: string;
+  password: string;
 }
 
 export interface AIResponse {
@@ -79,3 +121,20 @@ export interface PendingMeal {
   analysis: MealAnalysisData;
   timestamp: number;
 }
+
+// Zod schemas
+import { z } from 'zod';
+
+export const SignUpSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
+  name: z.string().min(1),
+  age: z.number().min(1).max(120).optional(),
+  weight: z.number().min(1).max(500).optional(),
+  height: z.number().min(1).max(300).optional(),
+});
+
+export const SignInSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
