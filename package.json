@@ -1,12 +1,11 @@
-
 {
   "name": "nutrition-tracker-server",
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "tsx watch server/src/index.ts",
+    "dev": "cd server && tsx watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "cd server && node dist/src/index.js",
     "db:generate": "prisma generate --schema=server/prisma/schema.prisma",
     "db:push": "prisma db push --schema=server/prisma/schema.prisma",
     "db:migrate": "prisma migrate dev --schema=server/prisma/schema.prisma",

@@ -8,8 +8,8 @@ import { nutritionRoutes } from "./routes/nutrition";
 import { userRoutes } from "./routes/user";
 import "./services/cron";
 
-// Load environment variables
-dotenv.config();
+// Load environment variables from server directory
+dotenv.config({ path: './server/.env' });
 
 const app = express();
 const PORT = Number(process.env.PORT) || 5000;
