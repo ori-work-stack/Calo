@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from "react";
 import {
   View,
@@ -59,34 +60,59 @@ export default function CameraScreen() {
   }
 
   const takePicture = async () => {
-    if (cameraRef.current) {
+    if (cameraRef.current && !isAnalyzing) {
       try {
-        const photo = await cameraRef.current.takePictureAsync();
-        if (photo) {
+        console.log("Taking picture...");
+        const photo = await cameraRef.current.takePictureAsync({
+          quality: 0.8,
+          base64: true,
+        });
+        
+        if (photo && photo.base64) {
+          console.log("Picture taken, analyzing...");
           setShowCamera(false);
-          dispatch(analyzeMeal(photo.uri));
+          dispatch(analyzeMeal(photo.base64));
+        } else {
+          Alert.alert("Error", "Failed to capture image data");
         }
       } catch (error) {
+        console.error("Camera error:", error);
         Alert.alert("Error", "Failed to take picture");
       }
     }
   };
 
   const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
-    });
+    if (isAnalyzing) return;
+    
+    try {
+      console.log("Opening image picker...");
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+        base64: true,
+      });
 
-    if (!result.canceled && result.assets[0]) {
-      dispatch(analyzeMeal(result.assets[0].uri));
+      if (!result.canceled && result.assets[0]) {
+        const asset = result.assets[0];
+        console.log("Image selected, processing...");
+        
+        if (asset.base64) {
+          dispatch(analyzeMeal(asset.base64));
+        } else {
+          Alert.alert("Error", "Failed to process selected image");
+        }
+      }
+    } catch (error) {
+      console.error("Image picker error:", error);
+      Alert.alert("Error", "Failed to select image");
     }
   };
 
   const handlePost = async () => {
-    if (pendingMeal) {
+    if (pendingMeal && !isPosting) {
       const result = await dispatch(postMeal());
       if (postMeal.fulfilled.match(result)) {
         Alert.alert("Success", "Meal posted successfully!");
@@ -133,8 +159,12 @@ export default function CameraScreen() {
             <TouchableOpacity
               style={styles.captureButton}
               onPress={takePicture}
+              disabled={isAnalyzing}
             >
-              <View style={styles.captureButtonInner} />
+              <View style={[
+                styles.captureButtonInner,
+                isAnalyzing && styles.captureButtonDisabled
+              ]} />
             </TouchableOpacity>
           </View>
         </CameraView>
@@ -147,11 +177,10 @@ export default function CameraScreen() {
       <ScrollView style={styles.container}>
         <View style={styles.analysisContainer}>
           <Image
-            source={{ uri: pendingMeal.imageUri }}
+            source={{ uri: `data:image/jpeg;base64,${pendingMeal.imageBase64}` }}
             style={styles.analyzedImage}
             onError={(error) => {
-              console.error("Image load error:", error);
-              Alert.alert("Error", "Failed to load image");
+              console.error("Image display error:", error);
             }}
           />
 
@@ -159,8 +188,9 @@ export default function CameraScreen() {
             <Text style={styles.analysisTitle}>Analysis Results</Text>
 
             <Text style={styles.mealName}>
-              {pendingMeal.analysis?.name || pendingMeal.analysis?.description || "Unknown Meal"}
+              {pendingMeal.analysis?.description || "Unknown Meal"}
             </Text>
+            
             {pendingMeal.analysis?.description && (
               <Text style={styles.mealDescription}>
                 {pendingMeal.analysis.description}
@@ -170,25 +200,25 @@ export default function CameraScreen() {
             <View style={styles.nutritionGrid}>
               <View style={styles.nutritionItem}>
                 <Text style={styles.nutritionValue}>
-                  {Math.round(parseInt(pendingMeal.analysis?.totalCalories || '0'))}
+                  {pendingMeal.analysis?.totalCalories || '0'}
                 </Text>
                 <Text style={styles.nutritionLabel}>Calories</Text>
               </View>
               <View style={styles.nutritionItem}>
                 <Text style={styles.nutritionValue}>
-                  {Math.round(parseInt(pendingMeal.analysis?.totalProtein || '0'))}g
+                  {pendingMeal.analysis?.totalProtein || '0'}g
                 </Text>
                 <Text style={styles.nutritionLabel}>Protein</Text>
               </View>
               <View style={styles.nutritionItem}>
                 <Text style={styles.nutritionValue}>
-                  {Math.round(parseInt(pendingMeal.analysis?.totalCarbs || '0'))}g
+                  {pendingMeal.analysis?.totalCarbs || '0'}g
                 </Text>
                 <Text style={styles.nutritionLabel}>Carbs</Text>
               </View>
               <View style={styles.nutritionItem}>
                 <Text style={styles.nutritionValue}>
-                  {Math.round(parseInt(pendingMeal.analysis?.totalFat || '0'))}g
+                  {pendingMeal.analysis?.totalFat || '0'}g
                 </Text>
                 <Text style={styles.nutritionLabel}>Fat</Text>
               </View>
@@ -237,7 +267,7 @@ export default function CameraScreen() {
 
       <View style={styles.buttonContainer}>
         <TouchableOpacity
-          style={styles.cameraButton}
+          style={[styles.cameraButton, isAnalyzing && styles.buttonDisabled]}
           onPress={() => setShowCamera(true)}
           disabled={isAnalyzing}
         >
@@ -246,7 +276,7 @@ export default function CameraScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.galleryButton}
+          style={[styles.galleryButton, isAnalyzing && styles.buttonDisabled]}
           onPress={pickImage}
           disabled={isAnalyzing}
         >
@@ -296,6 +326,9 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     backgroundColor: "white",
   },
+  captureButtonDisabled: {
+    backgroundColor: "rgba(255,255,255,0.5)",
+  },
   title: {
     fontSize: 28,
     fontWeight: "bold",
@@ -344,6 +377,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "center",
+  },
+  buttonDisabled: {
+    opacity: 0.5,
   },
   buttonText: {
     color: "white",

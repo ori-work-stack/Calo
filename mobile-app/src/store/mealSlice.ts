@@ -164,28 +164,16 @@ const processImage = async (imageUri: string): Promise<string> => {
 
 export const analyzeMeal = createAsyncThunk(
   "meal/analyzeMeal",
-  async (imageUri: string, { rejectWithValue }) => {
+  async (imageBase64: string, { rejectWithValue }) => {
     try {
-      console.log(
-        "Starting meal analysis for URI:",
-        imageUri.substring(0, 50) + "..."
-      );
+      console.log("Starting meal analysis with base64 data...");
 
       // Validate input
-      if (!imageUri || imageUri.trim() === "") {
-        throw new Error("Image URI is empty or invalid");
-      }
-
-      // Process and compress the image
-      const imageBase64 = await processImage(imageUri);
-
       if (!imageBase64 || imageBase64.trim() === "") {
-        throw new Error("Image processing returned empty base64 data");
+        throw new Error("Image data is empty or invalid");
       }
 
-      console.log("Image processed successfully, sending to API...");
       console.log("Base64 data length:", imageBase64.length);
-      console.log("Base64 preview:", imageBase64.substring(0, 100) + "...");
 
       // Make the API call with proper error handling
       const response = await nutritionAPI.analyzeMeal(imageBase64);
@@ -193,7 +181,7 @@ export const analyzeMeal = createAsyncThunk(
 
       if (response && response.success && response.data) {
         const pendingMeal: PendingMeal = {
-          imageUri: imageUri, // Keep original URI for display
+          imageBase64: imageBase64,
           analysis: response.data,
           timestamp: Date.now(),
         };
@@ -207,7 +195,6 @@ export const analyzeMeal = createAsyncThunk(
           console.log("Pending meal saved to storage");
         } catch (storageError) {
           console.warn("Failed to save pending meal to storage:", storageError);
-          // Don't fail the whole operation for storage issues
         }
 
         console.log("Analysis completed successfully");
@@ -221,7 +208,6 @@ export const analyzeMeal = createAsyncThunk(
     } catch (error) {
       console.error("Analysis error details:", error);
 
-      // Provide more specific error messages
       let errorMessage = "Analysis failed";
       if (error instanceof Error) {
         errorMessage = error.message;
@@ -229,7 +215,6 @@ export const analyzeMeal = createAsyncThunk(
         errorMessage = error;
       }
 
-      // Handle specific error types
       if (
         errorMessage.includes("Network Error") ||
         errorMessage.includes("ERR_NETWORK")

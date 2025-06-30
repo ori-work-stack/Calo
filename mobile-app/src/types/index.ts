@@ -86,8 +86,8 @@ export interface AIResponse {
 }
 
 export interface PendingMeal {
-  imageUri: string;
-  analysis: MealAnalysisData;
+  imageBase64: string;
+  analysis: AIResponse | null;
   timestamp: number;
 }
 
