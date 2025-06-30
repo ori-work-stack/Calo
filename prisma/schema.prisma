@@ -1,3 +1,4 @@
+
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
@@ -8,6 +9,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -26,6 +28,10 @@ model User {
   dietaryGoals  String?
   allergies     String[]
   
+  // AI usage tracking
+  aiRequestsCount Int @default(0)
+  aiRequestsResetAt DateTime @default(now())
+  
   // Smart watch connection
   smartWatchConnected Boolean @default(false)
   smartWatchType      String?
@@ -35,6 +41,7 @@ model User {
   meals         Meal[]
   nutritionGoals NutritionGoal[]
   healthMetrics HealthMetric[]
+  sessions      Session[]
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -42,10 +49,25 @@ model User {
   @@map("users")
 }
 
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  
+  // Relationships
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("sessions")
+}
+
 model Meal {
   id          String   @id @default(cuid())
   userId      String
-  imageUrl    String?  // Firebase Storage URL
+  imageUrl    String?  // Supabase Storage URL
   imageBase64 String?  // Temporary base64 storage
   
   // AI Analysis Results
@@ -125,7 +147,7 @@ model HealthMetric {
   value      Float
   unit       String
   recordedAt DateTime   @default(now())
-  source     String?    // e.g., "manual", "apple_watch", "fitbit"
+  source     String?    // e.g., "manual", "apple_watch", "fitbit", "supabase"
   
   // Relationships
   user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -140,6 +162,8 @@ enum UserRole {
   USER
   ADMIN
   NUTRITIONIST
+  FREE
+  PREMIUM
 }
 
 enum ActivityLevel {

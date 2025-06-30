@@ -1,44 +1,57 @@
 
 export interface MealAnalysisData {
   imageBase64: string;
-  language?: 'english' | 'hebrew';
-  date?: string;
+  language: 'english' | 'hebrew';
+  date: string;
 }
 
 export interface MealItem {
   name: string;
   quantity: string;
-  calories: string;
-  protein: string;
-  carbs: string;
-  fat: string;
-  fiber?: string;
-  sugar?: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber?: number;
+  sugar?: number;
 }
 
 export interface AIResponse {
   description: string;
   items: MealItem[];
-  totalCalories: string;
-  totalProtein: string;
-  totalCarbs: string;
-  totalFat: string;
-  healthScore: string;
+  totalCalories: number;
+  totalProtein: number;
+  totalCarbs: number;
+  totalFat: number;
+  totalFiber?: number;
+  totalSugar?: number;
+  healthScore: number;
   recommendations: string;
 }
 
 export interface Meal {
   id: string;
-  image: string;
-  aiResponse: AIResponse;
-  calories: number;
-  timestamp: string;
+  userId: string;
+  imageUrl?: string;
+  description: string;
+  totalCalories: number;
+  totalProtein: number;
+  totalCarbs: number;
+  totalFat: number;
+  totalFiber?: number;
+  totalSugar?: number;
+  healthScore: number;
+  recommendations?: string;
+  mealType: string;
+  consumedAt: string;
+  foodItems: MealItem[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface MealAnalysisResponse {
   success: boolean;
   meal?: Meal;
-  remainingRequests?: number;
   error?: string;
 }
 
@@ -49,10 +62,15 @@ export interface MealsResponse {
 }
 
 export interface DailyStats {
+  date: string;
   totalCalories: number;
-  totalMeals: number;
+  totalProtein: number;
+  totalCarbs: number;
+  totalFat: number;
+  totalFiber: number;
+  totalSugar: number;
+  mealsCount: number;
   averageHealthScore: number;
-  meals: Meal[];
 }
 
 export interface StatsResponse {
@@ -61,7 +79,7 @@ export interface StatsResponse {
   error?: string;
 }
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://0.0.0.0:5000/api';
 
 export class NutritionAPI {
   private static getHeaders(token: string) {

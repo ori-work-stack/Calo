@@ -1,3 +1,4 @@
+
 export interface UpdateProfileData {
   name?: string;
   username?: string;
@@ -15,6 +16,7 @@ export interface User {
   smartWatchConnected: boolean;
   smartWatchType: string | null;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface UserResponse {
@@ -24,10 +26,11 @@ export interface UserResponse {
 }
 
 export interface SubscriptionInfo {
-  dailyRequests: number;
-  name: string;
-  currentRequests: number;
-  resetAt: string;
+  plan: string;
+  isActive: boolean;
+  expiresAt?: string;
+  aiRequestsLimit: number;
+  aiRequestsUsed: number;
 }
 
 export interface SubscriptionResponse {
@@ -36,7 +39,7 @@ export interface SubscriptionResponse {
   error?: string;
 }
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://0.0.0.0:5000/api';
 
 export class UserAPI {
   private static getHeaders(token: string) {
@@ -52,16 +55,16 @@ export class UserAPI {
       headers: this.getHeaders(token),
       body: JSON.stringify(data),
     });
-
+    
     return response.json();
   }
 
   static async getSubscriptionInfo(token: string): Promise<SubscriptionResponse> {
-    const response = await fetch(`${API_BASE_URL}/user/subscription-info`, {
+    const response = await fetch(`${API_BASE_URL}/user/subscription`, {
       method: 'GET',
       headers: this.getHeaders(token),
     });
-
+    
     return response.json();
   }
 }

@@ -28,7 +28,7 @@ export interface AuthResponse {
   error?: string;
 }
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://0.0.0.0:5000/api';
 
 export class AuthAPI {
   private static getHeaders(token?: string) {
