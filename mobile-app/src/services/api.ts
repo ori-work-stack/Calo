@@ -18,9 +18,12 @@ const api = axios.create({
 api.interceptors.request.use(
   async (config) => {
     try {
-      const token = await AsyncStorage.getItem("authToken");
+      const token = await AsyncStorage.getItem("token");
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
+        console.log("Adding auth token to request");
+      } else {
+        console.log("No auth token found");
       }
     } catch (error) {
       console.warn("Failed to get auth token:", error);
@@ -38,7 +41,7 @@ api.interceptors.response.use(
   async (error) => {
     if (error.response?.status === 401) {
       // Token expired or invalid
-      await AsyncStorage.removeItem("authToken");
+      await AsyncStorage.removeItem("token");
       await AsyncStorage.removeItem("userData");
     }
     return Promise.reject(error);
@@ -68,7 +71,7 @@ export const authAPI = {
 
   signOut: async () => {
     try {
-      await AsyncStorage.removeItem("authToken");
+      await AsyncStorage.removeItem("token");
       await AsyncStorage.removeItem("userData");
     } catch (error) {
       console.error("Sign out error:", error);
