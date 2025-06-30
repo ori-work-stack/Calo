@@ -159,7 +159,7 @@ export default function CameraScreen() {
             <Text style={styles.analysisTitle}>Analysis Results</Text>
 
             <Text style={styles.mealName}>
-              {pendingMeal.analysis?.name || "Unknown Meal"}
+              {pendingMeal.analysis?.name || pendingMeal.analysis?.description || "Unknown Meal"}
             </Text>
             {pendingMeal.analysis?.description && (
               <Text style={styles.mealDescription}>
@@ -170,25 +170,25 @@ export default function CameraScreen() {
             <View style={styles.nutritionGrid}>
               <View style={styles.nutritionItem}>
                 <Text style={styles.nutritionValue}>
-                  {Math.round(pendingMeal.analysis?.calories || 0)}
+                  {Math.round(parseInt(pendingMeal.analysis?.totalCalories || '0'))}
                 </Text>
                 <Text style={styles.nutritionLabel}>Calories</Text>
               </View>
               <View style={styles.nutritionItem}>
                 <Text style={styles.nutritionValue}>
-                  {Math.round(pendingMeal.analysis?.protein || 0)}g
+                  {Math.round(parseInt(pendingMeal.analysis?.totalProtein || '0'))}g
                 </Text>
                 <Text style={styles.nutritionLabel}>Protein</Text>
               </View>
               <View style={styles.nutritionItem}>
                 <Text style={styles.nutritionValue}>
-                  {Math.round(pendingMeal.analysis?.carbs || 0)}g
+                  {Math.round(parseInt(pendingMeal.analysis?.totalCarbs || '0'))}g
                 </Text>
                 <Text style={styles.nutritionLabel}>Carbs</Text>
               </View>
               <View style={styles.nutritionItem}>
                 <Text style={styles.nutritionValue}>
-                  {Math.round(pendingMeal.analysis?.fat || 0)}g
+                  {Math.round(parseInt(pendingMeal.analysis?.totalFat || '0'))}g
                 </Text>
                 <Text style={styles.nutritionLabel}>Fat</Text>
               </View>

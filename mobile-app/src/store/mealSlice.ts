@@ -27,96 +27,128 @@ const PENDING_MEAL_KEY = "pendingMeal";
 
 // Helper function to compress/resize image if needed
 const processImage = async (imageUri: string): Promise<string> => {
-  console.log("Processing image, URI:", imageUri.substring(0, 50) + "...");
-
-  if (Platform.OS === "web") {
-    return new Promise((resolve, reject) => {
-      // Handle different types of image URIs
-      let processUri = imageUri;
-
-      // If it's already a base64 data URI, extract just the base64 part
-      if (imageUri.startsWith("data:image/")) {
-        const base64Part = imageUri.split(",")[1];
-        if (base64Part) {
-          console.log("Image is already base64, returning processed version");
-          resolve(base64Part);
-          return;
-        }
-      }
-
-      // If it's a blob URL or file URL, process it
-      const img = new Image();
-      img.crossOrigin = "anonymous"; // Handle CORS issues
-
-      img.onload = () => {
-        try {
-          const canvas = document.createElement("canvas");
-          const ctx = canvas.getContext("2d");
-
-          if (!ctx) {
-            reject(new Error("Could not get canvas context"));
-            return;
-          }
-
-          // Calculate new dimensions (max 800px width/height)
-          const maxSize = 800;
-          let { width, height } = img;
-
-          if (width > height) {
-            if (width > maxSize) {
-              height = (height * maxSize) / width;
-              width = maxSize;
-            }
-          } else {
-            if (height > maxSize) {
-              width = (width * maxSize) / height;
-              height = maxSize;
-            }
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-
-          // Draw and compress
-          ctx.drawImage(img, 0, 0, width, height);
-
-          // Convert to base64 with compression (0.8 quality for better balance)
-          const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
-          const base64 = dataUrl.split(",")[1]; // Remove data:image/jpeg;base64, prefix
-
-          console.log(
-            "Image processed successfully, base64 length:",
-            base64.length
-          );
-          resolve(base64);
-        } catch (error) {
-          console.error("Error processing image on canvas:", error);
-          reject(error);
-        }
-      };
-
-      img.onerror = (error) => {
-        console.error("Error loading image:", error);
-        reject(new Error("Failed to load image"));
-      };
-
-      img.src = processUri;
-    });
-  } else {
-    // For native platforms
+  if (Platform.OS === 'web') {
     try {
-      console.log("Processing native image...");
-      let base64: string;
+      console.log("Processing web image:", imageUri);
 
-      if (imageUri.startsWith("data:image/")) {
-        // Already a data URI, extract base64 part
-        base64 = imageUri.split(",")[1];
+      let imageData: string;
+
+      if (imageUri.startsWith('data:')) {
+        // Extract base64 from data URL
+        imageData = imageUri.split(',')[1];
+        console.log("Extracted base64 from data URL, length:", imageData.length);
       } else {
-        // Read from file system
-        base64 = await FileSystem.readAsStringAsync(imageUri, {
-          encoding: FileSystem.EncodingType.Base64,
+        // Fetch the image and convert to base64
+        const response = await fetch(imageUri);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+        }
+
+        const blob = await response.blob();
+        console.log("Image blob size:", blob.size, "bytes, type:", blob.type);
+
+        // Convert blob to base64
+        const base64Result = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const result = reader.result as string;
+            if (!result) {
+              reject(new Error("FileReader returned null result"));
+              return;
+            }
+
+            // Extract base64 part (remove data:image/...;base64, prefix)
+            const base64 = result.split(',')[1];
+            if (!base64) {
+              reject(new Error("Failed to extract base64 from result"));
+              return;
+            }
+
+            resolve(base64);
+          };
+          reader.onerror = () => {
+            reject(new Error("FileReader failed to read the image"));
+          };
+          reader.readAsDataURL(blob);
         });
+
+        imageData = base64Result;
       }
+
+      // Compress image if it's too large (limit to ~1MB base64)
+      if (imageData.length > 1400000) { // ~1MB in base64
+        console.log("Image too large, compressing...");
+
+        // Create an image element to resize
+        const img = new Image();
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        const compressedBase64 = await new Promise<string>((resolve, reject) => {
+          img.onload = () => {
+            // Calculate new dimensions (max 800px on longest side)
+            const maxDimension = 800;
+            let { width, height } = img;
+
+            if (width > height && width > maxDimension) {
+              height = (height * maxDimension) / width;
+              width = maxDimension;
+            } else if (height > maxDimension) {
+              width = (width * maxDimension) / height;
+              height = maxDimension;
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+
+            if (!ctx) {
+              reject(new Error("Failed to get canvas context"));
+              return;
+            }
+
+            ctx.drawImage(img, 0, 0, width, height);
+
+            // Convert to base64 with quality compression
+            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+            const compressedBase64 = compressedDataUrl.split(',')[1];
+
+            console.log("Compressed image from", imageData.length, "to", compressedBase64.length);
+            resolve(compressedBase64);
+          };
+
+          img.onerror = () => reject(new Error("Failed to load image for compression"));
+          img.src = `data:image/jpeg;base64,${imageData}`;
+        });
+
+        return compressedBase64;
+      }
+
+      console.log("Web image processed, base64 length:", imageData.length);
+      return imageData;
+    } catch (error) {
+      console.error("Error processing web image:", error);
+      throw new Error(
+        "Failed to process image: " +
+          (error instanceof Error ? error.message : "Unknown error")
+      );
+    }
+  } else {
+    // Native processing (React Native)
+    try {
+      console.log("Processing native image:", imageUri);
+
+      // For native, use FileSystem to read the image
+      const imageInfo = await FileSystem.getInfoAsync(imageUri);
+      if (!imageInfo.exists) {
+        throw new Error("Image file does not exist");
+      }
+
+      console.log("Image file size:", imageInfo.size);
+
+      // Read as base64 directly
+      const base64 = await FileSystem.readAsStringAsync(imageUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
 
       console.log("Native image processed, base64 length:", base64.length);
       return base64;

@@ -53,6 +53,13 @@ export class NutritionService {
         aiResponse: analysis,
         calories: parseInt(analysis.totalCalories) || 0,
         timestamp: new Date(),
+        name: analysis.description || 'Unknown Meal',
+        description: analysis.description,
+        protein: parseInt(analysis.totalProtein) || 0,
+        carbs: parseInt(analysis.totalCarbs) || 0,
+        fat: parseInt(analysis.totalFat) || 0,
+        fiber: parseInt(analysis.totalFiber) || 0,
+        sugar: parseInt(analysis.totalSugar) || 0,
       };
 
       // Get current meals data

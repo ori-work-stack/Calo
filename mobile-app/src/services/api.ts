@@ -41,24 +41,11 @@ export const authAPI = {
 };
 
 export const nutritionAPI = {
-  analyzeMeal: async (imageUri: string): Promise<AIResponse> => {
-    // Convert image to base64
-    const base64 = await fetch(imageUri)
-      .then((response) => response.blob())
-      .then(
-        (blob) =>
-          new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-              const base64data = reader.result as string;
-              const base64 = base64data.split(",")[1];
-              resolve(base64);
-            };
-            reader.readAsDataURL(blob);
-          })
-      );
-
-    const response = await api.post("/nutrition/analyze", { image: base64 });
+  analyzeMeal: async (imageBase64: string): Promise<AIResponse> => {
+    const response = await api.post("/nutrition/analyze", { 
+      imageBase64: imageBase64,
+      language: 'english'
+    });
     return response.data;
   },
 

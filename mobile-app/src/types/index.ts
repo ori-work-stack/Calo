@@ -90,3 +90,32 @@ export interface PendingMeal {
   analysis: MealAnalysisData;
   timestamp: number;
 }
+
+export interface MealAnalysisData {
+  description: string;
+  items: Array<{
+    name: string;
+    quantity: string;
+    calories: string;
+    protein: string;
+    carbs: string;
+    fat: string;
+    fiber?: string;
+    sugar?: string;
+  }>;
+  totalCalories: string;
+  totalProtein: string;
+  totalCarbs: string;
+  totalFat: string;
+  totalFiber?: string;
+  totalSugar?: string;
+  healthScore: string;
+  recommendations: string;
+  name?: string;
+  calories?: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+  fiber?: number;
+  sugar?: number;
+}

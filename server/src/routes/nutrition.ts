@@ -7,15 +7,20 @@ const router = Router();
 
 router.post('/analyze', authenticateToken, async (req: AuthRequest, res, next) => {
   try {
+    console.log('Received analyze request, body keys:', Object.keys(req.body));
+    console.log('Request body imageBase64 length:', req.body.imageBase64?.length || 'undefined');
+    
     const validatedData = mealAnalysisSchema.parse(req.body);
     const result = await NutritionService.analyzeMeal(req.user.id, validatedData);
     
     res.json({
       success: true,
+      data: result.meal.aiResponse,
       meal: result.meal,
       remainingRequests: result.remainingRequests,
     });
   } catch (error) {
+    console.error('Analyze meal error:', error);
     if (error instanceof Error) {
       res.status(400).json({
         success: false,
