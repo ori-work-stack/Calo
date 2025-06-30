@@ -1,21 +1,24 @@
+import { z } from "zod";
 
-import { z } from 'zod';
-
-// Zod schemas
+//
+// ✅ Zod Schemas
+//
 export const SignUpSchema = z.object({
-  email: z.string().email('Invalid email'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-  name: z.string().min(1, 'Name is required'),
+  email: z.string().email("Invalid email"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  name: z.string().min(1, "Name is required"),
   age: z.number().min(1).max(120).optional(),
   weight: z.number().positive().optional(),
   height: z.number().positive().optional(),
-  activityLevel: z.enum(['sedentary', 'light', 'moderate', 'active', 'very_active']).optional(),
-  goal: z.enum(['lose_weight', 'maintain', 'gain_weight']).optional(),
+  activityLevel: z
+    .enum(["sedentary", "light", "moderate", "active", "very_active"])
+    .optional(),
+  goal: z.enum(["lose_weight", "maintain", "gain_weight"]).optional(),
 });
 
 export const SignInSchema = z.object({
-  email: z.string().email('Invalid email'),
-  password: z.string().min(1, 'Password is required'),
+  email: z.string().email("Invalid email"),
+  password: z.string().min(1, "Password is required"),
 });
 
 export const MealAnalysisSchema = z.object({
@@ -30,29 +33,16 @@ export const MealAnalysisSchema = z.object({
   sodium: z.number().optional(),
 });
 
-// TypeScript types
+//
+// ✅ Zod-Inferred Types
+//
 export type SignUpData = z.infer<typeof SignUpSchema>;
 export type SignInData = z.infer<typeof SignInSchema>;
 export type MealAnalysisData = z.infer<typeof MealAnalysisSchema>;
 
-export interface User {
-  id: string;
-  email: string;
-  name?: string;
-  age?: number;
-  weight?: number;
-  height?: number;
-  activityLevel?: string;
-  goal?: string;
-}
-
-export interface AuthResponse {
-  success: boolean;
-  user?: User;
-  token?: string;
-  error?: string;
-}
-
+//
+// ✅ Manual Interfaces
+//
 export interface User {
   id: string;
   email: string;
@@ -60,6 +50,8 @@ export interface User {
   age?: number;
   weight?: number;
   height?: number;
+  activityLevel?: string;
+  goal?: string;
   createdAt: string;
 }
 
@@ -79,35 +71,11 @@ export interface Meal {
   userId: string;
 }
 
-export interface MealAnalysisData {
-  name: string;
-  description?: string;
-  calories: number;
-  protein: number;
-  carbs: number;
-  fat: number;
-  fiber?: number;
-  sugar?: number;
-  sodium?: number;
-}
-
 export interface AuthResponse {
-  user: User;
-  token: string;
-}
-
-export interface SignUpData {
-  email: string;
-  password: string;
-  name: string;
-  age?: number;
-  weight?: number;
-  height?: number;
-}
-
-export interface SignInData {
-  email: string;
-  password: string;
+  success: boolean;
+  user?: User;
+  token?: string;
+  error?: string;
 }
 
 export interface AIResponse {
@@ -121,20 +89,3 @@ export interface PendingMeal {
   analysis: MealAnalysisData;
   timestamp: number;
 }
-
-// Zod schemas
-import { z } from 'zod';
-
-export const SignUpSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(6),
-  name: z.string().min(1),
-  age: z.number().min(1).max(120).optional(),
-  weight: z.number().min(1).max(500).optional(),
-  height: z.number().min(1).max(300).optional(),
-});
-
-export const SignInSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
-});

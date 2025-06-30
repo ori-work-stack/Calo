@@ -1,157 +1,127 @@
-import { PrismaClient } from '@prisma/client';
-import { openai } from './openai';
-import { MealAnalysisData, AIResponse } from '../types/nutrition';
-
-const prisma = new PrismaClient();
+import { openAIService } from './openai';
+import { prisma } from '../lib/database';
+import { MealAnalysisInput } from '../types/nutrition';
+import { AuthService } from './auth';
 
 export class NutritionService {
-  static async analyzeMealImage(imageBase64: string): Promise<AIResponse> {
-    try {
-      console.log('Analyzing meal image with OpenAI...');
+  static async analyzeMeal(userId: string, data: MealAnalysisInput) {
+    const { imageBase64, language, date } = data;
 
-      const response = await openai.chat.completions.create({
-        model: "gpt-4-vision-preview",
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: `Analyze this food image and provide detailed nutritional information. Return a JSON object with the following structure:
-                {
-                  "name": "Food name",
-                  "description": "Brief description",
-                  "calories": number,
-                  "protein": number,
-                  "carbs": number,
-                  "fat": number,
-                  "fiber": number,
-                  "sugar": number,
-                  "sodium": number
-                }
-                All nutritional values should be in grams except calories (kcal) and sodium (mg).`
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:image/jpeg;base64,${imageBase64}`
-                }
-              }
-            ]
-          }
-        ],
-        max_tokens: 500
+    // Get user and check AI request limits
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // Check if daily limit needs reset
+    const now = new Date();
+    const resetTime = new Date(user.aiRequestsResetAt);
+    
+    if (now.getDate() !== resetTime.getDate() || 
+        now.getMonth() !== resetTime.getMonth() || 
+        now.getFullYear() !== resetTime.getFullYear()) {
+      // Reset daily count
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          aiRequestsCount: 0,
+          aiRequestsResetAt: now,
+        }
+      });
+      user.aiRequestsCount = 0;
+    }
+
+    // Check role permissions
+    const permissions = await AuthService.getRolePermissions(user.role);
+    
+    if (permissions.dailyRequests !== -1 && user.aiRequestsCount >= permissions.dailyRequests) {
+      throw new Error(`Daily AI request limit reached. Upgrade your plan to analyze more meals.`);
+    }
+
+    try {
+      // Analyze food with OpenAI
+      const analysis = await openAIService.analyzeFood(imageBase64, language);
+
+      // Create meal object - store image as base64 in database
+      const mealId = `meal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const meal = {
+        id: mealId,
+        image: imageBase64, // Store base64 directly in database
+        aiResponse: analysis,
+        calories: parseInt(analysis.totalCalories) || 0,
+        timestamp: new Date(),
+      };
+
+      // Get current meals data
+      const currentMeals = user.meals as Record<string, any[]> || {};
+      const mealDate = date || now.toISOString().split('T')[0];
+      
+      if (!currentMeals[mealDate]) {
+        currentMeals[mealDate] = [];
+      }
+      
+      currentMeals[mealDate].push(meal);
+
+      // Update user with new meal and increment AI request count
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          meals: currentMeals,
+          aiRequestsCount: user.aiRequestsCount + 1,
+        }
       });
 
-      const content = response.choices[0].message.content;
-      if (!content) {
-        throw new Error('No response from OpenAI');
-      }
-
-      // Parse the JSON response
-      const analysisData = JSON.parse(content);
-
       return {
-        success: true,
-        data: analysisData
+        meal,
+        remainingRequests: permissions.dailyRequests === -1 
+          ? -1 
+          : permissions.dailyRequests - (user.aiRequestsCount + 1)
       };
     } catch (error) {
       console.error('Error analyzing meal:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to analyze meal'
-      };
+      throw new Error('Failed to analyze meal');
     }
   }
 
-  static async saveMeal(userId: string, mealData: MealAnalysisData, imageUrl?: string) {
-    try {
-      const meal = await prisma.meal.create({
-        data: {
-          userId,
-          name: mealData.name,
-          description: mealData.description,
-          imageUrl,
-          calories: mealData.calories,
-          protein: mealData.protein,
-          carbs: mealData.carbs,
-          fat: mealData.fat,
-          fiber: mealData.fiber || 0,
-          sugar: mealData.sugar || 0,
-          sodium: mealData.sodium || 0,
-        },
-      });
+  static async getUserMeals(userId: string, date?: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { meals: true }
+    });
 
-      return meal;
-    } catch (error) {
-      console.error('Error saving meal:', error);
-      throw new Error('Failed to save meal');
+    if (!user) {
+      throw new Error('User not found');
     }
+
+    const meals = user.meals as Record<string, any[]> || {};
+    
+    if (date) {
+      return meals[date] || [];
+    }
+
+    return meals;
   }
 
-  static async getUserMeals(userId: string, limit?: number) {
-    try {
-      const meals = await prisma.meal.findMany({
-        where: { userId },
-        orderBy: { createdAt: 'desc' },
-        take: limit,
-      });
+  static async getDailyStats(userId: string, date: string) {
+    const meals = await this.getUserMeals(userId, date);
+    
+    const stats = meals.reduce((acc, meal) => ({
+      totalCalories: acc.totalCalories + meal.calories,
+      totalMeals: acc.totalMeals + 1,
+      averageHealthScore: acc.averageHealthScore + parseInt(meal.aiResponse.healthScore),
+    }), {
+      totalCalories: 0,
+      totalMeals: 0,
+      averageHealthScore: 0,
+    });
 
-      return meals;
-    } catch (error) {
-      console.error('Error fetching user meals:', error);
-      throw new Error('Failed to fetch meals');
+    if (stats.totalMeals > 0) {
+      stats.averageHealthScore = stats.averageHealthScore / stats.totalMeals;
     }
-  }
 
-  static async getDailyStats(userId: string, date: Date) {
-    try {
-      const startOfDay = new Date(date);
-      startOfDay.setHours(0, 0, 0, 0);
-
-      const endOfDay = new Date(date);
-      endOfDay.setHours(23, 59, 59, 999);
-
-      // Get user's meals for today
-  const meals = await prisma.meal.findMany({
-    where: {
-      userId,
-      createdAt: {
-        gte: startOfDay,
-        lt: endOfDay,
-      },
-    },
-  });
-
-      const stats = meals.reduce(
-        (acc, meal) => ({
-          calories: acc.calories + meal.calories,
-          protein: acc.protein + meal.protein,
-          carbs: acc.carbs + meal.carbs,
-          fat: acc.fat + meal.fat,
-          fiber: acc.fiber + (meal.fiber || 0),
-          sugar: acc.sugar + (meal.sugar || 0),
-          sodium: acc.sodium + (meal.sodium || 0),
-        }),
-        {
-          calories: 0,
-          protein: 0,
-          carbs: 0,
-          fat: 0,
-          fiber: 0,
-          sugar: 0,
-          sodium: 0,
-        }
-      );
-
-      return {
-        date: date.toISOString().split('T')[0],
-        mealCount: meals.length,
-        ...stats,
-      };
-    } catch (error) {
-      console.error('Error calculating daily stats:', error);
-      throw new Error('Failed to calculate daily stats');
-    }
+    return { ...stats, meals };
   }
 }

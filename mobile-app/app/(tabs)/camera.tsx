@@ -14,8 +14,8 @@ import {
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useDispatch, useSelector } from 'react-redux';
-import { RootState, AppDispatch } from '../../src/store';
-import { analyzeMeal, postMeal, clearPendingMeal } from '../../src/store/mealSlice';
+import { RootState, AppDispatch } from '@/src/store';
+import { analyzeMeal, postMeal, clearPendingMeal } from '@/src/store/mealSlice';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function CameraScreen() {

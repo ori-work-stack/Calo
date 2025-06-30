@@ -5,12 +5,11 @@ declare global {
   var __prisma: PrismaClient | undefined;
 }
 
-// Database configuration
+// Supabase connection configuration
 const getDatabaseUrl = () => {
   const url = process.env.DATABASE_URL;
   if (!url) {
-    console.warn('DATABASE_URL not set, using default SQLite database');
-    return 'file:./prisma/dev.db';
+    throw new Error('DATABASE_URL environment variable is not set');
   }
   
   // Use Supabase connection pooling for better performance

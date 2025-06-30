@@ -11,9 +11,9 @@ import {
 } from 'react-native';
 import { Link, router } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
-import { RootState, AppDispatch } from '../../src/store';
-import { signIn, clearError } from '../../src/store/authSlice';
-import { SignInSchema } from '../../src/types';
+import { RootState, AppDispatch } from '@/src/store';
+import { signIn, clearError } from '@/src/store/authSlice';
+import { SignInSchema } from '@/src/types';
 
 export default function SignIn() {
   const dispatch = useDispatch<AppDispatch>();

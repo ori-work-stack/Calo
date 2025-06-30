@@ -10,9 +10,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import { RootState, AppDispatch } from '../../src/store';
-import { fetchMeals } from '../../src/store/mealSlice';
-import { Meal } from '../../src/types';
+import { RootState, AppDispatch } from '@/src/store';
+import { fetchMeals } from '@/src/store/mealSlice';
+import { Meal } from '@/src/types';
 
 export default function MealsScreen() {
   const dispatch = useDispatch<AppDispatch>();

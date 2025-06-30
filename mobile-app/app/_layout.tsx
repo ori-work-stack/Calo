@@ -2,7 +2,7 @@
 import { Stack } from 'expo-router';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
-import { store, persistor } from '../src/store';
+import { store, persistor } from '@/src/store';
 import { StatusBar } from 'expo-status-bar';
 import { Text } from 'react-native';
 

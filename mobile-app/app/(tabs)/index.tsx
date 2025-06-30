@@ -9,9 +9,9 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import { RootState, AppDispatch } from '../../src/store';
-import { fetchMeals } from '../../src/store/mealSlice';
-import { nutritionAPI } from '../../src/services/api';
+import { RootState, AppDispatch } from '@/src/store';
+import { fetchMeals } from '@/src/store/mealSlice';
+import { nutritionAPI } from '@/src/services/api';
 
 interface DailyStats {
   calories: number;

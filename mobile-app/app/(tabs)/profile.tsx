@@ -10,8 +10,8 @@ import {
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { router } from 'expo-router';
-import { RootState, AppDispatch } from '../../src/store';
-import { signOut } from '../../src/store/authSlice';
+import { RootState, AppDispatch } from '@/src/store';
+import { signOut } from '@/src/store/authSlice';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function ProfileScreen() {
