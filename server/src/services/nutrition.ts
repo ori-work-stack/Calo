@@ -1,4 +1,3 @@
-
 import { PrismaClient } from '@prisma/client';
 import { openai } from './openai';
 import { MealAnalysisData, AIResponse } from '../types/nutrition';
@@ -9,7 +8,7 @@ export class NutritionService {
   static async analyzeMealImage(imageBase64: string): Promise<AIResponse> {
     try {
       console.log('Analyzing meal image with OpenAI...');
-      
+
       const response = await openai.chat.completions.create({
         model: "gpt-4-vision-preview",
         messages: [
@@ -51,7 +50,7 @@ export class NutritionService {
 
       // Parse the JSON response
       const analysisData = JSON.parse(content);
-      
+
       return {
         success: true,
         data: analysisData
@@ -109,19 +108,20 @@ export class NutritionService {
     try {
       const startOfDay = new Date(date);
       startOfDay.setHours(0, 0, 0, 0);
-      
+
       const endOfDay = new Date(date);
       endOfDay.setHours(23, 59, 59, 999);
 
-      const meals = await prisma.meal.findMany({
-        where: {
-          userId,
-          createdAt: {
-            gte: startOfDay,
-            lte: endOfDay,
-          },
-        },
-      });
+      // Get user's meals for today
+  const meals = await prisma.meal.findMany({
+    where: {
+      userId,
+      createdAt: {
+        gte: startOfDay,
+        lt: endOfDay,
+      },
+    },
+  });
 
       const stats = meals.reduce(
         (acc, meal) => ({
