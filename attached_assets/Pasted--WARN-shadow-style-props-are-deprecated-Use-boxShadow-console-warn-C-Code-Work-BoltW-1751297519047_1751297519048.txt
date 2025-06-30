@@ -1,0 +1,63 @@
+λ  WARN  "shadow*" style props are deprecated. Use "boxShadow". 
+  console.warn (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\@expo\cli\src\start\server\serverLogLikeMetro.ts:152:21)
+  warnOnce (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\react-native-web\dist\modules\warnOnce\index.js:24:13)
+  preprocess (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\react-native-web\dist\exports\StyleSheet\preprocess.js:136:13)
+  compileAndInsertAtomic (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\react-native-web\dist\exports\StyleSheet\index.js:56:34)
+  forEach (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\react-native-web\dist\exports\StyleSheet\index.js:99:26)
+  Function.create (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\react-native-web\dist\exports\StyleSheet\index.js:87:23)
+  factory (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\expo-router\build\views\Sitemap.js:128:42)
+  loadModuleImplementation (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\metro-runtime\src\polyfills\require.js:277:5)
+  guardedLoadModule (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\metro-runtime\src\polyfills\require.js:184:12)
+Error storing data ReferenceError: window is not defined
+    at getValue (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\@react-native-async-storage\async-storage\lib\commonjs\AsyncStorage.js:69:52)
+    at C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\@react-native-async-storage\async-storage\lib\commonjs\AsyncStorage.js:39:21
+    at new Promise (<anonymous>)
+    at createPromise (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\@react-native-async-storage\async-storage\lib\commonjs\AsyncStorage.js:37:10)
+    at Object.setItem (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\@react-native-async-storage\async-storage\lib\commonjs\AsyncStorage.js:69:12)
+    at writeStagedState (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\redux-persist\lib\createPersistoid.js:98:28)
+    at Timeout.processNextKey [as _onTimeout] (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\redux-persist\lib\createPersistoid.js:87:7)
+    at listOnTimeout (node:internal/timers:594:17)
+    at processTimers (node:internal/timers:529:7)
+Error storing data ReferenceError: window is not defined
+    at getValue (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\@react-native-async-storage\async-storage\lib\commonjs\AsyncStorage.js:69:52)
+    at C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\@react-native-async-storage\async-storage\lib\commonjs\AsyncStorage.js:39:21
+    at new Promise (<anonymous>)
+    at createPromise (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\@react-native-async-storage\async-storage\lib\commonjs\AsyncStorage.js:37:10)
+    at Object.setItem (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\@react-native-async-storage\async-storage\lib\commonjs\AsyncStorage.js:69:12)
+    at writeStagedState (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\redux-persist\lib\createPersistoid.js:98:28)
+    at Timeout.processNextKey [as _onTimeout] (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\redux-persist\lib\createPersistoid.js:87:7)
+Web Bundled 6209ms node_modules\expo-router\entry.js (874 modules)
+λ Bundled 87ms node_modules\expo-router\node\render.js (1 module)      
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)     
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)     
+λ  WARN  "shadow*" style props are deprecated. Use "boxShadow". 
+  console.warn (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\@expo\cli\src\start\server\serverLogLikeMetro.ts:152:21)
+  warnOnce (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\react-native-web\dist\modules\warnOnce\index.js:24:13)
+  preprocess (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\react-native-web\dist\exports\StyleSheet\preprocess.js:136:13)
+  compileAndInsertAtomic (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\react-native-web\dist\exports\StyleSheet\index.js:56:34)
+  forEach (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\react-native-web\dist\exports\StyleSheet\index.js:99:26)
+  Function.create (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\react-native-web\dist\exports\StyleSheet\index.js:87:23)
+  factory (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\expo-router\build\views\Sitemap.js:128:42)
+  loadModuleImplementation (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\metro-runtime\src\polyfills\require.js:277:5)
+  guardedLoadModule (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\metro-runtime\src\polyfills\require.js:184:12)
+Error storing data ReferenceError: window is not defined
+    at getValue (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\@react-native-async-storage\async-storage\lib\commonjs\AsyncStorage.js:69:52)
+    at C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\@react-native-async-storage\async-storage\lib\commonjs\AsyncStorage.js:39:21
+    at new Promise (<anonymous>)
+    at createPromise (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\@react-native-async-storage\async-storage\lib\commonjs\AsyncStorage.js:37:10)
+    at Object.setItem (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\@react-native-async-storage\async-storage\lib\commonjs\AsyncStorage.js:69:12)
+    at writeStagedState (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\redux-persist\lib\createPersistoid.js:98:28)
+    at Timeout.processNextKey [as _onTimeout] (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\redux-persist\lib\createPersistoid.js:87:7)
+    at listOnTimeout (node:internal/timers:594:17)
+    at processTimers (node:internal/timers:529:7)
+Error storing data ReferenceError: window is not defined
+    at getValue (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\@react-native-async-storage\async-storage\lib\commonjs\AsyncStorage.js:69:52)
+    at C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\@react-native-async-storage\async-storage\lib\commonjs\AsyncStorage.js:39:21
+    at new Promise (<anonymous>)
+    at createPromise (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\@react-native-async-storage\async-storage\lib\commonjs\AsyncStorage.js:37:10)
+    at Object.setItem (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\@react-native-async-storage\async-storage\lib\commonjs\AsyncStorage.js:69:12)
+    at writeStagedState (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\redux-persist\lib\createPersistoid.js:98:28)
+    at Timeout.processNextKey [as _onTimeout] (C:\Code\Work\BoltWithServerAndNative\boltforserver-1\mobile-app\node_modules\redux-persist\lib\createPersistoid.js:87:7)
+Web Bundled 788ms node_modules\expo-router\entry.js (1 module)
+Web Bundled 1609ms node_modules\expo-router\entry.js (899 modules)     
+ LOG  [web] Logs will appear in the browser console
