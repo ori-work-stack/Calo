@@ -1,7 +1,6 @@
-
 export interface UpdateProfileData {
-  username?: string;
   name?: string;
+  username?: string;
   smartWatchConnected?: boolean;
   smartWatchType?: string;
 }
@@ -53,7 +52,7 @@ export class UserAPI {
       headers: this.getHeaders(token),
       body: JSON.stringify(data),
     });
-    
+
     return response.json();
   }
 
@@ -62,7 +61,7 @@ export class UserAPI {
       method: 'GET',
       headers: this.getHeaders(token),
     });
-    
+
     return response.json();
   }
 }

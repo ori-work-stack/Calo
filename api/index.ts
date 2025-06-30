@@ -2,6 +2,7 @@
 export { AuthAPI } from './auth';
 export { NutritionAPI } from './nutrition';
 export { UserAPI } from './user';
+export { AuthRequests, NutritionRequests, UserRequests, RequestUtils } from './requests';
 
 export type {
   SignUpData,
