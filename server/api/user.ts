@@ -1,20 +1,20 @@
-
 export interface UpdateProfileData {
   name?: string;
-  smartWatchConnected?: boolean;
-  smartWatchType?: string;
+  age?: number;
+  weight_kg?: number;
+  height_cm?: number;
 }
 
 export interface User {
-  id: string;
+  user_id: string;
   email: string;
   name: string;
-  role: string;
+  subscription_type: string;
+  age?: number;
+  weight_kg?: number;
+  height_cm?: number;
   aiRequestsCount: number;
-  smartWatchConnected: boolean;
-  smartWatchType: string | null;
   createdAt: string;
-  updatedAt: string;
 }
 
 export interface UserResponse {

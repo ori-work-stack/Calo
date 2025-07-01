@@ -1,4 +1,3 @@
-
 import { Router } from 'express';
 import { NutritionService } from '../services/nutrition';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
@@ -35,10 +34,10 @@ router.post('/analyze', async (req: AuthRequest, res) => {
       });
     }
 
-    console.log('Processing meal analysis for user:', req.user.id);
+    console.log('Processing meal analysis for user:', req.user.user_id);
     console.log('Image data length:', imageBase64.length);
 
-    const result = await NutritionService.analyzeMeal(req.user.id, {
+    const result = await NutritionService.analyzeMeal(req.user.user_id, {
       imageBase64,
       language,
       date: date || new Date().toISOString().split('T')[0]
@@ -70,9 +69,9 @@ router.post('/save', async (req: AuthRequest, res) => {
       });
     }
 
-    console.log('Saving meal for user:', req.user.id);
+    console.log('Saving meal for user:', req.user.user_id);
     
-    const meal = await NutritionService.saveMeal(req.user.id, mealData, imageBase64);
+    const meal = await NutritionService.saveMeal(req.user.user_id, mealData, imageBase64);
     
     console.log('Meal saved successfully');
     res.json({
@@ -92,9 +91,9 @@ router.post('/save', async (req: AuthRequest, res) => {
 // Get user meals
 router.get('/meals', async (req: AuthRequest, res) => {
   try {
-    console.log('Get meals request for user:', req.user.id);
+    console.log('Get meals request for user:', req.user.user_id);
     
-    const meals = await NutritionService.getUserMeals(req.user.id);
+    const meals = await NutritionService.getUserMeals(req.user.user_id);
     
     res.json({
       success: true,
@@ -122,9 +121,9 @@ router.get('/stats/:date', async (req: AuthRequest, res) => {
       });
     }
 
-    console.log('Get stats request for user:', req.user.id, 'date:', date);
+    console.log('Get stats request for user:', req.user.user_id, 'date:', date);
     
-    const stats = await NutritionService.getDailyStats(req.user.id, date);
+    const stats = await NutritionService.getDailyStats(req.user.user_id, date);
     
     res.json({
       success: true,

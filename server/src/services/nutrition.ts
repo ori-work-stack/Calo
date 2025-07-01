@@ -151,10 +151,10 @@ export class NutritionService {
       const meal = await prisma.meal.create({
         data: {
           user_id: user_id,
-          meal_name: mealData.name || "Unknown meal",
+          meal_name: mealData.name || mealData.description || "Unknown meal",
           image_url: imageBase64 ? `data:image/jpeg;base64,${imageBase64}` : "",
           upload_time: new Date(),
-          analysis_status: "COMPLETED", // or "PENDING" depending on logic
+          analysis_status: "COMPLETED",
           calories,
           protein_g: protein,
           carbs_g: carbs,
@@ -164,7 +164,21 @@ export class NutritionService {
         },
       });
 
-      return meal;
+      // Transform to match client expectations
+      return {
+        id: meal.meal_id.toString(),
+        name: meal.meal_name || "Unknown meal",
+        description: meal.meal_name,
+        imageUrl: meal.image_url,
+        calories: meal.calories || 0,
+        protein: meal.protein_g || 0,
+        carbs: meal.carbs_g || 0,
+        fat: meal.fats_g || 0,
+        fiber: meal.fiber_g || 0,
+        sugar: meal.sugar_g || 0,
+        createdAt: meal.createdAt.toISOString(),
+        userId: meal.user_id,
+      };
     } catch (error) {
       console.error("Error saving meal:", error);
       throw new Error("Failed to save meal");
@@ -178,7 +192,21 @@ export class NutritionService {
         orderBy: { createdAt: "desc" },
       });
 
-      return meals;
+      // Transform to match client expectations
+      return meals.map(meal => ({
+        id: meal.meal_id.toString(),
+        name: meal.meal_name || "Unknown meal",
+        description: meal.meal_name,
+        imageUrl: meal.image_url,
+        calories: meal.calories || 0,
+        protein: meal.protein_g || 0,
+        carbs: meal.carbs_g || 0,
+        fat: meal.fats_g || 0,
+        fiber: meal.fiber_g || 0,
+        sugar: meal.sugar_g || 0,
+        createdAt: meal.createdAt.toISOString(),
+        userId: meal.user_id,
+      }));
     } catch (error) {
       console.error("Error fetching meals:", error);
       throw new Error("Failed to fetch meals");
@@ -203,26 +231,26 @@ export class NutritionService {
 
       const stats = meals.reduce(
         (acc, meal) => ({
-          totalCalories: acc.totalCalories + (meal.calories || 0),
-          totalProtein: acc.totalProtein + (meal.protein_g || 0),
-          totalCarbs: acc.totalCarbs + (meal.carbs_g || 0),
-          totalFat: acc.totalFat + (meal.fats_g || 0),
-          totalFiber: acc.totalFiber + (meal.fiber_g || 0),
-          totalSugar: acc.totalSugar + (meal.sugar_g || 0),
-          totalMeals: acc.totalMeals + 1,
+          calories: acc.calories + (meal.calories || 0),
+          protein: acc.protein + (meal.protein_g || 0),
+          carbs: acc.carbs + (meal.carbs_g || 0),
+          fat: acc.fat + (meal.fats_g || 0),
+          fiber: acc.fiber + (meal.fiber_g || 0),
+          sugar: acc.sugar + (meal.sugar_g || 0),
+          mealCount: acc.mealCount + 1,
         }),
         {
-          totalCalories: 0,
-          totalProtein: 0,
-          totalCarbs: 0,
-          totalFat: 0,
-          totalFiber: 0,
-          totalSugar: 0,
-          totalMeals: 0,
+          calories: 0,
+          protein: 0,
+          carbs: 0,
+          fat: 0,
+          fiber: 0,
+          sugar: 0,
+          mealCount: 0,
         }
       );
 
-      return { ...stats, meals };
+      return stats;
     } catch (error) {
       console.error("Error fetching daily stats:", error);
       throw new Error("Failed to fetch daily stats");

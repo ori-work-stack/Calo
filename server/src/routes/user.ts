@@ -17,6 +17,9 @@ router.put('/profile', authenticateToken, async (req: AuthRequest, res, next) =>
         email: true,
         name: true,
         subscription_type: true,
+        age: true,
+        weight_kg: true,
+        height_cm: true,
         aiRequestsCount: true,
         createdAt: true,
       }
@@ -39,14 +42,14 @@ router.put('/profile', authenticateToken, async (req: AuthRequest, res, next) =>
 });
 
 router.get('/subscription-info', authenticateToken, async (req: AuthRequest, res) => {
-  const roleInfo = {
+  const subscriptionInfo = {
     FREE: { dailyRequests: 2, name: 'Free Plan' },
-    PREMIUM: { dailyRequests: 50, name: 'Premium Plan' },
-    GOLD: { dailyRequests: -1, name: 'Gold Plan' }
+    BASIC: { dailyRequests: 20, name: 'Basic Plan' },
+    PREMIUM: { dailyRequests: 50, name: 'Premium Plan' }
   };
 
-  const userRole = req.user.subscription_type;
-  const info = roleInfo[userRole as keyof typeof roleInfo] || roleInfo.FREE;
+  const userSubscriptionType = req.user.subscription_type;
+  const info = subscriptionInfo[userSubscriptionType as keyof typeof subscriptionInfo] || subscriptionInfo.FREE;
 
   res.json({
     success: true,

@@ -55,21 +55,14 @@ export const signIn = createAsyncThunk(
   }
 );
 
-// Updated signOut with proper error handling and API call
 export const signOut = createAsyncThunk(
   "auth/signOut",
   async (_, { rejectWithValue }) => {
     try {
-      // Add API call if your server has a signout endpoint
-      // await authAPI.signOut();
-
-      // Remove token from AsyncStorage
       await AsyncStorage.removeItem("token");
-
       return true;
     } catch (error) {
       console.error("SignOut error:", error);
-      // Even if API call fails, we still want to clear local storage
       await AsyncStorage.removeItem("token");
       return rejectWithValue(
         error instanceof Error ? error.message : "SignOut failed"
@@ -83,7 +76,6 @@ export const loadStoredAuth = createAsyncThunk(
   async () => {
     const token = await AsyncStorage.getItem("token");
     if (token) {
-      // You might want to validate the token with the server here
       return token;
     }
     return null;
@@ -97,7 +89,6 @@ const authSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
-    // Add manual signout reducer as fallback
     forceSignOut: (state) => {
       state.user = null;
       state.token = null;
@@ -137,7 +128,6 @@ const authSlice = createSlice({
         state.isLoading = false;
         state.error = action.payload as string;
       })
-      // Updated signOut cases
       .addCase(signOut.pending, (state) => {
         state.isLoading = true;
       })
@@ -149,7 +139,6 @@ const authSlice = createSlice({
         state.isLoading = false;
       })
       .addCase(signOut.rejected, (state, action) => {
-        // Even if signout fails, clear the local state
         state.user = null;
         state.token = null;
         state.isAuthenticated = false;

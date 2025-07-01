@@ -10,10 +10,6 @@ export const SignUpSchema = z.object({
   age: z.number().min(1).max(120).optional(),
   weight: z.number().positive().optional(),
   height: z.number().positive().optional(),
-  activityLevel: z
-    .enum(["sedentary", "light", "moderate", "active", "very_active"])
-    .optional(),
-  goal: z.enum(["lose_weight", "maintain", "gain_weight"]).optional(),
 });
 
 export const SignInSchema = z.object({
@@ -44,14 +40,13 @@ export type MealAnalysisData = z.infer<typeof MealAnalysisSchema>;
 // ✅ Manual Interfaces
 //
 export interface User {
-  id: string;
+  user_id: string;
   email: string;
   name: string;
   age?: number;
   weight?: number;
   height?: number;
-  activityLevel?: string;
-  goal?: string;
+  subscription_type?: string;
   createdAt: string;
 }
 
@@ -90,4 +85,3 @@ export interface PendingMeal {
   analysis: MealAnalysisData | null;
   timestamp: number;
 }
-

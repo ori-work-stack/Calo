@@ -13,16 +13,12 @@ export class AuthService {
     // Check if user already exists
     const existingUser = await prisma.user.findFirst({
       where: {
-        OR: [{ email }],
+        email: email,
       },
     });
 
     if (existingUser) {
-      throw new Error(
-        existingUser.email === email
-          ? "Email already registered"
-          : "Username already taken"
-      );
+      throw new Error("Email already registered");
     }
 
     // Hash password
@@ -56,7 +52,7 @@ export class AuthService {
 
     // Generate JWT token
     const token = jwt.sign(
-      { userId: user.user_id, email: user.email },
+      { user_id: user.user_id, email: user.email },
       JWT_SECRET,
       {
         expiresIn: JWT_EXPIRES_IN,
@@ -69,7 +65,7 @@ export class AuthService {
 
     await prisma.session.create({
       data: {
-        userId: user.user_id,
+        user_id: user.user_id,
         token,
         expiresAt,
       },
@@ -97,7 +93,7 @@ export class AuthService {
     }
 
     // Generate JWT token
-    const token = jwt.sign({ userId: user.user_id, email: user.email }, JWT_SECRET, {
+    const token = jwt.sign({ user_id: user.user_id, email: user.email }, JWT_SECRET, {
       expiresIn: JWT_EXPIRES_IN,
     });
 
@@ -107,7 +103,7 @@ export class AuthService {
 
     await prisma.session.create({
       data: {
-        userId: user.user_id,
+        user_id: user.user_id,
         token,
         expiresAt,
       },
@@ -120,7 +116,7 @@ export class AuthService {
   static async verifyToken(token: string) {
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as {
-        userId: string;
+        user_id: string;
         email: string;
       };
 
@@ -130,15 +126,15 @@ export class AuthService {
         include: {
           user: {
             select: {
-              id: true,
+              user_id: true,
               email: true,
               name: true,
-              role: true,
+              subscription_type: true,
+              age: true,
+              weight_kg: true,
+              height_cm: true,
               aiRequestsCount: true,
               aiRequestsResetAt: true,
-              smartWatchConnected: true,
-              smartWatchType: true,
-              meals: true,
               createdAt: true,
             },
           },
@@ -161,13 +157,13 @@ export class AuthService {
     });
   }
 
-  static async getRolePermissions(role: string) {
+  static async getRolePermissions(subscription_type: string) {
     const permissions = {
       FREE: { dailyRequests: 2 },
+      BASIC: { dailyRequests: 20 },
       PREMIUM: { dailyRequests: 50 },
-      GOLD: { dailyRequests: -1 }, // Unlimited
     };
 
-    return permissions[role as keyof typeof permissions] || permissions.FREE;
+    return permissions[subscription_type as keyof typeof permissions] || permissions.FREE;
   }
 }
