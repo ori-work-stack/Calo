@@ -1,12 +1,11 @@
 generator client {
   provider = "prisma-client-js"
   binaryTargets = ["native", "debian-openssl-1.1.x", "linux-musl", "linux-musl-openssl-3.0.x"]
-  engineType = "binary"
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
+  provider = "postgresql"
+  url = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
@@ -28,9 +27,8 @@ model User {
   meals              Meal[]
   nutritionPlans     NutritionPlan[]
   payments           SubscriptionPayment[]
+  sessions           Session[]
   createdAt          DateTime              @default(now())
-
-  Session Session[]
 }
 
 model Session {
@@ -38,12 +36,9 @@ model Session {
   user_id    String
   token      String   @unique
   expiresAt  DateTime
-
-  // Relationships
-  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  user       User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@map("sessions")
 }
@@ -162,7 +157,6 @@ model AdminDashboard {
 }
 
 // ENUMS
-
 enum SubscriptionType {
   FREE
   BASIC
