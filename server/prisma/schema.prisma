@@ -1,6 +1,6 @@
 generator client {
   provider = "prisma-client-js"
-  binaryTargets = ["native", "debian-openssl-1.1.x", "linux-musl", "linux-musl-openssl-3.0.x"]
+  binaryTargets = ["native", "debian-openssl-1.1.x"]
 }
 
 datasource db {
@@ -15,7 +15,7 @@ model User {
   password_hash      String
   name               String?
   signup_date        DateTime              @default(now())
-  subscription_type  SubscriptionType
+  subscription_type  SubscriptionType      @default(FREE)
   subscription_start DateTime?
   subscription_end   DateTime?
   height_cm          Float?
@@ -23,12 +23,14 @@ model User {
   age                Int
   aiRequestsCount    Int                   @default(0)
   aiRequestsResetAt  DateTime              @default(now())
+  createdAt          DateTime              @default(now())
+
+  // Relations
   questionnaires     UserQuestionnaire[]
   meals              Meal[]
   nutritionPlans     NutritionPlan[]
   payments           SubscriptionPayment[]
   sessions           Session[]
-  createdAt          DateTime              @default(now())
 }
 
 model Session {
@@ -36,16 +38,17 @@ model Session {
   user_id    String
   token      String   @unique
   expiresAt  DateTime
-  user       User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
   @@map("sessions")
 }
 
 model UserQuestionnaire {
   questionnaire_id           Int                     @id @default(autoincrement())
-  user                       User                    @relation(fields: [user_id], references: [user_id])
   user_id                    String
   date_completed             DateTime                @default(now())
   physical_activity_level    PhysicalActivityLevel
@@ -76,15 +79,17 @@ model UserQuestionnaire {
   smoking_status             SmokingStatus
   sleep_hours_per_night      Float?
   createdAt                  DateTime                @default(now())
+
+  // Relations
+  user User @relation(fields: [user_id], references: [user_id])
 }
 
 model Meal {
   meal_id                Int            @id @default(autoincrement())
-  user                   User           @relation(fields: [user_id], references: [user_id])
   user_id                String
   image_url              String
   upload_time            DateTime       @default(now())
-  analysis_status        AnalysisStatus
+  analysis_status        AnalysisStatus @default(PENDING)
   meal_name              String?
   calories               Float?
   protein_g              Float?
@@ -116,11 +121,13 @@ model Meal {
   additives_json         Json?
   health_risk_notes      String?
   createdAt              DateTime       @default(now())
+
+  // Relations
+  user User @relation(fields: [user_id], references: [user_id])
 }
 
 model NutritionPlan {
   plan_id          Int      @id @default(autoincrement())
-  user             User     @relation(fields: [user_id], references: [user_id])
   user_id          String
   created_at       DateTime @default(now())
   goal_calories    Float?
@@ -131,17 +138,22 @@ model NutritionPlan {
   duration_days    Int?
   notes            String?
   createdAt        DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [user_id], references: [user_id])
 }
 
 model SubscriptionPayment {
   payment_id     Int              @id @default(autoincrement())
-  user           User             @relation(fields: [user_id], references: [user_id])
   user_id        String
   plan_type      SubscriptionType
   amount         Float
   payment_date   DateTime         @default(now())
   payment_method String?
   createdAt      DateTime         @default(now())
+
+  // Relations
+  user User @relation(fields: [user_id], references: [user_id])
 }
 
 model AdminDashboard {
