@@ -96,7 +96,7 @@ export default function SignUp() {
 
       <TextInput
         style={styles.input}
-        placeholder="Age (optional)"
+        placeholder="Age"
         value={formData.age}
         onChangeText={(text) => setFormData({ ...formData, age: text })}
         keyboardType="numeric"

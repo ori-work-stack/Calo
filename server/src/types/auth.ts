@@ -13,7 +13,7 @@ export const signUpSchema = z.object({
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
       "Password must contain at least one lowercase letter, one uppercase letter, and one number"
     ),
-  age: z.coerce.number().min(1).max(120).optional(),
+  age: z.coerce.number().min(1).max(120),
   weight: z.coerce.number().positive().optional(),
   height: z.coerce.number().positive().optional(),
 });
