@@ -202,7 +202,25 @@ export class NutritionService {
       });
 
       const stats = meals.reduce(
-        (acc, meal) => ({
+        (
+          acc: {
+            totalCalories: any;
+            totalProtein: any;
+            totalCarbs: any;
+            totalFat: any;
+            totalFiber: any;
+            totalSugar: any;
+            totalMeals: number;
+          },
+          meal: {
+            calories: any;
+            protein_g: any;
+            carbs_g: any;
+            fats_g: any;
+            fiber_g: any;
+            sugar_g: any;
+          }
+        ) => ({
           totalCalories: acc.totalCalories + (meal.calories || 0),
           totalProtein: acc.totalProtein + (meal.protein_g || 0),
           totalCarbs: acc.totalCarbs + (meal.carbs_g || 0),

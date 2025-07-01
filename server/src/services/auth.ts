@@ -53,10 +53,29 @@ export class AuthService {
         createdAt: true,
       },
     });
+    console.log("Data being passed to Prisma:", {
+      email,
+      name,
+      password_hash: hashedPassword,
+      subscription_type: "FREE",
+      age: Number(age),
+      weight_kg: weight,
+      height_cm: height,
+      aiRequestsCount: 0,
+      aiRequestsResetAt: new Date(),
+    });
+
+    console.log("Types:", {
+      email: typeof email,
+      name: typeof name,
+      age: typeof Number(age),
+      weight_kg: typeof weight,
+      height_cm: typeof height,
+    });
 
     // Generate JWT token
     const token = jwt.sign(
-      { userId: user.user_id, email: user.email },
+      { user_id: user.user_id, email: user.email },
       JWT_SECRET,
       {
         expiresIn: JWT_EXPIRES_IN,
@@ -69,7 +88,7 @@ export class AuthService {
 
     await prisma.session.create({
       data: {
-        userId: user.user_id,
+        user_id: user.user_id,
         token,
         expiresAt,
       },
@@ -97,9 +116,13 @@ export class AuthService {
     }
 
     // Generate JWT token
-    const token = jwt.sign({ userId: user.user_id, email: user.email }, JWT_SECRET, {
-      expiresIn: JWT_EXPIRES_IN,
-    });
+    const token = jwt.sign(
+      { user_id: user.user_id, email: user.email },
+      JWT_SECRET,
+      {
+        expiresIn: JWT_EXPIRES_IN,
+      }
+    );
 
     // Store session
     const expiresAt = new Date();
@@ -107,7 +130,7 @@ export class AuthService {
 
     await prisma.session.create({
       data: {
-        userId: user.user_id,
+        user_id: user.user_id,
         token,
         expiresAt,
       },
@@ -120,7 +143,7 @@ export class AuthService {
   static async verifyToken(token: string) {
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as {
-        userId: string;
+        user_id: string;
         email: string;
       };
 
@@ -130,14 +153,12 @@ export class AuthService {
         include: {
           user: {
             select: {
-              id: true,
+              user_id: true,
               email: true,
               name: true,
-              role: true,
+              subscription_type: true,
               aiRequestsCount: true,
               aiRequestsResetAt: true,
-              smartWatchConnected: true,
-              smartWatchType: true,
               meals: true,
               createdAt: true,
             },

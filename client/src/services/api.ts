@@ -1,7 +1,6 @@
-
 import axios from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SignInData, SignUpData, MealAnalysisData, Meal } from "../types";
+import * as Keychain from "react-native-keychain";
 
 const API_BASE_URL = "http://localhost:5000/api";
 
@@ -18,9 +17,10 @@ const api = axios.create({
 api.interceptors.request.use(
   async (config) => {
     try {
-      const token = await AsyncStorage.getItem("token");
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+      const credentials = await Keychain.getInternetCredentials("myapp_auth");
+      if (credentials && credentials.password) {
+        // FIXED: Use credentials.password (the token) instead of credentials object
+        config.headers.Authorization = `Bearer ${credentials.password}`;
         console.log("Adding auth token to request");
       } else {
         console.log("No auth token found");
@@ -40,9 +40,13 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid
-      await AsyncStorage.removeItem("token");
-      await AsyncStorage.removeItem("userData");
+      // Token expired or invalid - clear keychain instead of AsyncStorage
+      try {
+        await Keychain.resetInternetCredentials({ server: "myapp_auth" });
+        console.log("Cleared invalid token from keychain");
+      } catch (keychainError) {
+        console.warn("Failed to clear keychain:", keychainError);
+      }
     }
     return Promise.reject(error);
   }
@@ -71,8 +75,9 @@ export const authAPI = {
 
   signOut: async () => {
     try {
-      await AsyncStorage.removeItem("token");
-      await AsyncStorage.removeItem("userData");
+      // FIXED: Use keychain instead of AsyncStorage
+      await Keychain.resetInternetCredentials({ server: "myapp_auth" });
+      console.log("Cleared auth token from keychain");
     } catch (error) {
       console.error("Sign out error:", error);
       throw error;
@@ -81,7 +86,9 @@ export const authAPI = {
 };
 
 export const nutritionAPI = {
-  analyzeMeal: async (imageBase64: string): Promise<{ success: boolean; data?: MealAnalysisData; error?: string }> => {
+  analyzeMeal: async (
+    imageBase64: string
+  ): Promise<{ success: boolean; data?: MealAnalysisData; error?: string }> => {
     try {
       console.log("Making analyze meal API request...");
       console.log("Base64 length:", imageBase64.length);
@@ -89,47 +96,50 @@ export const nutritionAPI = {
       const response = await api.post("/nutrition/analyze", {
         imageBase64: imageBase64,
         language: "english",
-        date: new Date().toISOString().split('T')[0]
+        date: new Date().toISOString().split("T")[0],
       });
 
       console.log("API response:", response.data);
       return response.data;
     } catch (error: any) {
       console.error("Analyze meal API error:", error);
-      
+
       if (error.response) {
         console.error("Error response:", error.response.data);
         return {
           success: false,
-          error: error.response.data?.error || "Server error occurred"
+          error: error.response.data?.error || "Server error occurred",
         };
       } else if (error.request) {
         console.error("Network error:", error.request);
         return {
           success: false,
-          error: "Network error - please check your connection"
+          error: "Network error - please check your connection",
         };
       } else {
         console.error("Request setup error:", error.message);
         return {
           success: false,
-          error: error.message || "Failed to make request"
+          error: error.message || "Failed to make request",
         };
       }
     }
   },
 
-  saveMeal: async (mealData: MealAnalysisData, imageBase64?: string): Promise<Meal> => {
+  saveMeal: async (
+    mealData: MealAnalysisData,
+    imageBase64?: string
+  ): Promise<Meal> => {
     try {
       console.log("Making save meal API request...");
-      
+
       const response = await api.post("/nutrition/save", {
         mealData,
-        imageBase64
+        imageBase64,
       });
 
       console.log("Save meal response:", response.data);
-      
+
       if (response.data.success) {
         return response.data.data;
       } else {
@@ -137,7 +147,7 @@ export const nutritionAPI = {
       }
     } catch (error: any) {
       console.error("Save meal API error:", error);
-      
+
       if (error.response?.data?.error) {
         throw new Error(error.response.data.error);
       } else if (error.message) {
@@ -151,11 +161,11 @@ export const nutritionAPI = {
   getMeals: async (): Promise<Meal[]> => {
     try {
       console.log("Making get meals API request...");
-      
+
       const response = await api.get("/nutrition/meals");
-      
+
       console.log("Get meals response:", response.data);
-      
+
       if (response.data.success) {
         return response.data.data || [];
       } else {
@@ -163,7 +173,7 @@ export const nutritionAPI = {
       }
     } catch (error: any) {
       console.error("Get meals API error:", error);
-      
+
       if (error.response?.data?.error) {
         throw new Error(error.response.data.error);
       } else if (error.message) {
@@ -177,11 +187,11 @@ export const nutritionAPI = {
   getDailyStats: async (date: string) => {
     try {
       console.log("Making get daily stats API request for date:", date);
-      
+
       const response = await api.get(`/nutrition/stats/${date}`);
-      
+
       console.log("Get daily stats response:", response.data);
-      
+
       if (response.data.success) {
         return response.data.data;
       } else {
@@ -189,7 +199,7 @@ export const nutritionAPI = {
       }
     } catch (error: any) {
       console.error("Get daily stats API error:", error);
-      
+
       if (error.response?.data?.error) {
         throw new Error(error.response.data.error);
       } else if (error.message) {

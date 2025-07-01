@@ -1,7 +1,7 @@
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import { User, SignUpData, SignInData, AuthResponse } from "../types";
 import { authAPI } from "../services/api";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Keychain from "react-native-keychain";
 
 interface AuthState {
   user: User | null;
@@ -25,7 +25,12 @@ export const signUp = createAsyncThunk(
     try {
       const response = await authAPI.signUp(data);
       if (response.success && response.token) {
-        await AsyncStorage.setItem("token", response.token);
+        // Store securely in device keychain
+        await Keychain.setInternetCredentials(
+          "myapp_auth",
+          "token",
+          response.token
+        );
         return response;
       }
       return rejectWithValue(response.error || "Signup failed");
@@ -43,7 +48,12 @@ export const signIn = createAsyncThunk(
     try {
       const response = await authAPI.signIn(data);
       if (response.success && response.token) {
-        await AsyncStorage.setItem("token", response.token);
+        // Store securely in device keychain (FIXED: was using AsyncStorage)
+        await Keychain.setInternetCredentials(
+          "myapp_auth",
+          "token",
+          response.token
+        );
         return response;
       }
       return rejectWithValue(response.error || "Login failed");
@@ -55,22 +65,18 @@ export const signIn = createAsyncThunk(
   }
 );
 
-// Updated signOut with proper error handling and API call
+// Updated signOut with proper keychain cleanup only
 export const signOut = createAsyncThunk(
   "auth/signOut",
   async (_, { rejectWithValue }) => {
     try {
-      // Add API call if your server has a signout endpoint
-      // await authAPI.signOut();
-
-      // Remove token from AsyncStorage
-      await AsyncStorage.removeItem("token");
-
+      await Keychain.resetInternetCredentials({ server: "myapp_auth" });
       return true;
     } catch (error) {
       console.error("SignOut error:", error);
-      // Even if API call fails, we still want to clear local storage
-      await AsyncStorage.removeItem("token");
+      try {
+        await Keychain.resetInternetCredentials({ server: "myapp_auth" });
+      } catch {}
       return rejectWithValue(
         error instanceof Error ? error.message : "SignOut failed"
       );
@@ -80,13 +86,17 @@ export const signOut = createAsyncThunk(
 
 export const loadStoredAuth = createAsyncThunk(
   "auth/loadStoredAuth",
-  async () => {
-    const token = await AsyncStorage.getItem("token");
-    if (token) {
-      // You might want to validate the token with the server here
-      return token;
+  async (_, { rejectWithValue }) => {
+    try {
+      const credentials = await Keychain.getInternetCredentials("myapp_auth");
+      if (credentials && credentials.password) {
+        // Return the token, not the credentials object
+        return credentials.password;
+      }
+      return null;
+    } catch (error) {
+      return rejectWithValue("Failed to load stored auth");
     }
-    return null;
   }
 );
 
@@ -137,7 +147,6 @@ const authSlice = createSlice({
         state.isLoading = false;
         state.error = action.payload as string;
       })
-      // Updated signOut cases
       .addCase(signOut.pending, (state) => {
         state.isLoading = true;
       })
@@ -156,11 +165,20 @@ const authSlice = createSlice({
         state.isLoading = false;
         state.error = action.payload as string;
       })
+      .addCase(loadStoredAuth.pending, (state) => {
+        state.isLoading = true;
+      })
       .addCase(loadStoredAuth.fulfilled, (state, action) => {
+        state.isLoading = false;
         if (action.payload) {
+          // FIXED: action.payload is now the token string, not credentials object
           state.token = action.payload;
           state.isAuthenticated = true;
         }
+      })
+      .addCase(loadStoredAuth.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
       });
   },
 });
