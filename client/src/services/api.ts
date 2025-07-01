@@ -1,4 +1,3 @@
-
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SignInData, SignUpData, MealAnalysisData, Meal } from "../types";
@@ -81,7 +80,7 @@ export const authAPI = {
 };
 
 export const nutritionAPI = {
-  analyzeMeal: async (imageBase64: string): Promise<{ success: boolean; data?: MealAnalysisData; error?: string }> => {
+  analyzeMeal: async (imageBase64: string, updateText?: string): Promise<{ success: boolean; data?: MealAnalysisData; error?: string }> => {
     try {
       console.log("Making analyze meal API request...");
       console.log("Base64 length:", imageBase64.length);
@@ -89,7 +88,8 @@ export const nutritionAPI = {
       const response = await api.post("/nutrition/analyze", {
         imageBase64: imageBase64,
         language: "english",
-        date: new Date().toISOString().split('T')[0]
+        date: new Date().toISOString().split('T')[0],
+        updateText
       });
 
       console.log("API response:", response.data);
@@ -114,6 +114,45 @@ export const nutritionAPI = {
         return {
           success: false,
           error: error.message || "Failed to make request"
+        };
+      }
+    }
+  },
+
+  updateMeal: async (meal_id: string, updateText: string): Promise<{ success: boolean; data?: Meal; error?: string }> => {
+    try {
+      console.log("Making update meal API request...");
+      
+      const response = await api.put("/nutrition/update", {
+        meal_id,
+        updateText,
+        language: "english"
+      });
+
+      console.log("Update meal response:", response.data);
+      
+      if (response.data.success) {
+        return response.data;
+      } else {
+        throw new Error(response.data.error || "Failed to update meal");
+      }
+    } catch (error: any) {
+      console.error("Update meal API error:", error);
+      
+      if (error.response?.data?.error) {
+        return {
+          success: false,
+          error: error.response.data.error
+        };
+      } else if (error.message) {
+        return {
+          success: false,
+          error: error.message
+        };
+      } else {
+        return {
+          success: false,
+          error: "Failed to update meal"
         };
       }
     }

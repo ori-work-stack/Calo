@@ -44,9 +44,10 @@ export interface User {
   email: string;
   name: string;
   age?: number;
-  weight?: number;
-  height?: number;
+  weight_kg?: number;
+  height_cm?: number;
   subscription_type?: string;
+  aiRequestsCount?: number;
   createdAt: string;
 }
 
@@ -84,4 +85,5 @@ export interface PendingMeal {
   imageUri?: string;
   analysis: MealAnalysisData | null;
   timestamp: number;
+  meal_id?: string; // For updates
 }

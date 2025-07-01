@@ -58,6 +58,70 @@ Please be as accurate as possible with portion sizes and nutritional estimates.
 `
 };
 
+const updateAnalysisPrompts = {
+  english: `
+Update the nutritional analysis for this meal based on the additional information provided by the user. 
+The user has added: "{updateText}"
+
+Please recalculate the nutritional values and respond in JSON format with the same structure as before:
+
+{
+  "description": "Updated description including the new information",
+  "items": [
+    {
+      "name": "Item name",
+      "quantity": "Updated quantity/portion size",
+      "calories": "Updated calories",
+      "protein": "Updated protein content in grams",
+      "carbs": "Updated carbohydrate content in grams", 
+      "fat": "Updated fat content in grams",
+      "fiber": "Updated fiber content in grams",
+      "sugar": "Updated sugar content in grams"
+    }
+  ],
+  "totalCalories": "Updated total calories for the entire meal",
+  "totalProtein": "Updated total protein in grams",
+  "totalCarbs": "Updated total carbohydrates in grams",
+  "totalFat": "Updated total fat in grams",
+  "healthScore": "Updated health score from 1-10",
+  "recommendations": "Updated health recommendations"
+}
+
+Make sure to add the nutritional values from the additional items mentioned by the user.
+`,
+
+  hebrew: `
+עדכן את הניתוח התזונתי לארוחה זו בהתבסס על המידע הנוסף שסופק על ידי המשתמש.
+המשתמש הוסיף: "{updateText}"
+
+אנא חשב מחדש את הערכים התזונתיים והגב בפורמט JSON עם אותו מבנה כמו קודם:
+
+{
+  "description": "תיאור מעודכן הכולל את המידע החדש",
+  "items": [
+    {
+      "name": "שם הפריט",
+      "quantity": "כמות/גודל מנה מעודכן",
+      "calories": "קלוריות מעודכנות",
+      "protein": "תכולת חלבון מעודכנת בגרמים",
+      "carbs": "תכולת פחמימות מעודכנת בגרמים",
+      "fat": "תכולת שומן מעודכנת בגרמים", 
+      "fiber": "תכולת סיבים מעודכנת בגרמים",
+      "sugar": "תכולת סוכר מעודכנת בגרמים"
+    }
+  ],
+  "totalCalories": "סך כל הקלוריות המעודכנות לארוחה השלמה",
+  "totalProtein": "סך כל החלבון המעודכן בגרמים",
+  "totalCarbs": "סך כל הפחמימות המעודכנות בגרמים", 
+  "totalFat": "סך כל השומן המעודכן בגרמים",
+  "healthScore": "ציון בריאות מעודכן מ-1 עד 10",
+  "recommendations": "המלצות בריאות מעודכנות"
+}
+
+וודא להוסיף את הערכים התזונתיים מהפריטים הנוספים שהוזכרו על ידי המשתמש.
+`
+};
+
 export class OpenAIService {
   private openai: OpenAI;
 
@@ -67,9 +131,13 @@ export class OpenAIService {
     });
   }
 
-  async analyzeFood(base64Image: string, language: 'english' | 'hebrew' = 'english') {
+  async analyzeFood(base64Image: string, language: 'english' | 'hebrew' = 'english', updateText?: string) {
     try {
-      const prompt = nutritionAnalysisPrompts[language];
+      let prompt = nutritionAnalysisPrompts[language];
+      
+      if (updateText) {
+        prompt = updateAnalysisPrompts[language].replace('{updateText}', updateText);
+      }
       
       const response = await this.openai.chat.completions.create({
         model: "gpt-4o",

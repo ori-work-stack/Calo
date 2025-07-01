@@ -1,11 +1,11 @@
 import { openAIService } from "./openai";
 import { prisma } from "../lib/database";
-import { MealAnalysisInput } from "../types/nutrition";
+import { MealAnalysisInput, MealUpdateInput } from "../types/nutrition";
 import { AuthService } from "./auth";
 
 export class NutritionService {
   static async analyzeMeal(user_id: string, data: MealAnalysisInput) {
-    const { imageBase64, language } = data;
+    const { imageBase64, language, updateText } = data;
 
     if (!imageBase64?.trim()) throw new Error("Image data is required");
 
@@ -58,7 +58,7 @@ export class NutritionService {
     }
 
     try {
-      const analysis = await openAIService.analyzeFood(cleanBase64, language);
+      const analysis = await openAIService.analyzeFood(cleanBase64, language, updateText);
 
       await prisma.user.update({
         where: { user_id: user_id },
@@ -119,6 +119,72 @@ export class NutritionService {
           (error instanceof Error ? error.message : "Unknown error")
       );
     }
+  }
+
+  static async updateMeal(user_id: string, data: MealUpdateInput) {
+    const { meal_id, updateText, language } = data;
+
+    // Get the existing meal
+    const existingMeal = await prisma.meal.findFirst({
+      where: {
+        meal_id: parseInt(meal_id),
+        user_id: user_id,
+      },
+    });
+
+    if (!existingMeal) {
+      throw new Error("Meal not found");
+    }
+
+    // Use the existing image for re-analysis with update text
+    const imageBase64 = existingMeal.image_url?.replace('data:image/jpeg;base64,', '') || '';
+    
+    if (!imageBase64) {
+      throw new Error("No image found for this meal");
+    }
+
+    // Re-analyze with update text
+    const analysisResult = await this.analyzeMeal(user_id, {
+      imageBase64,
+      language,
+      updateText,
+    });
+
+    if (!analysisResult.success || !analysisResult.data) {
+      throw new Error("Failed to re-analyze meal");
+    }
+
+    const mealData = analysisResult.data;
+
+    // Update the meal in database
+    const updatedMeal = await prisma.meal.update({
+      where: { meal_id: parseInt(meal_id) },
+      data: {
+        meal_name: mealData.name || mealData.description || "Unknown meal",
+        calories: mealData.calories,
+        protein_g: mealData.protein,
+        carbs_g: mealData.carbs,
+        fats_g: mealData.fat,
+        fiber_g: mealData.fiber,
+        sugar_g: mealData.sugar,
+      },
+    });
+
+    // Transform to match client expectations
+    return {
+      id: updatedMeal.meal_id.toString(),
+      name: updatedMeal.meal_name || "Unknown meal",
+      description: updatedMeal.meal_name,
+      imageUrl: updatedMeal.image_url,
+      calories: updatedMeal.calories || 0,
+      protein: updatedMeal.protein_g || 0,
+      carbs: updatedMeal.carbs_g || 0,
+      fat: updatedMeal.fats_g || 0,
+      fiber: updatedMeal.fiber_g || 0,
+      sugar: updatedMeal.sugar_g || 0,
+      createdAt: updatedMeal.createdAt.toISOString(),
+      userId: updatedMeal.user_id,
+    };
   }
 
   static async saveMeal(user_id: string, mealData: any, imageBase64?: string) {

@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -7,15 +7,23 @@ import {
   Image,
   RefreshControl,
   ActivityIndicator,
+  TouchableOpacity,
+  Modal,
+  TextInput,
+  Alert,
 } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState, AppDispatch } from "../../src/store";
-import { fetchMeals } from "../../src/store/mealSlice";
+import { fetchMeals, updateMeal } from "../../src/store/mealSlice";
 import { Meal } from "../../src/types";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function MealsScreen() {
   const dispatch = useDispatch<AppDispatch>();
-  const { meals, isLoading } = useSelector((state: RootState) => state.meal);
+  const { meals, isLoading, isUpdating } = useSelector((state: RootState) => state.meal);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null);
+  const [updateText, setUpdateText] = useState("");
 
   useEffect(() => {
     dispatch(fetchMeals());
@@ -25,13 +33,47 @@ export default function MealsScreen() {
     dispatch(fetchMeals());
   };
 
+  const handleUpdateMeal = (meal: Meal) => {
+    setSelectedMeal(meal);
+    setShowUpdateModal(true);
+  };
+
+  const handleUpdateSubmit = async () => {
+    if (selectedMeal && updateText.trim()) {
+      const result = await dispatch(updateMeal({
+        meal_id: selectedMeal.id,
+        updateText: updateText.trim()
+      }));
+      
+      if (updateMeal.fulfilled.match(result)) {
+        Alert.alert("Success", "Meal updated successfully!");
+        setShowUpdateModal(false);
+        setUpdateText("");
+        setSelectedMeal(null);
+        // Refresh meals to get updated data
+        dispatch(fetchMeals());
+      }
+    } else {
+      Alert.alert("Error", "Please enter update text");
+    }
+  };
+
   const renderMeal = ({ item }: { item: Meal }) => (
     <View style={styles.mealCard}>
       {item.imageUrl && (
         <Image source={{ uri: item.imageUrl }} style={styles.mealImage} />
       )}
       <View style={styles.mealInfo}>
-        <Text style={styles.mealName}>{item.name}</Text>
+        <View style={styles.mealHeader}>
+          <Text style={styles.mealName}>{item.name}</Text>
+          <TouchableOpacity
+            style={styles.updateButton}
+            onPress={() => handleUpdateMeal(item)}
+          >
+            <Ionicons name="create-outline" size={20} color="#007AFF" />
+          </TouchableOpacity>
+        </View>
+        
         {item.description && (
           <Text style={styles.mealDescription}>{item.description}</Text>
         )}
@@ -99,6 +141,58 @@ export default function MealsScreen() {
           </View>
         }
       />
+
+      {/* Update Modal */}
+      <Modal
+        visible={showUpdateModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowUpdateModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Update Meal</Text>
+            <Text style={styles.modalSubtitle}>
+              Add additional information about "{selectedMeal?.name}"
+            </Text>
+            
+            <TextInput
+              style={styles.updateInput}
+              placeholder="Enter additional meal information..."
+              value={updateText}
+              onChangeText={setUpdateText}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => {
+                  setShowUpdateModal(false);
+                  setUpdateText("");
+                  setSelectedMeal(null);
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.modalButton, styles.submitButton]}
+                onPress={handleUpdateSubmit}
+                disabled={!updateText.trim() || isUpdating}
+              >
+                {isUpdating ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text style={styles.submitButtonText}>Update</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -139,11 +233,20 @@ const styles = StyleSheet.create({
   mealInfo: {
     padding: 15,
   },
+  mealHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 5,
+  },
   mealName: {
     fontSize: 18,
     fontWeight: "bold",
-    marginBottom: 5,
     color: "#333",
+    flex: 1,
+  },
+  updateButton: {
+    padding: 5,
   },
   mealDescription: {
     fontSize: 14,
@@ -187,5 +290,68 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: "#666",
     lineHeight: 24,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    backgroundColor: "white",
+    margin: 20,
+    padding: 20,
+    borderRadius: 12,
+    width: "90%",
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  updateInput: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+    padding: 15,
+    fontSize: 16,
+    minHeight: 100,
+    marginBottom: 20,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  modalButton: {
+    flex: 1,
+    padding: 15,
+    borderRadius: 8,
+    alignItems: "center",
+    marginHorizontal: 5,
+  },
+  cancelButton: {
+    backgroundColor: "#f8f9fa",
+    borderWidth: 1,
+    borderColor: "#6c757d",
+  },
+  submitButton: {
+    backgroundColor: "#007AFF",
+  },
+  cancelButtonText: {
+    color: "#6c757d",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  submitButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
   },
 });

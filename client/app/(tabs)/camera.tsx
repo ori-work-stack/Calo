@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import {
   View,
@@ -9,6 +8,8 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
+  TextInput,
+  Modal,
 } from "react-native";
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
@@ -17,20 +18,24 @@ import { RootState, AppDispatch } from "@/src/store";
 import {
   analyzeMeal,
   postMeal,
+  updateMeal,
   clearPendingMeal,
   clearError,
+  setPendingMealForUpdate,
 } from "@/src/store/mealSlice";
 import { Ionicons } from "@expo/vector-icons";
 
 export default function CameraScreen() {
   const dispatch = useDispatch<AppDispatch>();
-  const { pendingMeal, isAnalyzing, isPosting, error } = useSelector(
+  const { pendingMeal, isAnalyzing, isPosting, isUpdating, error } = useSelector(
     (state: RootState) => state.meal
   );
 
   const [permission, requestPermission] = useCameraPermissions();
   const [showCamera, setShowCamera] = useState(false);
   const [facing, setFacing] = useState<CameraType>("back");
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [updateText, setUpdateText] = useState("");
   const cameraRef = useRef<CameraView>(null);
 
   // Handle errors
@@ -120,6 +125,29 @@ export default function CameraScreen() {
     }
   };
 
+  const handleUpdate = () => {
+    setShowUpdateModal(true);
+  };
+
+  const handleUpdateSubmit = async () => {
+    if (pendingMeal?.meal_id && updateText.trim()) {
+      const result = await dispatch(updateMeal({
+        meal_id: pendingMeal.meal_id,
+        updateText: updateText.trim()
+      }));
+      
+      if (updateMeal.fulfilled.match(result)) {
+        Alert.alert("Success", "Meal updated successfully!");
+        setShowUpdateModal(false);
+        setUpdateText("");
+      }
+    } else if (!pendingMeal?.meal_id) {
+      Alert.alert("Error", "Cannot update - no meal ID found");
+    } else {
+      Alert.alert("Error", "Please enter update text");
+    }
+  };
+
   const handleDiscard = () => {
     Alert.alert(
       "Discard Analysis",
@@ -200,25 +228,25 @@ export default function CameraScreen() {
             <View style={styles.nutritionGrid}>
               <View style={styles.nutritionItem}>
                 <Text style={styles.nutritionValue}>
-                  {pendingMeal.analysis?.totalCalories || '0'}
+                  {pendingMeal.analysis?.totalCalories || pendingMeal.analysis?.calories || '0'}
                 </Text>
                 <Text style={styles.nutritionLabel}>Calories</Text>
               </View>
               <View style={styles.nutritionItem}>
                 <Text style={styles.nutritionValue}>
-                  {pendingMeal.analysis?.totalProtein || '0'}g
+                  {pendingMeal.analysis?.totalProtein || pendingMeal.analysis?.protein || '0'}g
                 </Text>
                 <Text style={styles.nutritionLabel}>Protein</Text>
               </View>
               <View style={styles.nutritionItem}>
                 <Text style={styles.nutritionValue}>
-                  {pendingMeal.analysis?.totalCarbs || '0'}g
+                  {pendingMeal.analysis?.totalCarbs || pendingMeal.analysis?.carbs || '0'}g
                 </Text>
                 <Text style={styles.nutritionLabel}>Carbs</Text>
               </View>
               <View style={styles.nutritionItem}>
                 <Text style={styles.nutritionValue}>
-                  {pendingMeal.analysis?.totalFat || '0'}g
+                  {pendingMeal.analysis?.totalFat || pendingMeal.analysis?.fat || '0'}g
                 </Text>
                 <Text style={styles.nutritionLabel}>Fat</Text>
               </View>
@@ -229,15 +257,27 @@ export default function CameraScreen() {
             <TouchableOpacity
               style={[styles.actionButton, styles.discardButton]}
               onPress={handleDiscard}
-              disabled={isPosting}
+              disabled={isPosting || isUpdating}
             >
               <Text style={styles.discardButtonText}>Discard</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
+              style={[styles.actionButton, styles.updateButton]}
+              onPress={handleUpdate}
+              disabled={isPosting || isUpdating}
+            >
+              {isUpdating ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text style={styles.updateButtonText}>Update</Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
               style={[styles.actionButton, styles.postButton]}
               onPress={handlePost}
-              disabled={isPosting}
+              disabled={isPosting || isUpdating}
             >
               {isPosting ? (
                 <ActivityIndicator color="white" />
@@ -247,6 +287,57 @@ export default function CameraScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Update Modal */}
+        <Modal
+          visible={showUpdateModal}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setShowUpdateModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Update Meal</Text>
+              <Text style={styles.modalSubtitle}>
+                Add additional information about your meal (e.g., "I also ate 2 pieces of bread")
+              </Text>
+              
+              <TextInput
+                style={styles.updateInput}
+                placeholder="Enter additional meal information..."
+                value={updateText}
+                onChangeText={setUpdateText}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+              />
+              
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => {
+                    setShowUpdateModal(false);
+                    setUpdateText("");
+                  }}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.submitButton]}
+                  onPress={handleUpdateSubmit}
+                  disabled={!updateText.trim() || isUpdating}
+                >
+                  {isUpdating ? (
+                    <ActivityIndicator color="white" />
+                  ) : (
+                    <Text style={styles.submitButtonText}>Update</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </ScrollView>
     );
   }
@@ -466,22 +557,93 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 8,
     alignItems: "center",
-    marginHorizontal: 5,
+    marginHorizontal: 3,
   },
   discardButton: {
     backgroundColor: "#f8f9fa",
     borderWidth: 1,
     borderColor: "#dc3545",
   },
+  updateButton: {
+    backgroundColor: "#ffc107",
+  },
   postButton: {
     backgroundColor: "#28a745",
   },
   discardButtonText: {
     color: "#dc3545",
-    fontSize: 16,
+    fontSize: 14,
+    fontWeight: "bold",
+  },
+  updateButtonText: {
+    color: "white",
+    fontSize: 14,
     fontWeight: "bold",
   },
   postButtonText: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "bold",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    backgroundColor: "white",
+    margin: 20,
+    padding: 20,
+    borderRadius: 12,
+    width: "90%",
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  updateInput: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+    padding: 15,
+    fontSize: 16,
+    minHeight: 100,
+    marginBottom: 20,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  modalButton: {
+    flex: 1,
+    padding: 15,
+    borderRadius: 8,
+    alignItems: "center",
+    marginHorizontal: 5,
+  },
+  cancelButton: {
+    backgroundColor: "#f8f9fa",
+    borderWidth: 1,
+    borderColor: "#6c757d",
+  },
+  submitButton: {
+    backgroundColor: "#007AFF",
+  },
+  cancelButtonText: {
+    color: "#6c757d",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  submitButtonText: {
     color: "white",
     fontSize: 16,
     fontWeight: "bold",
