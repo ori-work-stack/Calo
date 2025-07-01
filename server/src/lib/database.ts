@@ -18,11 +18,6 @@ const getDatabaseUrl = () => {
 export const prisma =
   globalThis.__prisma ||
   new PrismaClient({
-    datasources: {
-      db: {
-        url: getDatabaseUrl(),
-      },
-    },
     log:
       process.env.NODE_ENV === "development"
         ? ["query", "error", "warn"]
