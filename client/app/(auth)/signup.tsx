@@ -33,11 +33,17 @@ export default function SignUp() {
   const handleSignUp = async () => {
     try {
       console.log("hello world");
+      
+      // Parse numeric fields with proper validation
+      const parsedAge = parseInt(formData.age);
+      const parsedWeight = parseFloat(formData.weight);
+      const parsedHeight = parseFloat(formData.height);
+      
       const data = {
         ...formData,
-        age: formData.age ? parseInt(formData.age) : undefined,
-        weight: formData.weight ? parseFloat(formData.weight) : undefined,
-        height: formData.height ? parseFloat(formData.height) : undefined,
+        age: isNaN(parsedAge) ? undefined : parsedAge,
+        weight: isNaN(parsedWeight) ? undefined : parsedWeight,
+        height: isNaN(parsedHeight) ? undefined : parsedHeight,
       };
       console.log(data);
 
