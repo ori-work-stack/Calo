@@ -39,9 +39,22 @@ export default function SignUp() {
       const parsedWeight = parseFloat(formData.weight);
       const parsedHeight = parseFloat(formData.height);
       
+      // Validate required fields
+      if (!formData.email || !formData.password || !formData.name || !formData.age) {
+        Alert.alert("Error", "Please fill in all required fields");
+        return;
+      }
+      
+      if (isNaN(parsedAge)) {
+        Alert.alert("Error", "Please enter a valid age");
+        return;
+      }
+      
       const data = {
-        ...formData,
-        age: isNaN(parsedAge) ? undefined : parsedAge,
+        email: formData.email,
+        password: formData.password,
+        name: formData.name,
+        age: parsedAge,
         weight: isNaN(parsedWeight) ? undefined : parsedWeight,
         height: isNaN(parsedHeight) ? undefined : parsedHeight,
       };
@@ -78,7 +91,7 @@ export default function SignUp() {
 
       <TextInput
         style={styles.input}
-        placeholder="Email"
+        placeholder="Email *"
         value={formData.email}
         onChangeText={(text) => setFormData({ ...formData, email: text })}
         keyboardType="email-address"
@@ -87,7 +100,7 @@ export default function SignUp() {
 
       <TextInput
         style={styles.input}
-        placeholder="Password"
+        placeholder="Password *"
         value={formData.password}
         onChangeText={(text) => setFormData({ ...formData, password: text })}
         secureTextEntry
@@ -95,14 +108,14 @@ export default function SignUp() {
 
       <TextInput
         style={styles.input}
-        placeholder="Name"
+        placeholder="Name *"
         value={formData.name}
         onChangeText={(text) => setFormData({ ...formData, name: text })}
       />
 
       <TextInput
         style={styles.input}
-        placeholder="Age"
+        placeholder="Age *"
         value={formData.age}
         onChangeText={(text) => setFormData({ ...formData, age: text })}
         keyboardType="numeric"
