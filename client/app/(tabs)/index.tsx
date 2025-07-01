@@ -70,7 +70,7 @@ export default function Dashboard() {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
-      <Text style={styles.welcome}>Welcome back, {user?.username}!</Text>
+      <Text style={styles.welcome}>Welcome back, {user?.name}!</Text>
 
       {dailyStats && (
         <View style={styles.statsContainer}>

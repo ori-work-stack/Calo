@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,51 +9,36 @@ datasource db {
 }
 
 model User {
-  id       String   @id @default(cuid())
-  email    String   @unique
-  username String   @unique
-  name     String
-  password String
-  role     UserRole @default(FREE)
+  user_id            String                @id @default(cuid())
+  email              String                @unique
+  password_hash      String
+  name               String?
+  signup_date        DateTime              @default(now())
+  subscription_type  SubscriptionType
+  subscription_start DateTime?
+  subscription_end   DateTime?
+  height_cm          Float?
+  weight_kg          Float?
+  age                Int
+  aiRequestsCount    Int                   @default(0)
+  aiRequestsResetAt  DateTime              @default(now())
+  questionnaires     UserQuestionnaire[]
+  meals              Meal[]
+  nutritionPlans     NutritionPlan[]
+  payments           SubscriptionPayment[]
+  createdAt          DateTime              @default(now())
 
-  // Profile information
-  dateOfBirth   DateTime?
-  height        Float? // in cm
-  weight        Float? // in kg
-  age           Int?
-  activityLevel ActivityLevel @default(MODERATE)
-  dietaryGoals  String?
-  allergies     String[]
-
-  // AI usage tracking
-  aiRequestsCount   Int      @default(0)
-  aiRequestsResetAt DateTime @default(now())
-
-  // Smart watch connection
-  smartWatchConnected Boolean   @default(false)
-  smartWatchType      String?
-  lastSyncAt          DateTime?
-
-  // Relationships
-  meals          Meal[]
-  nutritionGoals NutritionGoal[]
-  healthMetrics  HealthMetric[]
-  sessions       Session[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("users")
+  Session Session[]
 }
 
 model Session {
-  id        String   @id @default(cuid())
-  userId    String
-  token     String   @unique
-  expiresAt DateTime
+  session_id String   @id @default(cuid())
+  user_id    String
+  token      String   @unique
+  expiresAt  DateTime
 
   // Relationships
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -62,131 +46,177 @@ model Session {
   @@map("sessions")
 }
 
+model UserQuestionnaire {
+  questionnaire_id           Int                     @id @default(autoincrement())
+  user                       User                    @relation(fields: [user_id], references: [user_id])
+  user_id                    String
+  date_completed             DateTime                @default(now())
+  physical_activity_level    PhysicalActivityLevel
+  sport_frequency            SportFrequency
+  sport_types                Json?
+  sport_duration_min         Int?
+  meals_per_day              Int?
+  dietary_preferences        Json?
+  avoided_foods              Json?
+  regular_drinks             Json?
+  meal_texture_preference    String?
+  main_goal                  MainGoal
+  specific_goal              String?
+  goal_timeframe_days        Int?
+  program_duration           ProgramDuration
+  meal_timing_restrictions   String?
+  dietary_restrictions       String?
+  willingness_to_follow      Boolean?
+  upcoming_events            String?
+  upload_frequency           UploadFrequency
+  notifications_preference   NotificationsPreference
+  personalized_tips          Boolean?
+  health_metrics_integration Boolean?
+  medical_conditions         Json?
+  medications                String?
+  allergies                  Json?
+  family_medical_history     Json?
+  smoking_status             SmokingStatus
+  sleep_hours_per_night      Float?
+  createdAt                  DateTime                @default(now())
+}
+
 model Meal {
-  id          String  @id @default(cuid())
-  userId      String
-  name        String
-  imageUrl    String? // Supabase Storage URL
-  imageBase64 String? // Temporary base64 storage
-
-  // AI Analysis Results
-  description String
-  calories    Int
-  protein     Float
-  carbs       Float
-  fat         Float
-  fiber       Float?
-  sugar       Float?
-  healthScore Int? // 1-10
-  recommendations String?
-
-  // Meal metadata
-  mealType   MealType @default(OTHER)
-  consumedAt DateTime @default(now())
-
-  // Relationships
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  foodItems FoodItem[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("meals")
+  meal_id                Int            @id @default(autoincrement())
+  user                   User           @relation(fields: [user_id], references: [user_id])
+  user_id                String
+  image_url              String
+  upload_time            DateTime       @default(now())
+  analysis_status        AnalysisStatus
+  meal_name              String?
+  calories               Float?
+  protein_g              Float?
+  carbs_g                Float?
+  fats_g                 Float?
+  saturated_fats_g       Float?
+  polyunsaturated_fats_g Float?
+  monounsaturated_fats_g Float?
+  omega_3_g              Float?
+  omega_6_g              Float?
+  fiber_g                Float?
+  soluble_fiber_g        Float?
+  insoluble_fiber_g      Float?
+  sugar_g                Float?
+  cholesterol_mg         Float?
+  sodium_mg              Float?
+  alcohol_g              Float?
+  caffeine_mg            Float?
+  liquids_ml             Float?
+  serving_size_g         Float?
+  allergens_json         Json?
+  vitamins_json          Json?
+  micronutrients_json    Json?
+  glycemic_index         Float?
+  insulin_index          Float?
+  food_category          String?
+  processing_level       String?
+  cooking_method         String?
+  additives_json         Json?
+  health_risk_notes      String?
+  createdAt              DateTime       @default(now())
 }
 
-model FoodItem {
-  id     String @id @default(cuid())
-  mealId String
-
-  name     String
-  quantity String
-  calories Int
-  protein  Float
-  carbs    Float
-  fat      Float
-  fiber    Float?
-  sugar    Float?
-
-  // Relationships
-  meal Meal @relation(fields: [mealId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("food_items")
+model NutritionPlan {
+  plan_id          Int      @id @default(autoincrement())
+  user             User     @relation(fields: [user_id], references: [user_id])
+  user_id          String
+  created_at       DateTime @default(now())
+  goal_calories    Float?
+  goal_protein_g   Float?
+  goal_carbs_g     Float?
+  goal_fats_g      Float?
+  target_weight_kg Float?
+  duration_days    Int?
+  notes            String?
+  createdAt        DateTime @default(now())
 }
 
-model NutritionGoal {
-  id     String @id @default(cuid())
-  userId String
-
-  dailyCalories Int
-  dailyProtein  Float
-  dailyCarbs    Float
-  dailyFat      Float
-  dailyFiber    Float?
-  dailySugar    Float?
-
-  isActive Boolean @default(true)
-
-  // Relationships
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("nutrition_goals")
+model SubscriptionPayment {
+  payment_id     Int              @id @default(autoincrement())
+  user           User             @relation(fields: [user_id], references: [user_id])
+  user_id        String
+  plan_type      SubscriptionType
+  amount         Float
+  payment_date   DateTime         @default(now())
+  payment_method String?
+  createdAt      DateTime         @default(now())
 }
 
-model HealthMetric {
-  id     String @id @default(cuid())
-  userId String
-
-  metricType MetricType
-  value      Float
-  unit       String
-  recordedAt DateTime   @default(now())
-  source     String? // e.g., "manual", "apple_watch", "fitbit", "supabase"
-
-  // Relationships
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("health_metrics")
+model AdminDashboard {
+  record_id       Int      @id @default(autoincrement())
+  date            DateTime
+  active_users    Int
+  paying_users    Int
+  revenue         Float
+  api_calls       Int
+  marketing_spend Float
+  notes           String?
+  createdAt       DateTime @default(now())
 }
 
-enum UserRole {
-  GOLD
+// ENUMS
+
+enum SubscriptionType {
   FREE
+  BASIC
   PREMIUM
-  ADMIN
 }
 
-enum ActivityLevel {
-  SEDENTARY
+enum SmokingStatus {
+  YES
+  NO
+  UNKNOWN
+}
+
+enum PhysicalActivityLevel {
+  NONE
   LIGHT
   MODERATE
-  ACTIVE
-  VERY_ACTIVE
+  HIGH
 }
 
-enum MealType {
-  BREAKFAST
-  LUNCH
-  DINNER
-  SNACK
-  OTHER
+enum SportFrequency {
+  NONE
+  ONCE_A_WEEK
+  TWO_TO_THREE
+  FOUR_TO_FIVE
+  MORE_THAN_FIVE
 }
 
-enum MetricType {
-  WEIGHT
-  BODY_FAT
-  MUSCLE_MASS
-  WATER_INTAKE
-  SLEEP_HOURS
-  STEPS
-  HEART_RATE
-  BLOOD_PRESSURE
+enum MainGoal {
+  WEIGHT_LOSS
+  WEIGHT_MAINTENANCE
+  WEIGHT_GAIN
+  GENERAL_HEALTH
+  MEDICAL_CONDITION
+  SPORTS_PERFORMANCE
+}
+
+enum ProgramDuration {
+  SHORT_TERM
+  MEDIUM_TERM
+  LONG_TERM
+}
+
+enum UploadFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  NONE
+}
+
+enum NotificationsPreference {
+  DAILY
+  WEEKLY
+  NONE
+}
+
+enum AnalysisStatus {
+  PENDING
+  COMPLETED
 }

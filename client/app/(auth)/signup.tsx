@@ -24,7 +24,6 @@ export default function SignUp() {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
-    username: "",
     name: "",
     age: "",
     weight: "",
@@ -88,12 +87,6 @@ export default function SignUp() {
         secureTextEntry
       />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Username"
-        value={formData.username}
-        onChangeText={(text) => setFormData({ ...formData, username: text })}
-      />
       <TextInput
         style={styles.input}
         placeholder="Name"

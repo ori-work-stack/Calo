@@ -8,7 +8,6 @@ export class AuthRequests {
   // Sign up a new user
   static async signUpUser(userData: {
     email: string;
-    username: string;
     name: string;
     password: string;
   }) {
@@ -177,7 +176,6 @@ export class UserRequests {
   // Update user profile
   static async updateUserProfile(profileData: {
     name?: string;
-    username?: string;
     smartWatchConnected?: boolean;
     smartWatchType?: string;
   }) {

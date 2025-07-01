@@ -13,7 +13,7 @@ dotenv.config();
 
 const app = express();
 const PORT = Number(process.env.PORT) || 5000;
-
+console.error(process.env.PORT)
 // Middleware
 app.use(helmet());
 app.use(

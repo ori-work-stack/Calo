@@ -8,12 +8,12 @@ const JWT_EXPIRES_IN = "7d";
 
 export class AuthService {
   static async signUp(data: SignUpInput) {
-    const { email, username, name, password, age, weight, height } = data;
+    const { email, name, password, age, weight, height } = data;
 
     // Check if user already exists
     const existingUser = await prisma.user.findFirst({
       where: {
-        OR: [{ email }, { username }],
+        OR: [{ email }],
       },
     });
 
@@ -32,36 +32,36 @@ export class AuthService {
     const user = await prisma.user.create({
       data: {
         email,
-        username,
         name,
-        password: hashedPassword,
-        role: "FREE",
-        age: age,
-        weight: weight,
-        height: height,
+        password_hash: hashedPassword,
+        subscription_type: "FREE",
+        age: Number(age),
+        weight_kg: weight,
+        height_cm: height,
         aiRequestsCount: 0,
         aiRequestsResetAt: new Date(),
       },
       select: {
-        id: true,
+        user_id: true,
         email: true,
-        username: true,
         name: true,
-        role: true,
+        subscription_type: true,
         age: true,
-        weight: true,
-        height: true,
+        weight_kg: true,
+        height_cm: true,
         aiRequestsCount: true,
-        smartWatchConnected: true,
-        smartWatchType: true,
         createdAt: true,
       },
     });
 
     // Generate JWT token
-    const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, {
-      expiresIn: JWT_EXPIRES_IN,
-    });
+    const token = jwt.sign(
+      { userId: user.user_id, email: user.email },
+      JWT_SECRET,
+      {
+        expiresIn: JWT_EXPIRES_IN,
+      }
+    );
 
     // Store session
     const expiresAt = new Date();
@@ -69,7 +69,7 @@ export class AuthService {
 
     await prisma.session.create({
       data: {
-        userId: user.id,
+        userId: user.user_id,
         token,
         expiresAt,
       },
@@ -91,13 +91,13 @@ export class AuthService {
     }
 
     // Verify password
-    const isValidPassword = await bcrypt.compare(password, user.password);
+    const isValidPassword = await bcrypt.compare(password, user.password_hash);
     if (!isValidPassword) {
       throw new Error("Invalid email or password");
     }
 
     // Generate JWT token
-    const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, {
+    const token = jwt.sign({ userId: user.user_id, email: user.email }, JWT_SECRET, {
       expiresIn: JWT_EXPIRES_IN,
     });
 
@@ -107,13 +107,13 @@ export class AuthService {
 
     await prisma.session.create({
       data: {
-        userId: user.id,
+        userId: user.user_id,
         token,
         expiresAt,
       },
     });
 
-    const { password: _, ...userWithoutPassword } = user;
+    const { password_hash: _, ...userWithoutPassword } = user;
     return { user: userWithoutPassword, token };
   }
 
@@ -132,7 +132,6 @@ export class AuthService {
             select: {
               id: true,
               email: true,
-              username: true,
               name: true,
               role: true,
               aiRequestsCount: true,

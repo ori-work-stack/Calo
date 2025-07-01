@@ -10,17 +10,14 @@ router.put('/profile', authenticateToken, async (req: AuthRequest, res, next) =>
     const validatedData = updateProfileSchema.parse(req.body);
     
     const updatedUser = await prisma.user.update({
-      where: { id: req.user.id },
+      where: { user_id: req.user.user_id },
       data: validatedData,
       select: {
-        id: true,
+        user_id: true,
         email: true,
-        username: true,
         name: true,
-        role: true,
+        subscription_type: true,
         aiRequestsCount: true,
-        smartWatchConnected: true,
-        smartWatchType: true,
         createdAt: true,
       }
     });
@@ -48,7 +45,7 @@ router.get('/subscription-info', authenticateToken, async (req: AuthRequest, res
     GOLD: { dailyRequests: -1, name: 'Gold Plan' }
   };
 
-  const userRole = req.user.role;
+  const userRole = req.user.subscription_type;
   const info = roleInfo[userRole as keyof typeof roleInfo] || roleInfo.FREE;
 
   res.json({

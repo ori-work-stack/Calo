@@ -44,7 +44,7 @@ export default function ProfileScreen() {
         <View style={styles.avatarContainer}>
           <Ionicons name="person-circle" size={100} color="#007AFF" />
         </View>
-        <Text style={styles.name}>{user?.username || "User"}</Text>
+        <Text style={styles.name}>{user?.name || "User"}</Text>
         <Text style={styles.email}>{user?.email}</Text>
       </View>
 

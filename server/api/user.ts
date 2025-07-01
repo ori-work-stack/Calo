@@ -1,7 +1,6 @@
 
 export interface UpdateProfileData {
   name?: string;
-  username?: string;
   smartWatchConnected?: boolean;
   smartWatchType?: string;
 }
@@ -9,7 +8,6 @@ export interface UpdateProfileData {
 export interface User {
   id: string;
   email: string;
-  username: string;
   name: string;
   role: string;
   aiRequestsCount: number;

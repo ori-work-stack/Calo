@@ -6,7 +6,6 @@ import { z } from "zod";
 export const SignUpSchema = z.object({
   email: z.string().email("Invalid email"),
   password: z.string().min(6, "Password must be at least 6 characters"),
-  username: z.string().min(1, "username is required"),
   name: z.string(),
   age: z.number().min(1).max(120).optional(),
   weight: z.number().positive().optional(),
@@ -47,7 +46,7 @@ export type MealAnalysisData = z.infer<typeof MealAnalysisSchema>;
 export interface User {
   id: string;
   email: string;
-  username: string;
+  name: string;
   age?: number;
   weight?: number;
   height?: number;
