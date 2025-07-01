@@ -29,21 +29,26 @@ const PENDING_MEAL_KEY = "pendingMeal";
 
 // Helper function to compress/resize image if needed
 const processImage = async (imageUri: string): Promise<string> => {
-  if (Platform.OS === 'web') {
+  if (Platform.OS === "web") {
     try {
       console.log("Processing web image:", imageUri);
 
       let imageData: string;
 
-      if (imageUri.startsWith('data:')) {
+      if (imageUri.startsWith("data:")) {
         // Extract base64 from data URL
-        imageData = imageUri.split(',')[1];
-        console.log("Extracted base64 from data URL, length:", imageData.length);
+        imageData = imageUri.split(",")[1];
+        console.log(
+          "Extracted base64 from data URL, length:",
+          imageData.length
+        );
       } else {
         // Fetch the image and convert to base64
         const response = await fetch(imageUri);
         if (!response.ok) {
-          throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+          throw new Error(
+            `Failed to fetch image: ${response.status} ${response.statusText}`
+          );
         }
 
         const blob = await response.blob();
@@ -60,7 +65,7 @@ const processImage = async (imageUri: string): Promise<string> => {
             }
 
             // Extract base64 part (remove data:image/...;base64, prefix)
-            const base64 = result.split(',')[1];
+            const base64 = result.split(",")[1];
             if (!base64) {
               reject(new Error("Failed to extract base64 from result"));
               return;
@@ -78,49 +83,58 @@ const processImage = async (imageUri: string): Promise<string> => {
       }
 
       // Compress image if it's too large (limit to ~1MB base64)
-      if (imageData.length > 1400000) { // ~1MB in base64
+      if (imageData.length > 1400000) {
+        // ~1MB in base64
         console.log("Image too large, compressing...");
 
         // Create an image element to resize
         const img = new Image();
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
 
-        const compressedBase64 = await new Promise<string>((resolve, reject) => {
-          img.onload = () => {
-            // Calculate new dimensions (max 800px on longest side)
-            const maxDimension = 800;
-            let { width, height } = img;
+        const compressedBase64 = await new Promise<string>(
+          (resolve, reject) => {
+            img.onload = () => {
+              // Calculate new dimensions (max 800px on longest side)
+              const maxDimension = 800;
+              let { width, height } = img;
 
-            if (width > height && width > maxDimension) {
-              height = (height * maxDimension) / width;
-              width = maxDimension;
-            } else if (height > maxDimension) {
-              width = (width * maxDimension) / height;
-              height = maxDimension;
-            }
+              if (width > height && width > maxDimension) {
+                height = (height * maxDimension) / width;
+                width = maxDimension;
+              } else if (height > maxDimension) {
+                width = (width * maxDimension) / height;
+                height = maxDimension;
+              }
 
-            canvas.width = width;
-            canvas.height = height;
+              canvas.width = width;
+              canvas.height = height;
 
-            if (!ctx) {
-              reject(new Error("Failed to get canvas context"));
-              return;
-            }
+              if (!ctx) {
+                reject(new Error("Failed to get canvas context"));
+                return;
+              }
 
-            ctx.drawImage(img, 0, 0, width, height);
+              ctx.drawImage(img, 0, 0, width, height);
 
-            // Convert to base64 with quality compression
-            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
-            const compressedBase64 = compressedDataUrl.split(',')[1];
+              // Convert to base64 with quality compression
+              const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.7);
+              const compressedBase64 = compressedDataUrl.split(",")[1];
 
-            console.log("Compressed image from", imageData.length, "to", compressedBase64.length);
-            resolve(compressedBase64);
-          };
+              console.log(
+                "Compressed image from",
+                imageData.length,
+                "to",
+                compressedBase64.length
+              );
+              resolve(compressedBase64);
+            };
 
-          img.onerror = () => reject(new Error("Failed to load image for compression"));
-          img.src = `data:image/jpeg;base64,${imageData}`;
-        });
+            img.onerror = () =>
+              reject(new Error("Failed to load image for compression"));
+            img.src = `data:image/jpeg;base64,${imageData}`;
+          }
+        );
 
         return compressedBase64;
       }
@@ -237,7 +251,10 @@ export const analyzeMeal = createAsyncThunk(
 
 export const updateMeal = createAsyncThunk(
   "meal/updateMeal",
-  async ({ meal_id, updateText }: { meal_id: string; updateText: string }, { rejectWithValue }) => {
+  async (
+    { meal_id, updateText }: { meal_id: string; updateText: string },
+    { rejectWithValue }
+  ) => {
     try {
       console.log("Starting meal update...");
 
@@ -248,7 +265,8 @@ export const updateMeal = createAsyncThunk(
         console.log("Meal updated successfully");
         return response.data;
       } else {
-        const errorMessage = response?.error || "Update failed - no data returned";
+        const errorMessage =
+          response?.error || "Update failed - no data returned";
         console.error("Update failed:", errorMessage);
         return rejectWithValue(errorMessage);
       }
@@ -339,6 +357,57 @@ export const fetchMeals = createAsyncThunk(
   }
 );
 
+export const saveMealFeedback = createAsyncThunk(
+  "meal/saveMealFeedback",
+  async (
+    { mealId, feedback }: { mealId: string; feedback: any },
+    { rejectWithValue }
+  ) => {
+    try {
+      console.log("Saving meal feedback...");
+      const response = await nutritionAPI.saveMealFeedback(mealId, feedback);
+      console.log("Feedback saved successfully");
+      return { mealId, feedback };
+    } catch (error) {
+      console.error("Save feedback error:", error);
+      return rejectWithValue("Failed to save feedback");
+    }
+  }
+);
+
+export const toggleMealFavorite = createAsyncThunk(
+  "meal/toggleMealFavorite",
+  async (mealId: string, { rejectWithValue }) => {
+    try {
+      console.log("Toggling meal favorite...");
+      const response = await nutritionAPI.toggleMealFavorite(mealId);
+      console.log("Favorite toggled successfully");
+      return mealId;
+    } catch (error) {
+      console.error("Toggle favorite error:", error);
+      return rejectWithValue("Failed to toggle favorite");
+    }
+  }
+);
+
+export const duplicateMeal = createAsyncThunk(
+  "meal/duplicateMeal",
+  async (
+    { mealId, newDate }: { mealId: string; newDate?: string },
+    { rejectWithValue }
+  ) => {
+    try {
+      console.log("Duplicating meal...");
+      const response = await nutritionAPI.duplicateMeal(mealId, newDate);
+      console.log("Meal duplicated successfully");
+      return response.data;
+    } catch (error) {
+      console.error("Duplicate meal error:", error);
+      return rejectWithValue("Failed to duplicate meal");
+    }
+  }
+);
+
 export const loadPendingMeal = createAsyncThunk(
   "meal/loadPendingMeal",
   async (_, { rejectWithValue }) => {
@@ -379,7 +448,10 @@ const mealSlice = createSlice({
     setPendingMeal: (state, action: PayloadAction<PendingMeal>) => {
       state.pendingMeal = action.payload;
     },
-    setPendingMealForUpdate: (state, action: PayloadAction<{ meal_id: string; imageBase64: string }>) => {
+    setPendingMealForUpdate: (
+      state,
+      action: PayloadAction<{ meal_id: string; imageBase64: string }>
+    ) => {
       state.pendingMeal = {
         imageBase64: action.payload.imageBase64,
         analysis: null,
@@ -419,7 +491,9 @@ const mealSlice = createSlice({
         state.error = null;
         // Update the meal in the meals array
         const updatedMeal = action.payload;
-        const index = state.meals.findIndex(meal => meal.id === updatedMeal.id);
+        const index = state.meals.findIndex(
+          (meal) => meal.id === updatedMeal.id
+        );
         if (index !== -1) {
           state.meals[index] = updatedMeal;
         }
@@ -470,6 +544,27 @@ const mealSlice = createSlice({
         state.error = action.payload as string;
       })
 
+      // Save meal feedback cases
+      .addCase(saveMealFeedback.fulfilled, (state, action) => {
+        // Update meal with feedback in the state if needed
+        console.log("Feedback saved successfully");
+      })
+
+      // Toggle meal favorite cases
+      .addCase(toggleMealFavorite.fulfilled, (state, action) => {
+        // Update meal favorite status in the state if needed
+        console.log("Favorite toggled successfully");
+      })
+
+      // Duplicate meal cases
+      .addCase(duplicateMeal.fulfilled, (state, action) => {
+        // Add duplicated meal to the list
+        if (action.payload) {
+          state.meals.unshift(action.payload);
+        }
+        console.log("Meal duplicated successfully");
+      })
+
       // Load pending meal cases
       .addCase(loadPendingMeal.pending, (state) => {
         // Don't show loading for this background operation
@@ -487,6 +582,10 @@ const mealSlice = createSlice({
   },
 });
 
-export const { clearError, clearPendingMeal, setPendingMeal, setPendingMealForUpdate } =
-  mealSlice.actions;
+export const {
+  clearError,
+  clearPendingMeal,
+  setPendingMeal,
+  setPendingMealForUpdate,
+} = mealSlice.actions;
 export default mealSlice.reducer;

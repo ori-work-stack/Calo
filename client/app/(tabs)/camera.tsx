@@ -27,9 +27,8 @@ import { Ionicons } from "@expo/vector-icons";
 
 export default function CameraScreen() {
   const dispatch = useDispatch<AppDispatch>();
-  const { pendingMeal, isAnalyzing, isPosting, isUpdating, error } = useSelector(
-    (state: RootState) => state.meal
-  );
+  const { pendingMeal, isAnalyzing, isPosting, isUpdating, error } =
+    useSelector((state: RootState) => state.meal);
 
   const [permission, requestPermission] = useCameraPermissions();
   const [showCamera, setShowCamera] = useState(false);
@@ -67,21 +66,21 @@ export default function CameraScreen() {
   const takePicture = async () => {
     if (cameraRef.current && !isAnalyzing) {
       try {
-        console.log("Taking picture...");
+        console.log("📸 Taking picture...");
         const photo = await cameraRef.current.takePictureAsync({
           quality: 0.8,
           base64: true,
         });
-        
+
         if (photo && photo.base64) {
-          console.log("Picture taken, analyzing...");
+          console.log("✅ Picture taken, analyzing...");
           setShowCamera(false);
           dispatch(analyzeMeal(photo.base64));
         } else {
           Alert.alert("Error", "Failed to capture image data");
         }
       } catch (error) {
-        console.error("Camera error:", error);
+        console.error("💥 Camera error:", error);
         Alert.alert("Error", "Failed to take picture");
       }
     }
@@ -89,9 +88,9 @@ export default function CameraScreen() {
 
   const pickImage = async () => {
     if (isAnalyzing) return;
-    
+
     try {
-      console.log("Opening image picker...");
+      console.log("🖼️ Opening image picker...");
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -102,8 +101,8 @@ export default function CameraScreen() {
 
       if (!result.canceled && result.assets[0]) {
         const asset = result.assets[0];
-        console.log("Image selected, processing...");
-        
+        console.log("✅ Image selected, processing...");
+
         if (asset.base64) {
           dispatch(analyzeMeal(asset.base64));
         } else {
@@ -111,7 +110,7 @@ export default function CameraScreen() {
         }
       }
     } catch (error) {
-      console.error("Image picker error:", error);
+      console.error("💥 Image picker error:", error);
       Alert.alert("Error", "Failed to select image");
     }
   };
@@ -127,25 +126,44 @@ export default function CameraScreen() {
 
   const handleUpdate = () => {
     setShowUpdateModal(true);
+    setUpdateText(""); // Reset update text when opening modal
   };
 
   const handleUpdateSubmit = async () => {
     if (pendingMeal?.meal_id && updateText.trim()) {
-      const result = await dispatch(updateMeal({
-        meal_id: pendingMeal.meal_id,
-        updateText: updateText.trim()
-      }));
-      
+      console.log("🔄 Submitting update with text:", updateText.trim());
+      console.log("🆔 Meal ID:", pendingMeal.meal_id);
+
+      const result = await dispatch(
+        updateMeal({
+          meal_id: pendingMeal.meal_id,
+          updateText: updateText.trim(),
+        })
+      );
+
       if (updateMeal.fulfilled.match(result)) {
         Alert.alert("Success", "Meal updated successfully!");
+        // Close modal and reset state
         setShowUpdateModal(false);
         setUpdateText("");
+        // The pending meal will be cleared automatically by the reducer
+      } else {
+        console.error("❌ Update failed:", result.payload);
+        Alert.alert(
+          "Error",
+          "Failed to update meal: " + (result.payload || "Unknown error")
+        );
       }
     } else if (!pendingMeal?.meal_id) {
       Alert.alert("Error", "Cannot update - no meal ID found");
     } else {
       Alert.alert("Error", "Please enter update text");
     }
+  };
+
+  const handleUpdateCancel = () => {
+    setShowUpdateModal(false);
+    setUpdateText("");
   };
 
   const handleDiscard = () => {
@@ -189,10 +207,12 @@ export default function CameraScreen() {
               onPress={takePicture}
               disabled={isAnalyzing}
             >
-              <View style={[
-                styles.captureButtonInner,
-                isAnalyzing && styles.captureButtonDisabled
-              ]} />
+              <View
+                style={[
+                  styles.captureButtonInner,
+                  isAnalyzing && styles.captureButtonDisabled,
+                ]}
+              />
             </TouchableOpacity>
           </View>
         </CameraView>
@@ -205,10 +225,12 @@ export default function CameraScreen() {
       <ScrollView style={styles.container}>
         <View style={styles.analysisContainer}>
           <Image
-            source={{ uri: `data:image/jpeg;base64,${pendingMeal.imageBase64}` }}
+            source={{
+              uri: `data:image/jpeg;base64,${pendingMeal.imageBase64}`,
+            }}
             style={styles.analyzedImage}
             onError={(error) => {
-              console.error("Image display error:", error);
+              console.error("💥 Image display error:", error);
             }}
           />
 
@@ -216,37 +238,59 @@ export default function CameraScreen() {
             <Text style={styles.analysisTitle}>Analysis Results</Text>
 
             <Text style={styles.mealName}>
-              {pendingMeal.analysis?.description || "Unknown Meal"}
+              {pendingMeal.analysis?.description ||
+                pendingMeal.analysis?.name ||
+                "Unknown Meal"}
             </Text>
-            
-            {pendingMeal.analysis?.description && (
+
+            {(pendingMeal.analysis?.description ||
+              pendingMeal.analysis?.name) && (
               <Text style={styles.mealDescription}>
-                {pendingMeal.analysis.description}
+                {pendingMeal.analysis.description || pendingMeal.analysis.name}
               </Text>
             )}
 
             <View style={styles.nutritionGrid}>
               <View style={styles.nutritionItem}>
                 <Text style={styles.nutritionValue}>
-                  {pendingMeal.analysis?.totalCalories || pendingMeal.analysis?.calories || '0'}
+                  {Math.round(
+                    pendingMeal.analysis?.totalCalories ||
+                      pendingMeal.analysis?.calories ||
+                      0
+                  )}
                 </Text>
                 <Text style={styles.nutritionLabel}>Calories</Text>
               </View>
               <View style={styles.nutritionItem}>
                 <Text style={styles.nutritionValue}>
-                  {pendingMeal.analysis?.totalProtein || pendingMeal.analysis?.protein || '0'}g
+                  {Math.round(
+                    pendingMeal.analysis?.totalProtein ||
+                      pendingMeal.analysis?.protein ||
+                      0
+                  )}
+                  g
                 </Text>
                 <Text style={styles.nutritionLabel}>Protein</Text>
               </View>
               <View style={styles.nutritionItem}>
                 <Text style={styles.nutritionValue}>
-                  {pendingMeal.analysis?.totalCarbs || pendingMeal.analysis?.carbs || '0'}g
+                  {Math.round(
+                    pendingMeal.analysis?.totalCarbs ||
+                      pendingMeal.analysis?.carbs ||
+                      0
+                  )}
+                  g
                 </Text>
                 <Text style={styles.nutritionLabel}>Carbs</Text>
               </View>
               <View style={styles.nutritionItem}>
                 <Text style={styles.nutritionValue}>
-                  {pendingMeal.analysis?.totalFat || pendingMeal.analysis?.fat || '0'}g
+                  {Math.round(
+                    pendingMeal.analysis?.totalFat ||
+                      pendingMeal.analysis?.fat ||
+                      0
+                  )}
+                  g
                 </Text>
                 <Text style={styles.nutritionLabel}>Fat</Text>
               </View>
@@ -268,7 +312,7 @@ export default function CameraScreen() {
               disabled={isPosting || isUpdating}
             >
               {isUpdating ? (
-                <ActivityIndicator color="white" />
+                <ActivityIndicator color="white" size="small" />
               ) : (
                 <Text style={styles.updateButtonText}>Update</Text>
               )}
@@ -293,15 +337,16 @@ export default function CameraScreen() {
           visible={showUpdateModal}
           animationType="slide"
           transparent={true}
-          onRequestClose={() => setShowUpdateModal(false)}
+          onRequestClose={handleUpdateCancel}
         >
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>Update Meal</Text>
               <Text style={styles.modalSubtitle}>
-                Add additional information about your meal (e.g., "I also ate 2 pieces of bread")
+                Add additional information about your meal (e.g., "I also ate 2
+                pieces of bread")
               </Text>
-              
+
               <TextInput
                 style={styles.updateInput}
                 placeholder="Enter additional meal information..."
@@ -310,26 +355,25 @@ export default function CameraScreen() {
                 multiline
                 numberOfLines={4}
                 textAlignVertical="top"
+                autoFocus={true}
               />
-              
+
               <View style={styles.modalButtons}>
                 <TouchableOpacity
                   style={[styles.modalButton, styles.cancelButton]}
-                  onPress={() => {
-                    setShowUpdateModal(false);
-                    setUpdateText("");
-                  }}
+                  onPress={handleUpdateCancel}
+                  disabled={isUpdating}
                 >
                   <Text style={styles.cancelButtonText}>Cancel</Text>
                 </TouchableOpacity>
-                
+
                 <TouchableOpacity
                   style={[styles.modalButton, styles.submitButton]}
                   onPress={handleUpdateSubmit}
                   disabled={!updateText.trim() || isUpdating}
                 >
                   {isUpdating ? (
-                    <ActivityIndicator color="white" />
+                    <ActivityIndicator color="white" size="small" />
                   ) : (
                     <Text style={styles.submitButtonText}>Update</Text>
                   )}

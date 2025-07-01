@@ -33,23 +33,28 @@ export default function SignUp() {
   const handleSignUp = async () => {
     try {
       console.log("hello world");
-      
+
       // Parse numeric fields with proper validation
       const parsedAge = parseInt(formData.age);
       const parsedWeight = parseFloat(formData.weight);
       const parsedHeight = parseFloat(formData.height);
-      
+
       // Validate required fields
-      if (!formData.email || !formData.password || !formData.name || !formData.age) {
+      if (
+        !formData.email ||
+        !formData.password ||
+        !formData.name ||
+        !formData.age
+      ) {
         Alert.alert("Error", "Please fill in all required fields");
         return;
       }
-      
+
       if (isNaN(parsedAge)) {
         Alert.alert("Error", "Please enter a valid age");
         return;
       }
-      
+
       const data = {
         email: formData.email,
         password: formData.password,
@@ -65,7 +70,10 @@ export default function SignUp() {
       console.log(result);
 
       if (signUp.fulfilled.match(result)) {
+        console.log("Sign up successful, navigating to tabs...");
         router.replace("/(tabs)");
+      } else {
+        console.log("Sign up failed:", result.payload);
       }
     } catch (error: any) {
       Alert.alert("Error", error.issues?.[0]?.message || "Invalid input");
@@ -79,8 +87,10 @@ export default function SignUp() {
     }
   }, [error, dispatch]);
 
+  // Navigate to tabs when authentication is successful
   React.useEffect(() => {
     if (isAuthenticated) {
+      console.log("User is authenticated, navigating to tabs...");
       router.replace("/(tabs)");
     }
   }, [isAuthenticated]);

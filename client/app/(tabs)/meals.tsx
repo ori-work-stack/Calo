@@ -20,7 +20,9 @@ import { Ionicons } from "@expo/vector-icons";
 
 export default function MealsScreen() {
   const dispatch = useDispatch<AppDispatch>();
-  const { meals, isLoading, isUpdating } = useSelector((state: RootState) => state.meal);
+  const { meals, isLoading, isUpdating } = useSelector(
+    (state: RootState) => state.meal
+  );
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null);
   const [updateText, setUpdateText] = useState("");
@@ -34,17 +36,24 @@ export default function MealsScreen() {
   };
 
   const handleUpdateMeal = (meal: Meal) => {
+    console.log("🔄 Opening update modal for meal:", meal);
     setSelectedMeal(meal);
+    setUpdateText("");
     setShowUpdateModal(true);
   };
 
   const handleUpdateSubmit = async () => {
     if (selectedMeal && updateText.trim()) {
-      const result = await dispatch(updateMeal({
-        meal_id: selectedMeal.id,
-        updateText: updateText.trim()
-      }));
-      
+      console.log("🔄 Submitting update for meal:", selectedMeal.id);
+      console.log("📝 Update text:", updateText.trim());
+
+      const result = await dispatch(
+        updateMeal({
+          meal_id: selectedMeal.id,
+          updateText: updateText.trim(),
+        })
+      );
+
       if (updateMeal.fulfilled.match(result)) {
         Alert.alert("Success", "Meal updated successfully!");
         setShowUpdateModal(false);
@@ -52,16 +61,34 @@ export default function MealsScreen() {
         setSelectedMeal(null);
         // Refresh meals to get updated data
         dispatch(fetchMeals());
+      } else {
+        console.error("❌ Update failed:", result.payload);
+        Alert.alert(
+          "Error",
+          "Failed to update meal: " + (result.payload || "Unknown error")
+        );
       }
     } else {
       Alert.alert("Error", "Please enter update text");
     }
   };
 
+  const handleUpdateCancel = () => {
+    setShowUpdateModal(false);
+    setUpdateText("");
+    setSelectedMeal(null);
+  };
+
   const renderMeal = ({ item }: { item: Meal }) => (
     <View style={styles.mealCard}>
       {item.imageUrl && (
-        <Image source={{ uri: item.imageUrl }} style={styles.mealImage} />
+        <Image
+          source={{ uri: item.imageUrl }}
+          style={styles.mealImage}
+          onError={(error) => {
+            console.error("💥 Image load error for meal:", item.id, error);
+          }}
+        />
       )}
       <View style={styles.mealInfo}>
         <View style={styles.mealHeader}>
@@ -73,8 +100,8 @@ export default function MealsScreen() {
             <Ionicons name="create-outline" size={20} color="#007AFF" />
           </TouchableOpacity>
         </View>
-        
-        {item.description && (
+
+        {item.description && item.description !== item.name && (
           <Text style={styles.mealDescription}>{item.description}</Text>
         )}
         <Text style={styles.mealDate}>
@@ -89,22 +116,26 @@ export default function MealsScreen() {
         <View style={styles.nutritionRow}>
           <View style={styles.nutritionItem}>
             <Text style={styles.nutritionValue}>
-              {Math.round(item.calories)}
+              {Math.round(item.calories || 0)}
             </Text>
             <Text style={styles.nutritionLabel}>cal</Text>
           </View>
           <View style={styles.nutritionItem}>
             <Text style={styles.nutritionValue}>
-              {Math.round(item.protein)}g
+              {Math.round(item.protein || 0)}g
             </Text>
             <Text style={styles.nutritionLabel}>protein</Text>
           </View>
           <View style={styles.nutritionItem}>
-            <Text style={styles.nutritionValue}>{Math.round(item.carbs)}g</Text>
+            <Text style={styles.nutritionValue}>
+              {Math.round(item.carbs || 0)}g
+            </Text>
             <Text style={styles.nutritionLabel}>carbs</Text>
           </View>
           <View style={styles.nutritionItem}>
-            <Text style={styles.nutritionValue}>{Math.round(item.fat)}g</Text>
+            <Text style={styles.nutritionValue}>
+              {Math.round(item.fat || 0)}g
+            </Text>
             <Text style={styles.nutritionLabel}>fat</Text>
           </View>
         </View>
@@ -147,7 +178,7 @@ export default function MealsScreen() {
         visible={showUpdateModal}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => setShowUpdateModal(false)}
+        onRequestClose={handleUpdateCancel}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -155,7 +186,7 @@ export default function MealsScreen() {
             <Text style={styles.modalSubtitle}>
               Add additional information about "{selectedMeal?.name}"
             </Text>
-            
+
             <TextInput
               style={styles.updateInput}
               placeholder="Enter additional meal information..."
@@ -164,27 +195,25 @@ export default function MealsScreen() {
               multiline
               numberOfLines={4}
               textAlignVertical="top"
+              autoFocus={true}
             />
-            
+
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setShowUpdateModal(false);
-                  setUpdateText("");
-                  setSelectedMeal(null);
-                }}
+                onPress={handleUpdateCancel}
+                disabled={isUpdating}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={[styles.modalButton, styles.submitButton]}
                 onPress={handleUpdateSubmit}
                 disabled={!updateText.trim() || isUpdating}
               >
                 {isUpdating ? (
-                  <ActivityIndicator color="white" />
+                  <ActivityIndicator color="white" size="small" />
                 ) : (
                   <Text style={styles.submitButtonText}>Update</Text>
                 )}

@@ -4,6 +4,16 @@ import { MealAnalysisInput } from "../types/nutrition";
 import { AuthService } from "./auth";
 
 export class NutritionService {
+  static updateMeal(
+    user_id: any,
+    arg1: {
+      meal_id: string;
+      updateText: string;
+      language: "english" | "hebrew";
+    }
+  ) {
+    throw new Error("Method not implemented.");
+  }
   static async analyzeMeal(user_id: string, data: MealAnalysisInput) {
     const { imageBase64, language } = data;
 

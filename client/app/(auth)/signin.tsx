@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -8,50 +7,57 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
-} from 'react-native';
-import { Link, router } from 'expo-router';
-import { useDispatch, useSelector } from 'react-redux';
-import { RootState, AppDispatch } from '@/src/store';
-import { signIn, clearError } from '@/src/store/authSlice';
-import { SignInSchema } from '@/src/types';
+} from "react-native";
+import { Link, router } from "expo-router";
+import { useDispatch, useSelector } from "react-redux";
+import { RootState, AppDispatch } from "@/src/store";
+import { signIn, clearError } from "@/src/store/authSlice";
+import { SignInSchema } from "@/src/types";
 
 export default function SignIn() {
   const dispatch = useDispatch<AppDispatch>();
-  const { isLoading, error, isAuthenticated } = useSelector((state: RootState) => state.auth);
-  
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const { isLoading, error, isAuthenticated } = useSelector(
+    (state: RootState) => state.auth
+  );
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   const handleSignIn = async () => {
     try {
       const validatedData = SignInSchema.parse({ email, password });
       const result = await dispatch(signIn(validatedData));
-      
+
       if (signIn.fulfilled.match(result)) {
-        router.replace('/(tabs)');
+        console.log("Sign in successful, navigating to tabs...");
+        router.replace("/(tabs)");
+      } else {
+        console.log("Sign in failed:", result.payload);
       }
     } catch (error: any) {
-      Alert.alert('Error', error.issues?.[0]?.message || 'Invalid input');
+      Alert.alert("Error", error.issues?.[0]?.message || "Invalid input");
     }
   };
 
   React.useEffect(() => {
     if (error) {
-      Alert.alert('Error', error);
+      Alert.alert("Error", error);
       dispatch(clearError());
     }
   }, [error, dispatch]);
 
+  // Navigate to tabs when authentication is successful
   React.useEffect(() => {
     if (isAuthenticated) {
-      router.replace('/(tabs)');
+      console.log("User is authenticated, navigating to tabs...");
+      router.replace("/(tabs)");
     }
   }, [isAuthenticated]);
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Sign In</Text>
-      
+
       <TextInput
         style={styles.input}
         placeholder="Email"
@@ -60,7 +66,7 @@ export default function SignIn() {
         keyboardType="email-address"
         autoCapitalize="none"
       />
-      
+
       <TextInput
         style={styles.input}
         placeholder="Password"
@@ -68,7 +74,7 @@ export default function SignIn() {
         onChangeText={setPassword}
         secureTextEntry
       />
-      
+
       <TouchableOpacity
         style={styles.button}
         onPress={handleSignIn}
@@ -80,7 +86,7 @@ export default function SignIn() {
           <Text style={styles.buttonText}>Sign In</Text>
         )}
       </TouchableOpacity>
-      
+
       <Link href="/(auth)/signup" style={styles.link}>
         <Text>Don't have an account? Sign Up</Text>
       </Link>
@@ -91,38 +97,38 @@ export default function SignIn() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
   title: {
     fontSize: 32,
-    fontWeight: 'bold',
-    textAlign: 'center',
+    fontWeight: "bold",
+    textAlign: "center",
     marginBottom: 40,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: "#ddd",
     padding: 15,
     borderRadius: 8,
     marginBottom: 15,
     fontSize: 16,
   },
   button: {
-    backgroundColor: '#007AFF',
+    backgroundColor: "#007AFF",
     padding: 15,
     borderRadius: 8,
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 20,
   },
   buttonText: {
-    color: 'white',
+    color: "white",
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   link: {
-    textAlign: 'center',
-    color: '#007AFF',
+    textAlign: "center",
+    color: "#007AFF",
   },
 });

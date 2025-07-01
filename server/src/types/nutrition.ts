@@ -1,16 +1,19 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 export const mealAnalysisSchema = z.object({
-  imageBase64: z.string().min(1, 'Image is required'),
-  language: z.enum(['english', 'hebrew']).default('english'),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format').optional(),
+  imageBase64: z.string().min(1, "Image is required"),
+  language: z.enum(["english", "hebrew"]).default("english"),
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format")
+    .optional(),
   updateText: z.string().optional(), // For meal updates
 });
 
 export const mealUpdateSchema = z.object({
-  meal_id: z.string(),
-  updateText: z.string().min(1, 'Update text is required'),
-  language: z.enum(['english', 'hebrew']).default('english'),
+  meal_id: z.string().min(1, "Meal ID is required"),
+  updateText: z.string().min(1, "Update text is required"),
+  language: z.enum(["english", "hebrew"]).default("english"),
 });
 
 export const mealSchema = z.object({
@@ -24,7 +27,7 @@ export const mealSchema = z.object({
   fats_g: z.number().nullable(),
   fiber_g: z.number().nullable(),
   sugar_g: z.number().nullable(),
-  analysis_status: z.enum(['PENDING', 'COMPLETED']),
+  analysis_status: z.enum(["PENDING", "COMPLETED"]),
   upload_time: z.date(),
   createdAt: z.date(),
 });

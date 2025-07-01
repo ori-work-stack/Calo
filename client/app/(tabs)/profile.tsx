@@ -24,12 +24,12 @@ export default function ProfileScreen() {
       const result = await dispatch(signOut());
       console.log("SignOut result:", result);
 
-      if (signOut.fulfilled.match(result) || signOut.rejected.match(result)) {
-        console.log("Navigating to signin...");
-        router.replace("/(auth)/signin");
-      }
+      // Always navigate to signin regardless of the result
+      console.log("Navigating to signin...");
+      router.replace("/(auth)/signin");
     } catch (error) {
       console.error("SignOut catch error:", error);
+      // Force signout and navigate even if there's an error
       dispatch(forceSignOut());
       router.replace("/(auth)/signin");
     }
@@ -56,14 +56,14 @@ export default function ProfileScreen() {
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Weight</Text>
           <Text style={styles.infoValue}>
-            {user?.weight ? `${user.weight} kg` : "Not set"}
+            {user?.weight_kg ? `${user.weight_kg} kg` : "Not set"}
           </Text>
         </View>
 
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Height</Text>
           <Text style={styles.infoValue}>
-            {user?.height ? `${user.height} cm` : "Not set"}
+            {user?.height_cm ? `${user.height_cm} cm` : "Not set"}
           </Text>
         </View>
 

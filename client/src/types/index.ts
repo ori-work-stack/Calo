@@ -37,33 +37,71 @@ export type SignInData = z.infer<typeof SignInSchema>;
 export type MealAnalysisData = z.infer<typeof MealAnalysisSchema>;
 
 //
-// ✅ Manual Interfaces
+// ✅ Manual Interfaces - Updated to match Prisma schema
 //
 export interface User {
   user_id: string;
   email: string;
   name: string;
-  age?: number;
+  age: number;
   weight_kg?: number;
   height_cm?: number;
-  subscription_type?: string;
-  aiRequestsCount?: number;
+  subscription_type: string;
+  aiRequestsCount: number;
+  aiRequestsResetAt: string;
   createdAt: string;
 }
 
+// Updated Meal interface to match Prisma schema exactly
 export interface Meal {
-  id: string;
+  meal_id: number; // This is the actual field name in Prisma
+  id: string; // For compatibility with existing code
+  user_id: string;
+  image_url: string;
+  upload_time: string;
+  analysis_status: "PENDING" | "COMPLETED";
+  meal_name: string | null;
+  calories: number | null;
+  protein_g: number | null;
+  carbs_g: number | null;
+  fats_g: number | null;
+  saturated_fats_g?: number | null;
+  polyunsaturated_fats_g?: number | null;
+  monounsaturated_fats_g?: number | null;
+  omega_3_g?: number | null;
+  omega_6_g?: number | null;
+  fiber_g: number | null;
+  soluble_fiber_g?: number | null;
+  insoluble_fiber_g?: number | null;
+  sugar_g: number | null;
+  cholesterol_mg?: number | null;
+  sodium_mg?: number | null;
+  alcohol_g?: number | null;
+  caffeine_mg?: number | null;
+  liquids_ml?: number | null;
+  serving_size_g?: number | null;
+  allergens_json?: any;
+  vitamins_json?: any;
+  micronutrients_json?: any;
+  glycemic_index?: number | null;
+  insulin_index?: number | null;
+  food_category?: string | null;
+  processing_level?: string | null;
+  cooking_method?: string | null;
+  additives_json?: any;
+  health_risk_notes?: string | null;
+  createdAt: string;
+
+  // Computed fields for compatibility
   name: string;
   description?: string;
   imageUrl?: string;
-  calories: number;
   protein: number;
   carbs: number;
   fat: number;
   fiber?: number;
   sugar?: number;
   sodium?: number;
-  createdAt: string;
   userId: string;
 }
 
@@ -86,4 +124,15 @@ export interface PendingMeal {
   analysis: MealAnalysisData | null;
   timestamp: number;
   meal_id?: string; // For updates
+}
+
+// Daily stats interface
+export interface DailyStats {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber: number;
+  sugar: number;
+  mealCount: number;
 }

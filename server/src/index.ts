@@ -13,15 +13,26 @@ dotenv.config();
 
 const app = express();
 const PORT = Number(process.env.PORT) || 5000;
-console.error(process.env.PORT)
+console.error(process.env.PORT);
+
 // Middleware
 app.use(helmet());
+
+// CORS configuration for Expo Go
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:8081",
+    origin: [
+      process.env.CLIENT_URL || "http://localhost:8081",
+      "http://localhost:19006", // Expo web
+      "http://localhost:19000", // Expo DevTools
+      "http://192.168.1.56:19006", // Your computer's IP
+      "http://192.168.1.56:8081", // Your computer's IP
+      // Add more IP variations if needed
+    ],
     credentials: true,
   })
 );
+
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
@@ -42,11 +53,12 @@ app.use("/api/user", userRoutes);
 // Error handler
 app.use(errorHandler);
 
-// Start server
-app.listen(PORT, '0.0.0.0', () => {
+// Start server - binding to 0.0.0.0 allows external connections
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Database: Supabase PostgreSQL`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
+  console.log(`📱 Access from phone: http://192.168.1.56:${PORT}`);
 });
 
 export default app;
