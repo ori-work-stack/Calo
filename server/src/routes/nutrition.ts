@@ -1,8 +1,7 @@
-
 import { Router } from 'express';
 import { NutritionService } from '../services/nutrition';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
-import { mealAnalysisSchema } from '../types/nutrition';
+import { mealAnalysisSchema, mealUpdateSchema } from '../types/nutrition';
 
 const router = Router();
 
@@ -26,7 +25,7 @@ router.post('/analyze', async (req: AuthRequest, res) => {
       });
     }
 
-    const { imageBase64, language = 'english', date } = validationResult.data;
+    const { imageBase64, language = 'english', date, updateText } = validationResult.data;
     
     if (!imageBase64 || imageBase64.trim() === '') {
       return res.status(400).json({
@@ -35,13 +34,14 @@ router.post('/analyze', async (req: AuthRequest, res) => {
       });
     }
 
-    console.log('Processing meal analysis for user:', req.user.id);
+    console.log('Processing meal analysis for user:', req.user.user_id);
     console.log('Image data length:', imageBase64.length);
 
-    const result = await NutritionService.analyzeMeal(req.user.id, {
+    const result = await NutritionService.analyzeMeal(req.user.user_id, {
       imageBase64,
       language,
-      date: date || new Date().toISOString().split('T')[0]
+      date: date || new Date().toISOString().split('T')[0],
+      updateText
     });
 
     console.log('Analysis completed successfully');
@@ -49,6 +49,46 @@ router.post('/analyze', async (req: AuthRequest, res) => {
   } catch (error) {
     console.error('Analyze meal error:', error);
     const message = error instanceof Error ? error.message : 'Failed to analyze meal';
+    res.status(500).json({
+      success: false,
+      error: message
+    });
+  }
+});
+
+// Update meal endpoint
+router.put('/update', async (req: AuthRequest, res) => {
+  try {
+    console.log('Update meal request received');
+    
+    const validationResult = mealUpdateSchema.safeParse(req.body);
+    
+    if (!validationResult.success) {
+      console.error('Validation error:', validationResult.error);
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid request data: ' + validationResult.error.errors.map(e => e.message).join(', ')
+      });
+    }
+
+    const { meal_id, updateText, language } = validationResult.data;
+
+    console.log('Updating meal for user:', req.user.user_id);
+    
+    const meal = await NutritionService.updateMeal(req.user.user_id, {
+      meal_id,
+      updateText,
+      language
+    });
+    
+    console.log('Meal updated successfully');
+    res.json({
+      success: true,
+      data: meal
+    });
+  } catch (error) {
+    console.error('Update meal error:', error);
+    const message = error instanceof Error ? error.message : 'Failed to update meal';
     res.status(500).json({
       success: false,
       error: message
@@ -70,9 +110,9 @@ router.post('/save', async (req: AuthRequest, res) => {
       });
     }
 
-    console.log('Saving meal for user:', req.user.id);
+    console.log('Saving meal for user:', req.user.user_id);
     
-    const meal = await NutritionService.saveMeal(req.user.id, mealData, imageBase64);
+    const meal = await NutritionService.saveMeal(req.user.user_id, mealData, imageBase64);
     
     console.log('Meal saved successfully');
     res.json({
@@ -92,9 +132,9 @@ router.post('/save', async (req: AuthRequest, res) => {
 // Get user meals
 router.get('/meals', async (req: AuthRequest, res) => {
   try {
-    console.log('Get meals request for user:', req.user.id);
+    console.log('Get meals request for user:', req.user.user_id);
     
-    const meals = await NutritionService.getUserMeals(req.user.id);
+    const meals = await NutritionService.getUserMeals(req.user.user_id);
     
     res.json({
       success: true,
@@ -122,9 +162,9 @@ router.get('/stats/:date', async (req: AuthRequest, res) => {
       });
     }
 
-    console.log('Get stats request for user:', req.user.id, 'date:', date);
+    console.log('Get stats request for user:', req.user.user_id, 'date:', date);
     
-    const stats = await NutritionService.getDailyStats(req.user.id, date);
+    const stats = await NutritionService.getDailyStats(req.user.user_id, date);
     
     res.json({
       success: true,

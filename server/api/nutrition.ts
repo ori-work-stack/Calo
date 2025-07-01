@@ -1,4 +1,3 @@
-
 export interface MealAnalysisData {
   imageBase64: string;
   language: 'english' | 'hebrew';

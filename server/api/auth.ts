@@ -2,6 +2,9 @@ export interface SignUpData {
   email: string;
   name: string;
   password: string;
+  age?: number;
+  weight?: number;
+  height?: number;
 }
 
 export interface SignInData {
@@ -16,9 +19,10 @@ export interface AuthResponse {
     email: string;
     name: string;
     subscription_type: string;
+    age?: number;
+    weight_kg?: number;
+    height_cm?: number;
     aiRequestsCount: number;
-    // smartWatchConnected: boolean;
-    // smartWatchType: string | null;
     createdAt: string;
   };
   token?: string;

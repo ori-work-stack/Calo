@@ -11,6 +11,7 @@ interface MealState {
   isLoading: boolean;
   isAnalyzing: boolean;
   isPosting: boolean;
+  isUpdating: boolean;
   error: string | null;
 }
 
@@ -20,6 +21,7 @@ const initialState: MealState = {
   isLoading: false,
   isAnalyzing: false,
   isPosting: false,
+  isUpdating: false,
   error: null,
 };
 
@@ -233,6 +235,38 @@ export const analyzeMeal = createAsyncThunk(
   }
 );
 
+export const updateMeal = createAsyncThunk(
+  "meal/updateMeal",
+  async ({ meal_id, updateText }: { meal_id: string; updateText: string }, { rejectWithValue }) => {
+    try {
+      console.log("Starting meal update...");
+
+      const response = await nutritionAPI.updateMeal(meal_id, updateText);
+      console.log("Update response received:", response);
+
+      if (response && response.success && response.data) {
+        console.log("Meal updated successfully");
+        return response.data;
+      } else {
+        const errorMessage = response?.error || "Update failed - no data returned";
+        console.error("Update failed:", errorMessage);
+        return rejectWithValue(errorMessage);
+      }
+    } catch (error) {
+      console.error("Update error details:", error);
+
+      let errorMessage = "Update failed";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === "string") {
+        errorMessage = error;
+      }
+
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
 export const postMeal = createAsyncThunk(
   "meal/postMeal",
   async (_, { getState, rejectWithValue }) => {
@@ -345,6 +379,14 @@ const mealSlice = createSlice({
     setPendingMeal: (state, action: PayloadAction<PendingMeal>) => {
       state.pendingMeal = action.payload;
     },
+    setPendingMealForUpdate: (state, action: PayloadAction<{ meal_id: string; imageBase64: string }>) => {
+      state.pendingMeal = {
+        imageBase64: action.payload.imageBase64,
+        analysis: null,
+        timestamp: Date.now(),
+        meal_id: action.payload.meal_id,
+      };
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -364,6 +406,31 @@ const mealSlice = createSlice({
         state.isAnalyzing = false;
         state.error = action.payload as string;
         console.log("Analysis failed:", action.payload);
+      })
+
+      // Update meal cases
+      .addCase(updateMeal.pending, (state) => {
+        state.isUpdating = true;
+        state.error = null;
+        console.log("Update started...");
+      })
+      .addCase(updateMeal.fulfilled, (state, action) => {
+        state.isUpdating = false;
+        state.error = null;
+        // Update the meal in the meals array
+        const updatedMeal = action.payload;
+        const index = state.meals.findIndex(meal => meal.id === updatedMeal.id);
+        if (index !== -1) {
+          state.meals[index] = updatedMeal;
+        }
+        // Clear pending meal after successful update
+        state.pendingMeal = null;
+        console.log("Update completed successfully");
+      })
+      .addCase(updateMeal.rejected, (state, action) => {
+        state.isUpdating = false;
+        state.error = action.payload as string;
+        console.log("Update failed:", action.payload);
       })
 
       // Post meal cases
@@ -420,6 +487,6 @@ const mealSlice = createSlice({
   },
 });
 
-export const { clearError, clearPendingMeal, setPendingMeal } =
+export const { clearError, clearPendingMeal, setPendingMeal, setPendingMealForUpdate } =
   mealSlice.actions;
 export default mealSlice.reducer;

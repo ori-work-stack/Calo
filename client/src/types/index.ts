@@ -7,13 +7,9 @@ export const SignUpSchema = z.object({
   email: z.string().email("Invalid email"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   name: z.string(),
-  age: z.number().min(1).max(120).optional(),
+  age: z.number().min(1).max(120),
   weight: z.number().positive().optional(),
   height: z.number().positive().optional(),
-  activityLevel: z
-    .enum(["sedentary", "light", "moderate", "active", "very_active"])
-    .optional(),
-  goal: z.enum(["lose_weight", "maintain", "gain_weight"]).optional(),
 });
 
 export const SignInSchema = z.object({
@@ -44,14 +40,14 @@ export type MealAnalysisData = z.infer<typeof MealAnalysisSchema>;
 // ✅ Manual Interfaces
 //
 export interface User {
-  id: string;
+  user_id: string;
   email: string;
   name: string;
   age?: number;
-  weight?: number;
-  height?: number;
-  activityLevel?: string;
-  goal?: string;
+  weight_kg?: number;
+  height_cm?: number;
+  subscription_type?: string;
+  aiRequestsCount?: number;
   createdAt: string;
 }
 
@@ -89,5 +85,5 @@ export interface PendingMeal {
   imageUri?: string;
   analysis: MealAnalysisData | null;
   timestamp: number;
+  meal_id?: string; // For updates
 }
-

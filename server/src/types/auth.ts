@@ -2,12 +2,10 @@ import { z } from "zod";
 
 export const signUpSchema = z.object({
   email: z.string().email("Invalid email address"),
-
   name: z
     .string()
     .min(2, "Name must be at least 2 characters")
     .max(50, "Name must be less than 50 characters"),
-
   password: z
     .string()
     .min(8, "Password must be at least 8 characters")
@@ -15,10 +13,9 @@ export const signUpSchema = z.object({
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
       "Password must contain at least one lowercase letter, one uppercase letter, and one number"
     ),
-
-  age: z.coerce.number().optional(),
-  weight: z.coerce.number().optional(),
-  height: z.coerce.number().optional(),
+  age: z.coerce.number().min(1).max(120),
+  weight: z.coerce.number().positive().optional(),
+  height: z.coerce.number().positive().optional(),
 });
 
 export const signInSchema = z.object({
@@ -28,8 +25,9 @@ export const signInSchema = z.object({
 
 export const updateProfileSchema = z.object({
   name: z.string().min(2).max(50).optional(),
-  smartWatchConnected: z.boolean().optional(),
-  smartWatchType: z.string().optional(),
+  age: z.number().min(1).max(120).optional(),
+  weight_kg: z.number().positive().optional(),
+  height_cm: z.number().positive().optional(),
 });
 
 export type SignUpInput = z.infer<typeof signUpSchema>;

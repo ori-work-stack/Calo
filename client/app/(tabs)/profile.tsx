@@ -16,7 +16,6 @@ import { Ionicons } from "@expo/vector-icons";
 export default function ProfileScreen() {
   const dispatch = useDispatch<AppDispatch>();
   const { user, isLoading } = useSelector((state: RootState) => state.auth);
-  console.log(user);
 
   const handleSignOut = async () => {
     try {
@@ -26,13 +25,11 @@ export default function ProfileScreen() {
       console.log("SignOut result:", result);
 
       if (signOut.fulfilled.match(result) || signOut.rejected.match(result)) {
-        // Navigate regardless of success/failure since we cleared local state
         console.log("Navigating to signin...");
         router.replace("/(auth)/signin");
       }
     } catch (error) {
       console.error("SignOut catch error:", error);
-      // Fallback: force signout and navigate
       dispatch(forceSignOut());
       router.replace("/(auth)/signin");
     }
@@ -71,18 +68,9 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Activity Level</Text>
+          <Text style={styles.infoLabel}>Subscription</Text>
           <Text style={styles.infoValue}>
-            {user?.activityLevel
-              ? user.activityLevel.replace("_", " ")
-              : "Not set"}
-          </Text>
-        </View>
-
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Goal</Text>
-          <Text style={styles.infoValue}>
-            {user?.goal ? user.goal.replace("_", " ") : "Not set"}
+            {user?.subscription_type || "Free"}
           </Text>
         </View>
       </View>
