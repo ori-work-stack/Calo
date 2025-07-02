@@ -7,22 +7,40 @@ const router = Router();
 
 router.post("/signup", async (req, res, next) => {
   try {
-    const validatedData = signUpSchema.parse(req.body);
     console.log("🔄 Processing signup request...");
+    console.log("📱 Request body:", req.body);
+    console.log("🌐 Origin:", req.headers.origin);
+    console.log("📍 IP:", req.ip);
+    console.log("🔍 User-Agent:", req.headers["user-agent"]);
+
+    const validatedData = signUpSchema.parse(req.body);
     const result = await AuthService.signUp(validatedData);
 
-    // Set secure HTTP-only cookie
-    const cookieOptions = AuthService.getCookieOptions();
-    res.cookie("auth_token", result.token, cookieOptions);
+    // Set secure HTTP-only cookie for web clients
+    const isWebClient =
+      req.headers.origin?.includes("localhost:19006") ||
+      req.headers.origin?.includes("localhost:8081") ||
+      req.headers["user-agent"]?.includes("Mozilla");
 
-    console.log("✅ Signup successful, cookie set");
+    if (isWebClient) {
+      const cookieOptions = AuthService.getCookieOptions();
+      res.cookie("auth_token", result.token, cookieOptions);
+      console.log("🍪 Cookie set for web client");
+    } else {
+      console.log(
+        "📱 Mobile client detected - token will be stored in Keychain"
+      );
+    }
+
+    console.log("✅ Signup successful");
 
     res.status(201).json({
       success: true,
       user: result.user,
-      token: result.token, // Still send token for mobile compatibility
+      token: result.token, // Always send token for mobile compatibility
     });
   } catch (error) {
+    console.error("💥 Signup error:", error);
     if (error instanceof Error) {
       res.status(400).json({
         success: false,
@@ -36,22 +54,40 @@ router.post("/signup", async (req, res, next) => {
 
 router.post("/signin", async (req, res, next) => {
   try {
-    const validatedData = signInSchema.parse(req.body);
     console.log("🔄 Processing signin request...");
+    console.log("📱 Request body:", req.body);
+    console.log("🌐 Origin:", req.headers.origin);
+    console.log("📍 IP:", req.ip);
+    console.log("🔍 User-Agent:", req.headers["user-agent"]);
+
+    const validatedData = signInSchema.parse(req.body);
     const result = await AuthService.signIn(validatedData);
 
-    // Set secure HTTP-only cookie
-    const cookieOptions = AuthService.getCookieOptions();
-    res.cookie("auth_token", result.token, cookieOptions);
+    // Set secure HTTP-only cookie for web clients
+    const isWebClient =
+      req.headers.origin?.includes("localhost:19006") ||
+      req.headers.origin?.includes("localhost:8081") ||
+      req.headers["user-agent"]?.includes("Mozilla");
 
-    console.log("✅ Signin successful, cookie set");
+    if (isWebClient) {
+      const cookieOptions = AuthService.getCookieOptions();
+      res.cookie("auth_token", result.token, cookieOptions);
+      console.log("🍪 Cookie set for web client");
+    } else {
+      console.log(
+        "📱 Mobile client detected - token will be stored in Keychain"
+      );
+    }
+
+    console.log("✅ Signin successful");
 
     res.json({
       success: true,
       user: result.user,
-      token: result.token, // Still send token for mobile compatibility
+      token: result.token, // Always send token for mobile compatibility
     });
   } catch (error) {
+    console.error("💥 Signin error:", error);
     if (error instanceof Error) {
       res.status(401).json({
         success: false,

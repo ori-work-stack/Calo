@@ -16,6 +16,8 @@ export default function TabLayout() {
             iconName = focused ? "restaurant" : "restaurant-outline";
           } else if (route.name === "history") {
             iconName = focused ? "time" : "time-outline";
+          } else if (route.name === "calendar") {
+            iconName = focused ? "calendar" : "calendar-outline";
           } else if (route.name === "profile") {
             iconName = focused ? "person" : "person-outline";
           } else {
@@ -51,6 +53,12 @@ export default function TabLayout() {
         name="history"
         options={{
           title: "History",
+        }}
+      />
+      <Tabs.Screen
+        name="calendar"
+        options={{
+          title: "Calendar",
         }}
       />
       <Tabs.Screen

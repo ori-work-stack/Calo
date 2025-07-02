@@ -7,6 +7,7 @@ import { errorHandler } from "./middleware/errorHandler";
 import { authRoutes } from "./routes/auth";
 import { nutritionRoutes } from "./routes/nutrition";
 import { userRoutes } from "./routes/user";
+import { calendarRoutes } from "./routes/calendar";
 import "./services/cron";
 
 // Load environment variables
@@ -14,7 +15,10 @@ dotenv.config();
 
 const app = express();
 const PORT = Number(process.env.PORT) || 5000;
-console.error(process.env.PORT);
+
+console.log("🚀 Starting server...");
+console.log("📊 Environment:", process.env.NODE_ENV || "development");
+console.log("🔌 Port:", PORT);
 
 // Middleware
 app.use(helmet());
@@ -26,11 +30,19 @@ app.use(
       process.env.CLIENT_URL || "http://localhost:8081",
       "http://localhost:19006", // Expo web
       "http://localhost:19000", // Expo DevTools
-      "http://192.168.1.56:19006", // Your computer's IP
-      "http://192.168.1.56:8081", // Your computer's IP
-      // Add more IP variations if needed
+      "http://192.168.1.61:19006", // Updated IP for web
+      "http://192.168.1.61:8081", // Updated IP for mobile
+      "http://192.168.1.61:*", // Allow any port on your IP
+      // Add more IP variations if needed for different network configurations
+      "http://10.0.0.0/8", // Private network range
+      "http://172.16.0.0/12", // Private network range
+      "http://192.168.0.0/16", // Private network range
+      // Allow all origins for development (remove in production)
+      "*",
     ],
-    credentials: true, // CRITICAL: Enable credentials for cookies
+    credentials: true, // Enable credentials for cookies
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
   })
 );
 
@@ -46,6 +58,21 @@ app.get("/health", (req, res) => {
     status: "healthy",
     timestamp: new Date().toISOString(),
     database: "supabase-postgresql",
+    environment: process.env.NODE_ENV || "development",
+    ip: req.ip,
+    headers: req.headers,
+  });
+});
+
+// Test endpoint for connectivity
+app.get("/test", (req, res) => {
+  console.log("🧪 Test endpoint hit from:", req.ip);
+  res.json({
+    message: "Server is reachable!",
+    timestamp: new Date().toISOString(),
+    ip: req.ip,
+    userAgent: req.headers["user-agent"],
+    origin: req.headers.origin,
   });
 });
 
@@ -53,6 +80,7 @@ app.get("/health", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/nutrition", nutritionRoutes);
 app.use("/api/user", userRoutes);
+app.use("/api/calendar", calendarRoutes);
 
 // Error handler
 app.use(errorHandler);
@@ -62,8 +90,10 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Database: Supabase PostgreSQL`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
-  console.log(`📱 Access from phone: http://192.168.1.56:${PORT}`);
+  console.log(`📱 Access from phone: http://192.168.1.61:${PORT}`);
   console.log(`🍪 Cookie-based authentication enabled`);
+  console.log(`🧪 Test endpoint: http://192.168.1.61:${PORT}/test`);
+  console.log(`💚 Health check: http://192.168.1.61:${PORT}/health`);
 });
 
 export default app;

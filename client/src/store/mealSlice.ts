@@ -12,6 +12,9 @@ interface MealState {
   isAnalyzing: boolean;
   isPosting: boolean;
   isUpdating: boolean;
+  isSavingFeedback: boolean;
+  isTogglingFavorite: boolean;
+  isDuplicating: boolean;
   error: string | null;
 }
 
@@ -22,6 +25,9 @@ const initialState: MealState = {
   isAnalyzing: false,
   isPosting: false,
   isUpdating: false,
+  isSavingFeedback: false,
+  isTogglingFavorite: false,
+  isDuplicating: false,
   error: null,
 };
 
@@ -357,19 +363,32 @@ export const fetchMeals = createAsyncThunk(
   }
 );
 
+// NEW THUNKS FOR HISTORY FEATURES
+
 export const saveMealFeedback = createAsyncThunk(
   "meal/saveMealFeedback",
   async (
-    { mealId, feedback }: { mealId: string; feedback: any },
+    {
+      mealId,
+      feedback,
+    }: {
+      mealId: string;
+      feedback: {
+        tasteRating?: number;
+        satietyRating?: number;
+        energyRating?: number;
+        heavinessRating?: number;
+      };
+    },
     { rejectWithValue }
   ) => {
     try {
-      console.log("Saving meal feedback...");
+      console.log("💬 Saving meal feedback...");
       const response = await nutritionAPI.saveMealFeedback(mealId, feedback);
-      console.log("Feedback saved successfully");
+      console.log("✅ Feedback saved successfully");
       return { mealId, feedback };
     } catch (error) {
-      console.error("Save feedback error:", error);
+      console.error("💥 Save feedback error:", error);
       return rejectWithValue("Failed to save feedback");
     }
   }
@@ -379,12 +398,12 @@ export const toggleMealFavorite = createAsyncThunk(
   "meal/toggleMealFavorite",
   async (mealId: string, { rejectWithValue }) => {
     try {
-      console.log("Toggling meal favorite...");
+      console.log("❤️ Toggling meal favorite...");
       const response = await nutritionAPI.toggleMealFavorite(mealId);
-      console.log("Favorite toggled successfully");
-      return mealId;
+      console.log("✅ Favorite toggled successfully");
+      return { mealId, isFavorite: response.data.isFavorite };
     } catch (error) {
-      console.error("Toggle favorite error:", error);
+      console.error("💥 Toggle favorite error:", error);
       return rejectWithValue("Failed to toggle favorite");
     }
   }
@@ -397,12 +416,17 @@ export const duplicateMeal = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
-      console.log("Duplicating meal...");
+      console.log("📋 Duplicating meal...");
       const response = await nutritionAPI.duplicateMeal(mealId, newDate);
-      console.log("Meal duplicated successfully");
-      return response.data;
+      console.log("✅ Meal duplicated successfully");
+
+      if (response.success && response.data) {
+        return response.data;
+      } else {
+        return rejectWithValue(response.error || "Failed to duplicate meal");
+      }
     } catch (error) {
-      console.error("Duplicate meal error:", error);
+      console.error("💥 Duplicate meal error:", error);
       return rejectWithValue("Failed to duplicate meal");
     }
   }
@@ -545,24 +569,66 @@ const mealSlice = createSlice({
       })
 
       // Save meal feedback cases
+      .addCase(saveMealFeedback.pending, (state) => {
+        state.isSavingFeedback = true;
+        state.error = null;
+      })
       .addCase(saveMealFeedback.fulfilled, (state, action) => {
-        // Update meal with feedback in the state if needed
+        state.isSavingFeedback = false;
+        // Update meal with feedback in the state
+        const { mealId, feedback } = action.payload;
+        const mealIndex = state.meals.findIndex((meal) => meal.id === mealId);
+        if (mealIndex !== -1) {
+          const meal = state.meals[mealIndex] as any;
+          meal.tasteRating = feedback.tasteRating || meal.tasteRating;
+          meal.satietyRating = feedback.satietyRating || meal.satietyRating;
+          meal.energyRating = feedback.energyRating || meal.energyRating;
+          meal.heavinessRating =
+            feedback.heavinessRating || meal.heavinessRating;
+        }
         console.log("Feedback saved successfully");
+      })
+      .addCase(saveMealFeedback.rejected, (state, action) => {
+        state.isSavingFeedback = false;
+        state.error = action.payload as string;
       })
 
       // Toggle meal favorite cases
+      .addCase(toggleMealFavorite.pending, (state) => {
+        state.isTogglingFavorite = true;
+        state.error = null;
+      })
       .addCase(toggleMealFavorite.fulfilled, (state, action) => {
-        // Update meal favorite status in the state if needed
+        state.isTogglingFavorite = false;
+        // Update meal favorite status in the state
+        const { mealId, isFavorite } = action.payload;
+        const mealIndex = state.meals.findIndex((meal) => meal.id === mealId);
+        if (mealIndex !== -1) {
+          (state.meals[mealIndex] as any).isFavorite = isFavorite;
+        }
         console.log("Favorite toggled successfully");
+      })
+      .addCase(toggleMealFavorite.rejected, (state, action) => {
+        state.isTogglingFavorite = false;
+        state.error = action.payload as string;
       })
 
       // Duplicate meal cases
+      .addCase(duplicateMeal.pending, (state) => {
+        state.isDuplicating = true;
+        state.error = null;
+      })
       .addCase(duplicateMeal.fulfilled, (state, action) => {
-        // Add duplicated meal to the list
+        state.isDuplicating = false;
+        // Add duplicated meal to the beginning of the list
         if (action.payload) {
           state.meals.unshift(action.payload);
         }
         console.log("Meal duplicated successfully");
+      })
+      .addCase(duplicateMeal.rejected, (state, action) => {
+        state.isDuplicating = false;
+        state.error = action.payload as string;
       })
 
       // Load pending meal cases

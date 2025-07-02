@@ -14,17 +14,18 @@ import {
 } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState, AppDispatch } from "../../src/store";
-import { fetchMeals } from "../../src/store/mealSlice";
+import {
+  fetchMeals,
+  saveMealFeedback,
+  toggleMealFavorite,
+  duplicateMeal,
+  updateMeal,
+} from "../../src/store/mealSlice";
 import { Meal } from "../../src/types";
 import { Ionicons } from "@expo/vector-icons";
 
 interface MealWithFeedback extends Meal {
   userRating?: number;
-  tasteRating?: number;
-  satietyRating?: number;
-  energyRating?: number;
-  heavinessRating?: number;
-  isFavorite?: boolean;
 }
 
 interface FilterOptions {
@@ -36,17 +37,26 @@ interface FilterOptions {
 
 export default function HistoryScreen() {
   const dispatch = useDispatch<AppDispatch>();
-  const { meals, isLoading } = useSelector((state: RootState) => state.meal);
+  const {
+    meals,
+    isLoading,
+    isSavingFeedback,
+    isTogglingFavorite,
+    isDuplicating,
+    isUpdating,
+  } = useSelector((state: RootState) => state.meal);
 
   const [filteredMeals, setFilteredMeals] = useState<MealWithFeedback[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [selectedMeal, setSelectedMeal] = useState<MealWithFeedback | null>(
     null
   );
   const [searchText, setSearchText] = useState("");
   const [filters, setFilters] = useState<FilterOptions>({});
   const [smartInsight, setSmartInsight] = useState<string>("");
+  const [updateText, setUpdateText] = useState("");
 
   // Feedback ratings
   const [tasteRating, setTasteRating] = useState(0);
@@ -179,14 +189,55 @@ export default function HistoryScreen() {
     setSmartInsight(insights[Math.floor(Math.random() * insights.length)]);
   };
 
-  const handleFeedbackSubmit = () => {
+  const handleFeedbackSubmit = async () => {
     if (!selectedMeal) return;
 
-    // Here you would typically save the feedback to your backend
-    // For now, we'll just show a success message
-    Alert.alert("Thank you!", "Your feedback has been saved successfully");
-    setShowFeedbackModal(false);
-    resetFeedbackRatings();
+    const feedback = {
+      tasteRating,
+      satietyRating,
+      energyRating,
+      heavinessRating,
+    };
+
+    try {
+      await dispatch(
+        saveMealFeedback({
+          mealId: selectedMeal.id,
+          feedback,
+        })
+      ).unwrap();
+
+      Alert.alert("Thank you!", "Your feedback has been saved successfully");
+      setShowFeedbackModal(false);
+      resetFeedbackRatings();
+    } catch (error) {
+      Alert.alert("Error", "Failed to save feedback");
+    }
+  };
+
+  const handleUpdateSubmit = async () => {
+    if (!selectedMeal || !updateText.trim()) {
+      Alert.alert("Error", "Please enter update text");
+      return;
+    }
+
+    try {
+      await dispatch(
+        updateMeal({
+          meal_id: selectedMeal.id,
+          updateText: updateText.trim(),
+        })
+      ).unwrap();
+
+      Alert.alert("Success", "Meal updated successfully!");
+      setShowUpdateModal(false);
+      setUpdateText("");
+      setSelectedMeal(null);
+      // Refresh meals
+      dispatch(fetchMeals());
+    } catch (error) {
+      Alert.alert("Error", "Failed to update meal");
+    }
   };
 
   const resetFeedbackRatings = () => {
@@ -196,24 +247,58 @@ export default function HistoryScreen() {
     setHeavinessRating(0);
   };
 
-  const toggleFavorite = (mealId: string) => {
-    // Here you would typically update the favorite status in your backend
-    Alert.alert("Favorites", "Meal added to favorites");
+  const handleToggleFavorite = async (mealId: string) => {
+    try {
+      await dispatch(toggleMealFavorite(mealId)).unwrap();
+      Alert.alert("Success", "Favorite status updated");
+    } catch (error) {
+      Alert.alert("Error", "Failed to update favorite status");
+    }
   };
 
-  const duplicateMeal = (meal: Meal) => {
+  const handleDuplicateMeal = async (meal: Meal) => {
     Alert.alert(
       "Duplicate Meal",
-      "Would you like to duplicate this meal to another day?",
+      "Would you like to duplicate this meal to today?",
       [
         { text: "Cancel", style: "cancel" },
         {
           text: "Yes",
-          onPress: () =>
-            Alert.alert("Duplicated!", "Meal duplicated successfully"),
+          onPress: async () => {
+            try {
+              console.log("🔄 Starting duplicate process for meal:", meal.id);
+              console.log("📋 Meal data:", meal);
+
+              const result = await dispatch(
+                duplicateMeal({
+                  mealId: meal.id,
+                  newDate: new Date().toISOString().split("T")[0],
+                })
+              ).unwrap();
+
+              console.log("✅ Duplicate result:", result);
+              Alert.alert("Success", "Meal duplicated successfully!");
+
+              // Refresh meals to show the new duplicate
+              dispatch(fetchMeals());
+            } catch (error) {
+              console.error("💥 Duplicate error:", error);
+              Alert.alert(
+                "Error",
+                "Failed to duplicate meal: " +
+                  (error instanceof Error ? error.message : "Unknown error")
+              );
+            }
+          },
         },
       ]
     );
+  };
+
+  const handleUpdateMeal = (meal: Meal) => {
+    setSelectedMeal(meal);
+    setUpdateText("");
+    setShowUpdateModal(true);
   };
 
   const renderStarRating = (
@@ -243,7 +328,12 @@ export default function HistoryScreen() {
       <View style={styles.mealCard}>
         <View style={styles.mealHeader}>
           <View style={styles.mealInfo}>
-            <Text style={styles.mealName}>{item.name}</Text>
+            <View style={styles.mealTitleRow}>
+              <Text style={styles.mealName}>{item.name}</Text>
+              {item.isFavorite && (
+                <Ionicons name="heart" size={16} color="#FF6B6B" />
+              )}
+            </View>
             <Text style={styles.mealTime}>
               {mealDate.toLocaleDateString()} •{" "}
               {mealDate.toLocaleTimeString([], {
@@ -293,13 +383,73 @@ export default function HistoryScreen() {
           </View>
         </View>
 
+        {/* User Ratings Display */}
+        {item.tasteRating ||
+        item.satietyRating ||
+        item.energyRating ||
+        item.heavinessRating ? (
+          <View style={styles.ratingsDisplay}>
+            <Text style={styles.ratingsTitle}>Your Ratings:</Text>
+            <View style={styles.ratingsRow}>
+              {item.tasteRating ? (
+                <View style={styles.ratingItem}>
+                  <Text style={styles.ratingLabel}>Taste</Text>
+                  <View style={styles.miniStars}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Ionicons
+                        key={star}
+                        name={
+                          star <= (item.tasteRating || 0)
+                            ? "star"
+                            : "star-outline"
+                        }
+                        size={12}
+                        color={
+                          star <= (item.tasteRating || 0) ? "#FFD700" : "#DDD"
+                        }
+                      />
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+              {item.satietyRating ? (
+                <View style={styles.ratingItem}>
+                  <Text style={styles.ratingLabel}>Satiety</Text>
+                  <View style={styles.miniStars}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Ionicons
+                        key={star}
+                        name={
+                          star <= (item.satietyRating || 0)
+                            ? "star"
+                            : "star-outline"
+                        }
+                        size={12}
+                        color={
+                          star <= (item.satietyRating || 0) ? "#FFD700" : "#DDD"
+                        }
+                      />
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+            </View>
+          </View>
+        ) : null}
+
         <View style={styles.mealActions}>
           <TouchableOpacity
             style={styles.actionButton}
             onPress={() => {
               setSelectedMeal(item);
+              // Pre-fill existing ratings
+              setTasteRating(item.tasteRating || 0);
+              setSatietyRating(item.satietyRating || 0);
+              setEnergyRating(item.energyRating || 0);
+              setHeavinessRating(item.heavinessRating || 0);
               setShowFeedbackModal(true);
             }}
+            disabled={isSavingFeedback}
           >
             <Ionicons name="chatbubble-outline" size={20} color="#007AFF" />
             <Text style={styles.actionText}>Rate</Text>
@@ -307,18 +457,39 @@ export default function HistoryScreen() {
 
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => toggleFavorite(item.id)}
+            onPress={() => handleToggleFavorite(item.id)}
+            disabled={isTogglingFavorite}
           >
-            <Ionicons name="heart-outline" size={20} color="#FF6B6B" />
-            <Text style={styles.actionText}>Favorite</Text>
+            <Ionicons
+              name={item.isFavorite ? "heart" : "heart-outline"}
+              size={20}
+              color="#FF6B6B"
+            />
+            <Text style={styles.actionText}>
+              {item.isFavorite ? "Unfavorite" : "Favorite"}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => duplicateMeal(item)}
+            onPress={() => handleDuplicateMeal(item)}
+            disabled={isDuplicating}
           >
-            <Ionicons name="copy-outline" size={20} color="#4CAF50" />
+            {isDuplicating ? (
+              <ActivityIndicator size="small" color="#4CAF50" />
+            ) : (
+              <Ionicons name="copy-outline" size={20} color="#4CAF50" />
+            )}
             <Text style={styles.actionText}>Duplicate</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => handleUpdateMeal(item)}
+            disabled={isUpdating}
+          >
+            <Ionicons name="create-outline" size={20} color="#FF9800" />
+            <Text style={styles.actionText}>Update</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -358,7 +529,7 @@ export default function HistoryScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Smart Insight - FIXED: Wrapped text in Text component */}
+      {/* Smart Insight */}
       {smartInsight ? (
         <View style={styles.insightContainer}>
           <Ionicons name="bulb" size={20} color="#FFD700" />
@@ -429,6 +600,7 @@ export default function HistoryScreen() {
                   setShowFeedbackModal(false);
                   resetFeedbackRatings();
                 }}
+                disabled={isSavingFeedback}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
@@ -436,8 +608,67 @@ export default function HistoryScreen() {
               <TouchableOpacity
                 style={[styles.modalButton, styles.submitButton]}
                 onPress={handleFeedbackSubmit}
+                disabled={isSavingFeedback}
               >
-                <Text style={styles.submitButtonText}>Save</Text>
+                {isSavingFeedback ? (
+                  <ActivityIndicator color="white" size="small" />
+                ) : (
+                  <Text style={styles.submitButtonText}>Save</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Update Modal */}
+      <Modal
+        visible={showUpdateModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowUpdateModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Update Meal</Text>
+            <Text style={styles.modalSubtitle}>
+              Add additional information about "{selectedMeal?.name}"
+            </Text>
+
+            <TextInput
+              style={styles.updateInput}
+              placeholder="Enter additional meal information..."
+              value={updateText}
+              onChangeText={setUpdateText}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+              autoFocus={true}
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => {
+                  setShowUpdateModal(false);
+                  setUpdateText("");
+                  setSelectedMeal(null);
+                }}
+                disabled={isUpdating}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.submitButton]}
+                onPress={handleUpdateSubmit}
+                disabled={!updateText.trim() || isUpdating}
+              >
+                {isUpdating ? (
+                  <ActivityIndicator color="white" size="small" />
+                ) : (
+                  <Text style={styles.submitButtonText}>Update</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -592,6 +823,11 @@ const styles = StyleSheet.create({
   mealInfo: {
     flex: 1,
   },
+  mealTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   mealName: {
     fontSize: 18,
     fontWeight: "bold",
@@ -637,6 +873,33 @@ const styles = StyleSheet.create({
     color: "#666",
     marginTop: 2,
   },
+  ratingsDisplay: {
+    padding: 15,
+    borderTopWidth: 1,
+    borderTopColor: "#eee",
+  },
+  ratingsTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 8,
+  },
+  ratingsRow: {
+    flexDirection: "row",
+    gap: 20,
+  },
+  ratingItem: {
+    alignItems: "center",
+  },
+  ratingLabel: {
+    fontSize: 12,
+    color: "#666",
+    marginBottom: 4,
+  },
+  miniStars: {
+    flexDirection: "row",
+    gap: 2,
+  },
   mealActions: {
     flexDirection: "row",
     justifyContent: "space-around",
@@ -646,11 +909,13 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     alignItems: "center",
+    flex: 1,
   },
   actionText: {
     fontSize: 12,
     color: "#666",
     marginTop: 4,
+    textAlign: "center",
   },
   emptyState: {
     alignItems: "center",
@@ -700,14 +965,18 @@ const styles = StyleSheet.create({
   ratingSection: {
     marginBottom: 20,
   },
-  ratingLabel: {
-    fontSize: 16,
-    fontWeight: "500",
-    marginBottom: 10,
-  },
   starContainer: {
     flexDirection: "row",
     justifyContent: "center",
+  },
+  updateInput: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+    padding: 15,
+    fontSize: 16,
+    minHeight: 100,
+    marginBottom: 20,
   },
   modalButtons: {
     flexDirection: "row",

@@ -24,11 +24,17 @@ export class NutritionService {
       throw new Error("Invalid base64 image format");
     }
 
+    console.log("🔍 Finding user:", user_id);
     const user = await prisma.user.findUnique({
       where: { user_id: user_id },
     });
 
-    if (!user) throw new Error("User not found");
+    if (!user) {
+      console.error("❌ User not found:", user_id);
+      throw new Error("User not found");
+    }
+
+    console.log("✅ User found:", user.email);
 
     const now = new Date();
     const resetTime = new Date(user.aiRequestsResetAt);
@@ -127,6 +133,7 @@ export class NutritionService {
     console.log("🔄 Starting meal update process...");
     console.log("🆔 Meal ID:", meal_id);
     console.log("📝 Update text:", updateText);
+    console.log("👤 User ID:", user_id);
 
     // Find the meal
     const meal = await prisma.meal.findFirst({
@@ -137,6 +144,7 @@ export class NutritionService {
     });
 
     if (!meal) {
+      console.error("❌ Meal not found for user:", user_id, "meal:", meal_id);
       throw new Error("Meal not found");
     }
 
@@ -266,6 +274,8 @@ export class NutritionService {
 
   static async saveMeal(user_id: string, mealData: any, imageBase64?: string) {
     try {
+      console.log("💾 Saving meal for user:", user_id);
+
       const calories =
         typeof mealData.calories === "number"
           ? mealData.calories
@@ -307,6 +317,8 @@ export class NutritionService {
         },
       });
 
+      console.log("✅ Meal saved with ID:", meal.meal_id);
+
       // Transform the meal data to match client expectations
       const transformedMeal = {
         // Server fields
@@ -346,40 +358,58 @@ export class NutritionService {
 
   static async getUserMeals(user_id: string) {
     try {
+      console.log("📥 Fetching meals for user:", user_id);
+
       const meals = await prisma.meal.findMany({
         where: { user_id: user_id },
         orderBy: { createdAt: "desc" },
       });
 
-      // Transform meals to match client expectations
-      const transformedMeals = meals.map((meal) => ({
-        // Server fields
-        meal_id: meal.meal_id,
-        user_id: meal.user_id,
-        image_url: meal.image_url,
-        upload_time: meal.upload_time,
-        analysis_status: meal.analysis_status,
-        meal_name: meal.meal_name,
-        calories: meal.calories,
-        protein_g: meal.protein_g,
-        carbs_g: meal.carbs_g,
-        fats_g: meal.fats_g,
-        fiber_g: meal.fiber_g,
-        sugar_g: meal.sugar_g,
-        createdAt: meal.createdAt,
+      console.log("✅ Found", meals.length, "meals for user");
 
-        // Computed fields for compatibility
-        id: meal.meal_id.toString(),
-        name: meal.meal_name || "Unknown Meal",
-        description: meal.meal_name,
-        imageUrl: meal.image_url,
-        protein: meal.protein_g || 0,
-        carbs: meal.carbs_g || 0,
-        fat: meal.fats_g || 0,
-        fiber: meal.fiber_g || 0,
-        sugar: meal.sugar_g || 0,
-        userId: meal.user_id,
-      }));
+      // Transform meals to match client expectations
+      const transformedMeals = meals.map((meal) => {
+        // Parse additives_json to get feedback and favorite status
+        const additives = (meal.additives_json as any) || {};
+        const feedback = additives.feedback || {};
+        const isFavorite = additives.isFavorite || false;
+
+        return {
+          // Server fields
+          meal_id: meal.meal_id,
+          user_id: meal.user_id,
+          image_url: meal.image_url,
+          upload_time: meal.upload_time,
+          analysis_status: meal.analysis_status,
+          meal_name: meal.meal_name,
+          calories: meal.calories,
+          protein_g: meal.protein_g,
+          carbs_g: meal.carbs_g,
+          fats_g: meal.fats_g,
+          fiber_g: meal.fiber_g,
+          sugar_g: meal.sugar_g,
+          createdAt: meal.createdAt,
+
+          // Computed fields for compatibility
+          id: meal.meal_id.toString(),
+          name: meal.meal_name || "Unknown Meal",
+          description: meal.meal_name,
+          imageUrl: meal.image_url,
+          protein: meal.protein_g || 0,
+          carbs: meal.carbs_g || 0,
+          fat: meal.fats_g || 0,
+          fiber: meal.fiber_g || 0,
+          sugar: meal.sugar_g || 0,
+          userId: meal.user_id,
+
+          // History features
+          isFavorite,
+          tasteRating: feedback.tasteRating || 0,
+          satietyRating: feedback.satietyRating || 0,
+          energyRating: feedback.energyRating || 0,
+          heavinessRating: feedback.heavinessRating || 0,
+        };
+      });
 
       return transformedMeals;
     } catch (error) {
@@ -390,6 +420,8 @@ export class NutritionService {
 
   static async getDailyStats(user_id: string, date: string) {
     try {
+      console.log("📊 Fetching daily stats for user:", user_id, "date:", date);
+
       const startDate = new Date(date);
       const endDate = new Date(date);
       endDate.setDate(endDate.getDate() + 1);
@@ -403,6 +435,8 @@ export class NutritionService {
           },
         },
       });
+
+      console.log("✅ Found", meals.length, "meals for date");
 
       const stats = meals.reduce(
         (
@@ -447,6 +481,197 @@ export class NutritionService {
     } catch (error) {
       console.error("Error fetching daily stats:", error);
       throw new Error("Failed to fetch daily stats");
+    }
+  }
+
+  // NEW METHODS FOR HISTORY FEATURES
+
+  static async saveMealFeedback(
+    user_id: string,
+    meal_id: string,
+    feedback: {
+      tasteRating?: number;
+      satietyRating?: number;
+      energyRating?: number;
+      heavinessRating?: number;
+    }
+  ) {
+    try {
+      console.log("💬 Saving feedback for meal:", meal_id, "user:", user_id);
+
+      // Find the meal
+      const meal = await prisma.meal.findFirst({
+        where: {
+          meal_id: parseInt(meal_id),
+          user_id: user_id,
+        },
+      });
+
+      if (!meal) {
+        throw new Error("Meal not found");
+      }
+
+      // Get existing additives or create new object
+      const existingAdditives = (meal.additives_json as any) || {};
+
+      // Update feedback in additives_json
+      const updatedAdditives = {
+        ...existingAdditives,
+        feedback: {
+          ...existingAdditives.feedback,
+          ...feedback,
+          updatedAt: new Date().toISOString(),
+        },
+      };
+
+      // Update the meal
+      const updatedMeal = await prisma.meal.update({
+        where: { meal_id: meal.meal_id },
+        data: {
+          additives_json: updatedAdditives,
+        },
+      });
+
+      console.log("✅ Feedback saved successfully");
+      return { meal_id, feedback };
+    } catch (error) {
+      console.error("💥 Error saving feedback:", error);
+      throw new Error("Failed to save feedback");
+    }
+  }
+
+  static async toggleMealFavorite(user_id: string, meal_id: string) {
+    try {
+      console.log("❤️ Toggling favorite for meal:", meal_id, "user:", user_id);
+
+      // Find the meal
+      const meal = await prisma.meal.findFirst({
+        where: {
+          meal_id: parseInt(meal_id),
+          user_id: user_id,
+        },
+      });
+
+      if (!meal) {
+        throw new Error("Meal not found");
+      }
+
+      // Get existing additives or create new object
+      const existingAdditives = (meal.additives_json as any) || {};
+      const currentFavoriteStatus = existingAdditives.isFavorite || false;
+
+      // Toggle favorite status
+      const updatedAdditives = {
+        ...existingAdditives,
+        isFavorite: !currentFavoriteStatus,
+        favoriteUpdatedAt: new Date().toISOString(),
+      };
+
+      // Update the meal
+      const updatedMeal = await prisma.meal.update({
+        where: { meal_id: meal.meal_id },
+        data: {
+          additives_json: updatedAdditives,
+        },
+      });
+
+      console.log("✅ Favorite status toggled successfully");
+      return { meal_id, isFavorite: !currentFavoriteStatus };
+    } catch (error) {
+      console.error("💥 Error toggling favorite:", error);
+      throw new Error("Failed to toggle favorite");
+    }
+  }
+
+  static async duplicateMeal(
+    user_id: string,
+    meal_id: string,
+    newDate?: string
+  ) {
+    try {
+      console.log("📋 Duplicating meal:", meal_id, "for user:", user_id);
+
+      // Find the original meal
+      const originalMeal = await prisma.meal.findFirst({
+        where: {
+          meal_id: parseInt(meal_id),
+          user_id: user_id,
+        },
+      });
+
+      if (!originalMeal) {
+        console.error("❌ Meal not found for user:", user_id, "meal:", meal_id);
+        throw new Error("Meal not found");
+      }
+
+      console.log("✅ Found original meal:", originalMeal.meal_name);
+
+      // Set the new date (default to today)
+      const duplicateDate = newDate ? new Date(newDate) : new Date();
+
+      // Create a duplicate meal
+      const duplicatedMeal = await prisma.meal.create({
+        data: {
+          user_id: originalMeal.user_id,
+          image_url: originalMeal.image_url,
+          meal_name: `${originalMeal.meal_name} (Copy)`,
+          calories: originalMeal.calories,
+          protein_g: originalMeal.protein_g,
+          carbs_g: originalMeal.carbs_g,
+          fats_g: originalMeal.fats_g,
+          fiber_g: originalMeal.fiber_g,
+          sugar_g: originalMeal.sugar_g,
+          sodium_mg: originalMeal.sodium_mg,
+          analysis_status: originalMeal.analysis_status,
+          upload_time: duplicateDate,
+          createdAt: duplicateDate,
+          // Don't copy feedback or favorite status
+          additives_json: {
+            duplicatedFrom: originalMeal.meal_id,
+            duplicatedAt: new Date().toISOString(),
+          },
+        },
+      });
+
+      console.log(
+        "✅ Meal duplicated successfully with ID:",
+        duplicatedMeal.meal_id
+      );
+
+      // Transform the meal data to match client expectations
+      const transformedMeal = {
+        // Server fields
+        meal_id: duplicatedMeal.meal_id,
+        user_id: duplicatedMeal.user_id,
+        image_url: duplicatedMeal.image_url,
+        upload_time: duplicatedMeal.upload_time,
+        analysis_status: duplicatedMeal.analysis_status,
+        meal_name: duplicatedMeal.meal_name,
+        calories: duplicatedMeal.calories,
+        protein_g: duplicatedMeal.protein_g,
+        carbs_g: duplicatedMeal.carbs_g,
+        fats_g: duplicatedMeal.fats_g,
+        fiber_g: duplicatedMeal.fiber_g,
+        sugar_g: duplicatedMeal.sugar_g,
+        createdAt: duplicatedMeal.createdAt,
+
+        // Computed fields for compatibility
+        id: duplicatedMeal.meal_id.toString(),
+        name: duplicatedMeal.meal_name || "Unknown Meal",
+        description: duplicatedMeal.meal_name,
+        imageUrl: duplicatedMeal.image_url,
+        protein: duplicatedMeal.protein_g || 0,
+        carbs: duplicatedMeal.carbs_g || 0,
+        fat: duplicatedMeal.fats_g || 0,
+        fiber: duplicatedMeal.fiber_g || 0,
+        sugar: duplicatedMeal.sugar_g || 0,
+        userId: duplicatedMeal.user_id,
+      };
+
+      return transformedMeal;
+    } catch (error) {
+      console.error("💥 Error duplicating meal:", error);
+      throw new Error("Failed to duplicate meal");
     }
   }
 }

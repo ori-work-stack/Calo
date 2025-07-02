@@ -187,7 +187,7 @@ export class AuthService {
 
   static async getRolePermissions(role: string) {
     const permissions = {
-      FREE: { dailyRequests: 2 },
+      FREE: { dailyRequests: 10 },
       PREMIUM: { dailyRequests: 50 },
       GOLD: { dailyRequests: -1 }, // Unlimited
     };

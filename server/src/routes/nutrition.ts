@@ -198,4 +198,102 @@ router.get("/stats/:date", async (req: AuthRequest, res) => {
   }
 });
 
+// NEW ENDPOINTS FOR HISTORY FEATURES
+
+// Save meal feedback (ratings)
+router.post("/meals/:mealId/feedback", async (req: AuthRequest, res) => {
+  try {
+    const { mealId } = req.params;
+    const feedback = req.body;
+
+    console.log("💬 Save feedback request for meal:", mealId);
+    console.log("📊 Feedback data:", feedback);
+
+    const result = await NutritionService.saveMealFeedback(
+      req.user.user_id,
+      mealId,
+      feedback
+    );
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error("💥 Save feedback error:", error);
+    const message =
+      error instanceof Error ? error.message : "Failed to save feedback";
+    res.status(500).json({
+      success: false,
+      error: message,
+    });
+  }
+});
+
+// Toggle meal favorite status
+router.post("/meals/:mealId/favorite", async (req: AuthRequest, res) => {
+  try {
+    const { mealId } = req.params;
+
+    console.log("❤️ Toggle favorite request for meal:", mealId);
+
+    const result = await NutritionService.toggleMealFavorite(
+      req.user.user_id,
+      mealId
+    );
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error("💥 Toggle favorite error:", error);
+    const message =
+      error instanceof Error ? error.message : "Failed to toggle favorite";
+    res.status(500).json({
+      success: false,
+      error: message,
+    });
+  }
+});
+
+// Duplicate meal to a new date
+router.post("/meals/:mealId/duplicate", async (req: AuthRequest, res) => {
+  try {
+    const { mealId } = req.params;
+    const { newDate } = req.body;
+
+    console.log("📋 Duplicate meal request for meal:", mealId);
+    console.log("📅 New date:", newDate);
+    console.log("🔍 Request body:", req.body);
+
+    // Validate mealId
+    if (!mealId || mealId === "undefined") {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid meal ID provided",
+      });
+    }
+
+    const result = await NutritionService.duplicateMeal(
+      req.user.user_id,
+      mealId,
+      newDate
+    );
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error("💥 Duplicate meal error:", error);
+    const message =
+      error instanceof Error ? error.message : "Failed to duplicate meal";
+    res.status(500).json({
+      success: false,
+      error: message,
+    });
+  }
+});
+
 export { router as nutritionRoutes };

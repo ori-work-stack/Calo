@@ -2,10 +2,7 @@ import axios from "axios";
 import { SignInData, SignUpData, MealAnalysisData, Meal } from "../types";
 import * as Keychain from "react-native-keychain";
 import { Platform } from "react-native";
-import Cookies from "universal-cookie";
-
-// Initialize cookies
-const cookies = new Cookies();
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Get the correct API URL based on platform
 const getApiBaseUrl = () => {
@@ -14,12 +11,15 @@ const getApiBaseUrl = () => {
     return "http://localhost:5000/api";
   } else {
     // For mobile devices, use your computer's IP address
-    // Replace this with your actual computer's IP address
-    return "http://192.168.1.56:5000/api";
+    // Updated with your correct IP address
+    return "http://192.168.1.61:5000/api";
   }
 };
 
 const API_BASE_URL = getApiBaseUrl();
+
+console.log("🌐 API Base URL:", API_BASE_URL);
+console.log("📱 Platform:", Platform.OS);
 
 // Create axios instance
 const api = axios.create({
@@ -28,29 +28,57 @@ const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-  withCredentials: true, // CRITICAL: Enable cookies for all requests
+  withCredentials: Platform.OS === "web", // Only enable credentials for web (cookies)
 });
 
-// Helper function to get token - Use cookies for web, Keychain for mobile
+// SECURE TOKEN STORAGE - Use AsyncStorage as fallback for Expo Go
+const STORAGE_KEY = "auth_token_secure";
+
+// Helper function to get token - Use Keychain with AsyncStorage fallback
 const getAuthToken = async (): Promise<string | null> => {
   try {
     if (Platform.OS === "web") {
-      // For web, use cookies
-      const token = cookies.get("auth_token");
-      console.log(
-        "🌐 Web token retrieved from cookie:",
-        token ? "Found" : "Not found"
-      );
-      return token || null;
+      // For web, cookies are handled automatically by withCredentials
+      console.log("🌐 Web platform - cookies handled automatically");
+      return null; // Don't need to manually handle tokens on web
     } else {
-      // For mobile, use Keychain as fallback
-      const credentials = await Keychain.getInternetCredentials("myapp_auth");
-      const token = credentials ? credentials.password : null;
-      console.log(
-        "📱 Mobile token retrieved from keychain:",
-        token ? "Found" : "Not found"
-      );
-      return token;
+      // For mobile, try Keychain first, then AsyncStorage fallback
+      console.log("📱 Mobile platform - getting token from secure storage");
+
+      try {
+        // Try Keychain first
+        const credentials = await Keychain.getInternetCredentials("myapp_auth");
+        if (
+          credentials &&
+          typeof credentials === "object" &&
+          "password" in credentials
+        ) {
+          const token = credentials.password;
+          console.log(
+            "🔐 Token retrieved from Keychain:",
+            token ? "Found" : "Not found"
+          );
+          return token;
+        }
+      } catch (keychainError) {
+        console.warn(
+          "⚠️ Keychain failed, trying AsyncStorage fallback:",
+          keychainError
+        );
+      }
+
+      // Fallback to AsyncStorage
+      try {
+        const token = await AsyncStorage.getItem(STORAGE_KEY);
+        console.log(
+          "💾 Token retrieved from AsyncStorage:",
+          token ? "Found" : "Not found"
+        );
+        return token;
+      } catch (asyncError) {
+        console.error("💥 AsyncStorage also failed:", asyncError);
+        return null;
+      }
     }
   } catch (error) {
     console.warn("⚠️ Failed to get auth token:", error);
@@ -58,41 +86,74 @@ const getAuthToken = async (): Promise<string | null> => {
   }
 };
 
-// Helper function to store token - Use cookies for web, Keychain for mobile
+// Helper function to store token - Use Keychain with AsyncStorage fallback
 const storeAuthToken = async (token: string): Promise<void> => {
   try {
     if (Platform.OS === "web") {
-      // For web, cookies are automatically handled by the server
-      // But we can also set it manually for immediate access
-      cookies.set("auth_token", token, {
-        path: "/",
-        maxAge: 7 * 24 * 60 * 60, // 7 days in seconds
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-      });
-      console.log("🌐 Web token stored in cookie");
+      // For web, cookies are handled by the server
+      console.log("🌐 Web token will be stored via server cookie");
     } else {
-      // For mobile, store in Keychain as fallback
-      await Keychain.setInternetCredentials("myapp_auth", "token", token);
-      console.log("📱 Mobile token stored in keychain");
+      // For mobile, try Keychain first, then AsyncStorage fallback
+      console.log("📱 Mobile platform - storing token in secure storage");
+
+      let keychainSuccess = false;
+
+      try {
+        // Try Keychain first
+        await Keychain.setInternetCredentials("myapp_auth", "token", token);
+        console.log("🔐 Token stored in Keychain successfully");
+        keychainSuccess = true;
+      } catch (keychainError) {
+        console.warn(
+          "⚠️ Keychain storage failed, using AsyncStorage fallback:",
+          keychainError
+        );
+      }
+
+      // Always store in AsyncStorage as backup
+      try {
+        await AsyncStorage.setItem(STORAGE_KEY, token);
+        console.log("💾 Token stored in AsyncStorage successfully");
+      } catch (asyncError) {
+        console.error("💥 AsyncStorage storage failed:", asyncError);
+        if (!keychainSuccess) {
+          throw new Error("Failed to store authentication token securely");
+        }
+      }
     }
     console.log("🔐 Token stored securely");
   } catch (error) {
-    console.warn("⚠️ Failed to store auth token:", error);
+    console.error("⚠️ Failed to store auth token:", error);
+    throw error;
   }
 };
 
-// Helper function to clear token - Use cookies for web, Keychain for mobile
+// Helper function to clear token - Use both Keychain and AsyncStorage
 const clearAuthToken = async (): Promise<void> => {
   try {
     if (Platform.OS === "web") {
-      // For web, remove cookie
-      cookies.remove("auth_token", { path: "/" });
-      console.log("🌐 Web token cleared from cookie");
+      // For web, cookies are cleared by server
+      console.log("🌐 Web token will be cleared by server");
     } else {
-      // For mobile, clear Keychain
-      await Keychain.resetInternetCredentials({ server: "myapp_auth" });
-      console.log("📱 Mobile token cleared from keychain");
+      // For mobile, clear both storage methods
+      console.log("📱 Mobile platform - clearing token from secure storage");
+
+      try {
+        await Keychain.resetInternetCredentials({ server: "myapp_auth" });
+        console.log("🔐 Token cleared from Keychain successfully");
+      } catch (keychainError) {
+        console.warn("⚠️ Keychain clear failed (non-critical):", keychainError);
+      }
+
+      try {
+        await AsyncStorage.removeItem(STORAGE_KEY);
+        console.log("💾 Token cleared from AsyncStorage successfully");
+      } catch (asyncError) {
+        console.warn(
+          "⚠️ AsyncStorage clear failed (non-critical):",
+          asyncError
+        );
+      }
     }
     console.log("🗑️ Token cleared securely");
   } catch (error) {
@@ -134,6 +195,13 @@ const transformMealData = (serverMeal: any): Meal => {
     sodium: serverMeal.sodium_mg || 0,
     userId: serverMeal.user_id,
 
+    // History features
+    isFavorite: serverMeal.isFavorite || false,
+    tasteRating: serverMeal.tasteRating || 0,
+    satietyRating: serverMeal.satietyRating || 0,
+    energyRating: serverMeal.energyRating || 0,
+    heavinessRating: serverMeal.heavinessRating || 0,
+
     // Optional fields
     saturated_fats_g: serverMeal.saturated_fats_g,
     polyunsaturated_fats_g: serverMeal.polyunsaturated_fats_g,
@@ -167,13 +235,15 @@ const transformMealData = (serverMeal: any): Meal => {
 api.interceptors.request.use(
   async (config) => {
     try {
-      // For web, cookies are automatically sent
-      // For mobile, we need to add the Authorization header
+      console.log("🔄 Making request to:", config.url);
+      console.log("📱 Platform:", Platform.OS);
+
       if (Platform.OS !== "web") {
+        // Only add Authorization header for mobile
         const token = await getAuthToken();
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
-          console.log("📱 Adding auth token to mobile request");
+          console.log("🔐 Added auth token to mobile request");
         } else {
           console.log("⚠️ No auth token found for mobile request");
         }
@@ -186,13 +256,17 @@ api.interceptors.request.use(
     return config;
   },
   (error) => {
+    console.error("🚨 Request interceptor error:", error);
     return Promise.reject(error);
   }
 );
 
 // Response interceptor for error handling
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log("✅ API Response success:", response.config.url);
+    return response;
+  },
   async (error) => {
     console.error("🚨 API Response Error:", {
       status: error.response?.status,
@@ -200,7 +274,15 @@ api.interceptors.response.use(
       data: error.response?.data,
       url: error.config?.url,
       method: error.config?.method,
+      message: error.message,
     });
+
+    // Check for network errors
+    if (error.code === "NETWORK_ERROR" || error.message === "Network Error") {
+      console.error("🌐 Network connectivity issue detected");
+      console.error("💡 Check if your server is running and accessible");
+      console.error("💡 Verify your IP address in the API configuration");
+    }
 
     if (error.response?.status === 401) {
       // Token expired or invalid - clear stored token
@@ -219,23 +301,33 @@ export const authAPI = {
   signIn: async (data: SignInData) => {
     try {
       console.log("🔑 Attempting sign in...");
+      console.log("🌐 API URL:", `${API_BASE_URL}/auth/signin`);
+
       const response = await api.post("/auth/signin", data);
 
-      // For mobile, store token in Keychain as fallback
+      // Store token for mobile only (web uses cookies)
       if (
         Platform.OS !== "web" &&
         response.data.success &&
         response.data.token
       ) {
         await storeAuthToken(response.data.token);
-        console.log("✅ Sign in successful, token stored securely");
+        console.log("✅ Sign in successful, token stored securely for mobile");
       } else if (Platform.OS === "web") {
-        console.log("✅ Sign in successful, cookie set by server");
+        console.log("✅ Sign in successful, cookie set by server for web");
       }
 
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
       console.error("💥 Sign in error:", error);
+
+      // Provide more specific error messages
+      if (error.code === "NETWORK_ERROR" || error.message === "Network Error") {
+        throw new Error(
+          "Cannot connect to server. Please check your internet connection and ensure the server is running."
+        );
+      }
+
       throw error;
     }
   },
@@ -243,23 +335,33 @@ export const authAPI = {
   signUp: async (data: SignUpData) => {
     try {
       console.log("📝 Attempting sign up...");
+      console.log("🌐 API URL:", `${API_BASE_URL}/auth/signup`);
+
       const response = await api.post("/auth/signup", data);
 
-      // For mobile, store token in Keychain as fallback
+      // Store token for mobile only (web uses cookies)
       if (
         Platform.OS !== "web" &&
         response.data.success &&
         response.data.token
       ) {
         await storeAuthToken(response.data.token);
-        console.log("✅ Sign up successful, token stored securely");
+        console.log("✅ Sign up successful, token stored securely for mobile");
       } else if (Platform.OS === "web") {
-        console.log("✅ Sign up successful, cookie set by server");
+        console.log("✅ Sign up successful, cookie set by server for web");
       }
 
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
       console.error("💥 Sign up error:", error);
+
+      // Provide more specific error messages
+      if (error.code === "NETWORK_ERROR" || error.message === "Network Error") {
+        throw new Error(
+          "Cannot connect to server. Please check your internet connection and ensure the server is running."
+        );
+      }
+
       throw error;
     }
   },
@@ -492,7 +594,7 @@ export const nutritionAPI = {
     }
   },
 
-  // New API methods for meal feedback and favorites
+  // NEW API METHODS FOR HISTORY FEATURES
   saveMealFeedback: async (
     mealId: string,
     feedback: {
@@ -504,6 +606,8 @@ export const nutritionAPI = {
   ) => {
     try {
       console.log("💬 Making save meal feedback API request...");
+      console.log("🆔 Meal ID:", mealId);
+      console.log("📊 Feedback:", feedback);
 
       const response = await api.post(
         `/nutrition/meals/${mealId}/feedback`,
@@ -521,6 +625,7 @@ export const nutritionAPI = {
   toggleMealFavorite: async (mealId: string) => {
     try {
       console.log("❤️ Making toggle meal favorite API request...");
+      console.log("🆔 Meal ID:", mealId);
 
       const response = await api.post(`/nutrition/meals/${mealId}/favorite`);
 
@@ -535,16 +640,170 @@ export const nutritionAPI = {
   duplicateMeal: async (mealId: string, newDate?: string) => {
     try {
       console.log("📋 Making duplicate meal API request...");
+      console.log("🆔 Meal ID:", mealId);
+      console.log("📅 New date:", newDate);
 
-      const response = await api.post(`/nutrition/meals/${mealId}/duplicate`, {
+      // Ensure we're sending the correct meal ID format
+      const requestData = {
         newDate: newDate || new Date().toISOString().split("T")[0],
-      });
+      };
+
+      console.log("📤 Request data:", requestData);
+      console.log("🔗 Request URL:", `/nutrition/meals/${mealId}/duplicate`);
+
+      const response = await api.post(
+        `/nutrition/meals/${mealId}/duplicate`,
+        requestData
+      );
 
       console.log("✅ Duplicate meal response:", response.data);
+
+      if (response.data.success && response.data.data) {
+        return {
+          success: true,
+          data: transformMealData(response.data.data),
+        };
+      }
+
       return response.data;
     } catch (error: any) {
       console.error("💥 Duplicate meal API error:", error);
+      console.error("💥 Error details:", {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        url: error.config?.url,
+        method: error.config?.method,
+      });
       throw error;
+    }
+  },
+};
+
+// NEW CALENDAR API
+export const calendarAPI = {
+  getCalendarData: async (year: number, month: number) => {
+    try {
+      console.log("📅 Making get calendar data API request...");
+      console.log("📊 Year:", year, "Month:", month);
+
+      const response = await api.get(`/calendar/data/${year}/${month}`);
+
+      console.log("🎯 RAW CALENDAR DATA API RESPONSE:");
+      console.log("=====================================");
+      console.log("📋 Full Response:", JSON.stringify(response.data, null, 2));
+      console.log("=====================================");
+
+      if (response.data.success) {
+        return response.data.data;
+      } else {
+        throw new Error(response.data.error || "Failed to fetch calendar data");
+      }
+    } catch (error: any) {
+      console.error("💥 Get calendar data API error:", error);
+
+      if (error.response?.data?.error) {
+        throw new Error(error.response.data.error);
+      } else if (error.message) {
+        throw new Error(error.message);
+      } else {
+        throw new Error("Failed to fetch calendar data");
+      }
+    }
+  },
+
+  getStatistics: async (year: number, month: number) => {
+    try {
+      console.log("📊 Making get statistics API request...");
+      console.log("📊 Year:", year, "Month:", month);
+
+      const response = await api.get(`/calendar/statistics/${year}/${month}`);
+
+      console.log("🎯 RAW STATISTICS API RESPONSE:");
+      console.log("=====================================");
+      console.log("📋 Full Response:", JSON.stringify(response.data, null, 2));
+      console.log("=====================================");
+
+      if (response.data.success) {
+        return response.data.data;
+      } else {
+        throw new Error(response.data.error || "Failed to fetch statistics");
+      }
+    } catch (error: any) {
+      console.error("💥 Get statistics API error:", error);
+
+      if (error.response?.data?.error) {
+        throw new Error(error.response.data.error);
+      } else if (error.message) {
+        throw new Error(error.message);
+      } else {
+        throw new Error("Failed to fetch statistics");
+      }
+    }
+  },
+
+  addEvent: async (date: string, title: string, type: string) => {
+    try {
+      console.log("📝 Making add event API request...");
+      console.log("📅 Date:", date, "Title:", title, "Type:", type);
+
+      const response = await api.post("/calendar/events", {
+        date,
+        title,
+        type,
+      });
+
+      console.log("✅ Add event response:", response.data);
+
+      if (response.data.success) {
+        return response.data.data;
+      } else {
+        throw new Error(response.data.error || "Failed to add event");
+      }
+    } catch (error: any) {
+      console.error("💥 Add event API error:", error);
+
+      if (error.response?.data?.error) {
+        throw new Error(error.response.data.error);
+      } else if (error.message) {
+        throw new Error(error.message);
+      } else {
+        throw new Error("Failed to add event");
+      }
+    }
+  },
+};
+
+// NEW USER API METHODS
+export const userAPI = {
+  getGlobalStatistics: async () => {
+    try {
+      console.log("📊 Making get global statistics API request...");
+
+      const response = await api.get("/user/global-statistics");
+
+      console.log("🎯 RAW GLOBAL STATISTICS API RESPONSE:");
+      console.log("=====================================");
+      console.log("📋 Full Response:", JSON.stringify(response.data, null, 2));
+      console.log("=====================================");
+
+      if (response.data.success) {
+        return response.data.data;
+      } else {
+        throw new Error(
+          response.data.error || "Failed to fetch global statistics"
+        );
+      }
+    } catch (error: any) {
+      console.error("💥 Get global statistics API error:", error);
+
+      if (error.response?.data?.error) {
+        throw new Error(error.response.data.error);
+      } else if (error.message) {
+        throw new Error(error.message);
+      } else {
+        throw new Error("Failed to fetch global statistics");
+      }
     }
   },
 };

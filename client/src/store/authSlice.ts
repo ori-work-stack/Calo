@@ -24,16 +24,25 @@ export const signUp = createAsyncThunk(
     try {
       console.log("🔄 Starting sign up process...");
       const response = await authAPI.signUp(data);
-      if (response.success && response.token) {
+
+      if (response.success && response.token && response.user) {
         console.log("✅ Sign up successful");
         return response;
       }
+
       return rejectWithValue(response.error || "Signup failed");
-    } catch (error) {
+    } catch (error: any) {
       console.error("💥 Sign up error:", error);
-      return rejectWithValue(
-        error instanceof Error ? error.message : "Signup failed"
-      );
+
+      // Extract meaningful error message
+      let errorMessage = "Signup failed";
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -44,16 +53,25 @@ export const signIn = createAsyncThunk(
     try {
       console.log("🔄 Starting sign in process...");
       const response = await authAPI.signIn(data);
-      if (response.success && response.token) {
+
+      if (response.success && response.token && response.user) {
         console.log("✅ Sign in successful");
         return response;
       }
+
       return rejectWithValue(response.error || "Login failed");
-    } catch (error) {
+    } catch (error: any) {
       console.error("💥 Sign in error:", error);
-      return rejectWithValue(
-        error instanceof Error ? error.message : "Login failed"
-      );
+
+      // Extract meaningful error message
+      let errorMessage = "Login failed";
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -66,7 +84,7 @@ export const signOut = createAsyncThunk(
       await authAPI.signOut();
       console.log("✅ Sign out successful");
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error("💥 SignOut error:", error);
       // Even if there's an error, try to clear the token
       try {
@@ -131,6 +149,7 @@ const authSlice = createSlice({
       .addCase(signUp.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
+        state.isAuthenticated = false;
         console.log("❌ Sign up failed:", action.payload);
       })
       .addCase(signIn.pending, (state) => {
@@ -148,6 +167,7 @@ const authSlice = createSlice({
       .addCase(signIn.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
+        state.isAuthenticated = false;
         console.log("❌ Sign in failed:", action.payload);
       })
       .addCase(signOut.pending, (state) => {

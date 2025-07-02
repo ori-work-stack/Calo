@@ -103,6 +103,13 @@ export interface Meal {
   sugar?: number;
   sodium?: number;
   userId: string;
+
+  // History features
+  isFavorite?: boolean;
+  tasteRating?: number;
+  satietyRating?: number;
+  energyRating?: number;
+  heavinessRating?: number;
 }
 
 export interface AuthResponse {

@@ -6,11 +6,13 @@ import {
   ScrollView,
   ActivityIndicator,
   RefreshControl,
+  TouchableOpacity,
 } from "react-native";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "@/src/store";
 import { fetchMeals } from "@/src/store/mealSlice";
-import { nutritionAPI } from "@/src/services/api";
+import { nutritionAPI, userAPI } from "@/src/services/api";
+import { Ionicons } from "@expo/vector-icons";
 
 interface DailyStats {
   calories: number;
@@ -18,6 +20,33 @@ interface DailyStats {
   carbs: number;
   fat: number;
   mealCount: number;
+}
+
+interface GlobalStatistics {
+  generalStats: {
+    averageCaloriesPerMeal: number;
+    averageProteinPerMeal: number;
+    averageCarbsPerMeal: number;
+    averageFatPerMeal: number;
+    mostCommonMealTime: string;
+    averageMealsPerDay: number;
+  };
+  healthInsights: {
+    proteinAdequacy: string;
+    calorieDistribution: string;
+    fiberIntake: string;
+    sugarConsumption: string;
+  };
+  behavioralPatterns: {
+    weekdayVsWeekend: string;
+    seasonalTrends: string;
+    mealFrequency: string;
+  };
+  recommendations: {
+    nutritionalTips: string[];
+    mealTimingTips: string[];
+    portionControlTips: string[];
+  };
 }
 
 export default function Dashboard() {
@@ -32,7 +61,10 @@ export default function Dashboard() {
   const { user } = useSelector((state: RootState) => state.auth);
 
   const [dailyStats, setDailyStats] = useState<DailyStats | null>(null);
+  const [globalStats, setGlobalStats] = useState<GlobalStatistics | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingGlobalStats, setLoadingGlobalStats] = useState(false);
+  const [showGlobalStats, setShowGlobalStats] = useState(false);
 
   const loadDailyStats = async () => {
     try {
@@ -44,16 +76,115 @@ export default function Dashboard() {
     }
   };
 
+  const loadGlobalStats = async () => {
+    try {
+      setLoadingGlobalStats(true);
+      const stats = await userAPI.getGlobalStatistics();
+      setGlobalStats(stats);
+    } catch (error) {
+      console.error("Failed to load global stats:", error);
+    } finally {
+      setLoadingGlobalStats(false);
+    }
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([dispatch(fetchMeals()), loadDailyStats()]);
+    await Promise.all([
+      dispatch(fetchMeals()),
+      loadDailyStats(),
+      showGlobalStats ? loadGlobalStats() : Promise.resolve(),
+    ]);
     setRefreshing(false);
   };
 
   useEffect(() => {
     dispatch(fetchMeals());
     loadDailyStats();
+    // Load global stats on app start for efficiency
+    loadGlobalStats();
   }, [dispatch]);
+
+  const renderGlobalStatistics = () => {
+    if (!globalStats) return null;
+
+    return (
+      <View style={styles.globalStatsContainer}>
+        <Text style={styles.sectionTitle}>📊 Global Insights</Text>
+
+        {/* General Stats */}
+        <View style={styles.statsCard}>
+          <Text style={styles.cardTitle}>Community Averages</Text>
+          <View style={styles.statsGrid}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>
+                {globalStats.generalStats.averageCaloriesPerMeal}
+              </Text>
+              <Text style={styles.statLabel}>Avg Calories/Meal</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>
+                {globalStats.generalStats.averageProteinPerMeal}g
+              </Text>
+              <Text style={styles.statLabel}>Avg Protein/Meal</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>
+                {globalStats.generalStats.mostCommonMealTime}
+              </Text>
+              <Text style={styles.statLabel}>Peak Meal Time</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>
+                {globalStats.generalStats.averageMealsPerDay}
+              </Text>
+              <Text style={styles.statLabel}>Meals/Day</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Health Insights */}
+        <View style={styles.statsCard}>
+          <Text style={styles.cardTitle}>Health Insights</Text>
+          <View style={styles.insightsList}>
+            <View style={styles.insightItem}>
+              <Ionicons name="fitness" size={16} color="#4CAF50" />
+              <Text style={styles.insightText}>
+                {globalStats.healthInsights.proteinAdequacy}
+              </Text>
+            </View>
+            <View style={styles.insightItem}>
+              <Ionicons name="restaurant" size={16} color="#FF9800" />
+              <Text style={styles.insightText}>
+                {globalStats.healthInsights.calorieDistribution}
+              </Text>
+            </View>
+            <View style={styles.insightItem}>
+              <Ionicons name="leaf" size={16} color="#8BC34A" />
+              <Text style={styles.insightText}>
+                {globalStats.healthInsights.fiberIntake}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Quick Tips */}
+        <View style={styles.statsCard}>
+          <Text style={styles.cardTitle}>💡 Quick Tips</Text>
+          <View style={styles.tipsList}>
+            {globalStats.recommendations.nutritionalTips
+              .slice(0, 2)
+              .map((tip, index) => (
+                <View key={index} style={styles.tipItem}>
+                  <Text style={styles.tipBullet}>•</Text>
+                  <Text style={styles.tipText}>{tip}</Text>
+                </View>
+              ))}
+          </View>
+        </View>
+      </View>
+    );
+  };
 
   if (isLoading && !meals.length) {
     return (
@@ -106,6 +237,34 @@ export default function Dashboard() {
           </Text>
         </View>
       )}
+
+      {/* Global Statistics Toggle */}
+      <View style={styles.globalStatsToggle}>
+        <TouchableOpacity
+          style={styles.toggleButton}
+          onPress={() => setShowGlobalStats(!showGlobalStats)}
+          disabled={loadingGlobalStats}
+        >
+          <Ionicons
+            name={showGlobalStats ? "chevron-up" : "chevron-down"}
+            size={20}
+            color="#007AFF"
+          />
+          <Text style={styles.toggleButtonText}>
+            {showGlobalStats ? "Hide" : "Show"} Community Insights
+          </Text>
+          {loadingGlobalStats && (
+            <ActivityIndicator
+              size="small"
+              color="#007AFF"
+              style={styles.toggleLoader}
+            />
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {/* Global Statistics */}
+      {showGlobalStats && renderGlobalStatistics()}
 
       <View style={styles.recentMeals}>
         <Text style={styles.sectionTitle}>Recent Meals</Text>
@@ -187,6 +346,91 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: "#666",
     marginTop: 10,
+  },
+  globalStatsToggle: {
+    backgroundColor: "white",
+    marginHorizontal: 15,
+    marginBottom: 10,
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  toggleButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 15,
+  },
+  toggleButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#007AFF",
+    marginLeft: 8,
+  },
+  toggleLoader: {
+    marginLeft: 10,
+  },
+  globalStatsContainer: {
+    marginHorizontal: 15,
+    marginBottom: 15,
+  },
+  statsCard: {
+    backgroundColor: "white",
+    padding: 20,
+    borderRadius: 12,
+    marginBottom: 15,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 15,
+    color: "#333",
+  },
+  statItem: {
+    width: "48%",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  insightsList: {
+    gap: 12,
+  },
+  insightItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  insightText: {
+    flex: 1,
+    fontSize: 14,
+    color: "#666",
+    lineHeight: 20,
+  },
+  tipsList: {
+    gap: 10,
+  },
+  tipItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+  },
+  tipBullet: {
+    fontSize: 16,
+    color: "#007AFF",
+    fontWeight: "bold",
+  },
+  tipText: {
+    flex: 1,
+    fontSize: 14,
+    color: "#666",
+    lineHeight: 20,
   },
   recentMeals: {
     backgroundColor: "white",
