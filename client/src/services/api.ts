@@ -1,8 +1,7 @@
 import axios from "axios";
 import { SignInData, SignUpData, MealAnalysisData, Meal } from "../types";
-import * as Keychain from "react-native-keychain";
+import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Get the correct API URL based on platform
 const getApiBaseUrl = () => {
@@ -31,10 +30,10 @@ const api = axios.create({
   withCredentials: Platform.OS === "web", // Only enable credentials for web (cookies)
 });
 
-// SECURE TOKEN STORAGE - Use AsyncStorage as fallback for Expo Go
+// SECURE TOKEN STORAGE - Use SecureStore for mobile, cookies for web
 const STORAGE_KEY = "auth_token_secure";
 
-// Helper function to get token - Use Keychain with AsyncStorage fallback
+// Helper function to get token - Use SecureStore for mobile, cookies for web
 const getAuthToken = async (): Promise<string | null> => {
   try {
     if (Platform.OS === "web") {
@@ -42,41 +41,18 @@ const getAuthToken = async (): Promise<string | null> => {
       console.log("🌐 Web platform - cookies handled automatically");
       return null; // Don't need to manually handle tokens on web
     } else {
-      // For mobile, try Keychain first, then AsyncStorage fallback
-      console.log("📱 Mobile platform - getting token from secure storage");
+      // For mobile, use SecureStore
+      console.log("📱 Mobile platform - getting token from SecureStore");
 
       try {
-        // Try Keychain first
-        const credentials = await Keychain.getInternetCredentials("myapp_auth");
-        if (
-          credentials &&
-          typeof credentials === "object" &&
-          "password" in credentials
-        ) {
-          const token = credentials.password;
-          console.log(
-            "🔐 Token retrieved from Keychain:",
-            token ? "Found" : "Not found"
-          );
-          return token;
-        }
-      } catch (keychainError) {
-        console.warn(
-          "⚠️ Keychain failed, trying AsyncStorage fallback:",
-          keychainError
-        );
-      }
-
-      // Fallback to AsyncStorage
-      try {
-        const token = await AsyncStorage.getItem(STORAGE_KEY);
+        const token = await SecureStore.getItemAsync(STORAGE_KEY);
         console.log(
-          "💾 Token retrieved from AsyncStorage:",
+          "🔐 Token retrieved from SecureStore:",
           token ? "Found" : "Not found"
         );
         return token;
-      } catch (asyncError) {
-        console.error("💥 AsyncStorage also failed:", asyncError);
+      } catch (secureStoreError) {
+        console.error("💥 SecureStore get failed:", secureStoreError);
         return null;
       }
     }
@@ -86,39 +62,22 @@ const getAuthToken = async (): Promise<string | null> => {
   }
 };
 
-// Helper function to store token - Use Keychain with AsyncStorage fallback
+// Helper function to store token - Use SecureStore for mobile
 const storeAuthToken = async (token: string): Promise<void> => {
   try {
     if (Platform.OS === "web") {
       // For web, cookies are handled by the server
       console.log("🌐 Web token will be stored via server cookie");
     } else {
-      // For mobile, try Keychain first, then AsyncStorage fallback
-      console.log("📱 Mobile platform - storing token in secure storage");
-
-      let keychainSuccess = false;
+      // For mobile, use SecureStore
+      console.log("📱 Mobile platform - storing token in SecureStore");
 
       try {
-        // Try Keychain first
-        await Keychain.setInternetCredentials("myapp_auth", "token", token);
-        console.log("🔐 Token stored in Keychain successfully");
-        keychainSuccess = true;
-      } catch (keychainError) {
-        console.warn(
-          "⚠️ Keychain storage failed, using AsyncStorage fallback:",
-          keychainError
-        );
-      }
-
-      // Always store in AsyncStorage as backup
-      try {
-        await AsyncStorage.setItem(STORAGE_KEY, token);
-        console.log("💾 Token stored in AsyncStorage successfully");
-      } catch (asyncError) {
-        console.error("💥 AsyncStorage storage failed:", asyncError);
-        if (!keychainSuccess) {
-          throw new Error("Failed to store authentication token securely");
-        }
+        await SecureStore.setItemAsync(STORAGE_KEY, token);
+        console.log("🔐 Token stored in SecureStore successfully");
+      } catch (secureStoreError) {
+        console.error("💥 SecureStore storage failed:", secureStoreError);
+        throw new Error("Failed to store authentication token securely");
       }
     }
     console.log("🔐 Token stored securely");
@@ -128,30 +87,23 @@ const storeAuthToken = async (token: string): Promise<void> => {
   }
 };
 
-// Helper function to clear token - Use both Keychain and AsyncStorage
+// Helper function to clear token - Use SecureStore for mobile
 const clearAuthToken = async (): Promise<void> => {
   try {
     if (Platform.OS === "web") {
       // For web, cookies are cleared by server
       console.log("🌐 Web token will be cleared by server");
     } else {
-      // For mobile, clear both storage methods
-      console.log("📱 Mobile platform - clearing token from secure storage");
+      // For mobile, clear SecureStore
+      console.log("📱 Mobile platform - clearing token from SecureStore");
 
       try {
-        await Keychain.resetInternetCredentials({ server: "myapp_auth" });
-        console.log("🔐 Token cleared from Keychain successfully");
-      } catch (keychainError) {
-        console.warn("⚠️ Keychain clear failed (non-critical):", keychainError);
-      }
-
-      try {
-        await AsyncStorage.removeItem(STORAGE_KEY);
-        console.log("💾 Token cleared from AsyncStorage successfully");
-      } catch (asyncError) {
+        await SecureStore.deleteItemAsync(STORAGE_KEY);
+        console.log("🔐 Token cleared from SecureStore successfully");
+      } catch (secureStoreError) {
         console.warn(
-          "⚠️ AsyncStorage clear failed (non-critical):",
-          asyncError
+          "⚠️ SecureStore clear failed (non-critical):",
+          secureStoreError
         );
       }
     }
