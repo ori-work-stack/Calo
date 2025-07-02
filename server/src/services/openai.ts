@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import OpenAI from "openai";
 
 const nutritionAnalysisPrompts = {
   english: `
@@ -55,7 +55,7 @@ Please be as accurate as possible with portion sizes and nutritional estimates.
 }
 
 אנא היה מדויק ככל האפשר עם גדלי המנות והערכות תזונתיות.
-`
+`,
 };
 
 const updateAnalysisPrompts = {
@@ -119,7 +119,7 @@ Make sure to add the nutritional values from the additional items mentioned by t
 }
 
 וודא להוסיף את הערכים התזונתיים מהפריטים הנוספים שהוזכרו על ידי המשתמש.
-`
+`,
 };
 
 export class OpenAIService {
@@ -131,14 +131,21 @@ export class OpenAIService {
     });
   }
 
-  async analyzeFood(base64Image: string, language: 'english' | 'hebrew' = 'english', updateText?: string) {
+  async analyzeFood(
+    base64Image: string,
+    language: "english" | "hebrew" = "english",
+    updateText?: string
+  ) {
     try {
       let prompt = nutritionAnalysisPrompts[language];
-      
+
       if (updateText) {
-        prompt = updateAnalysisPrompts[language].replace('{updateText}', updateText);
+        prompt = updateAnalysisPrompts[language].replace(
+          "{updateText}",
+          updateText
+        );
       }
-      
+
       const response = await this.openai.chat.completions.create({
         model: "gpt-4o",
         messages: [
@@ -147,17 +154,19 @@ export class OpenAIService {
             content: [
               {
                 type: "text",
-                text: prompt
+                text: prompt,
               },
               {
                 type: "image_url",
                 image_url: {
-                  url: base64Image.startsWith('data:') ? base64Image : `data:image/jpeg;base64,${base64Image}`,
-                  detail: "high"
-                }
-              }
-            ]
-          }
+                  url: base64Image.startsWith("data:")
+                    ? base64Image
+                    : `data:image/jpeg;base64,${base64Image}`,
+                  detail: "high",
+                },
+              },
+            ],
+          },
         ],
         max_tokens: 1000,
         temperature: 0.1,
@@ -165,18 +174,18 @@ export class OpenAIService {
 
       const content = response.choices[0]?.message?.content;
       if (!content) {
-        throw new Error('No response from OpenAI');
+        throw new Error("No response from OpenAI");
       }
 
       // Parse JSON response
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
-        throw new Error('Invalid JSON response from OpenAI');
+        throw new Error("Invalid JSON response from OpenAI");
       }
 
       return JSON.parse(jsonMatch[0]);
     } catch (error) {
-      console.error('Error analyzing food with OpenAI:', error);
+      console.error("Error analyzing food with OpenAI:", error);
       throw error;
     }
   }

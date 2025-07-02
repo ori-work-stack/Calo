@@ -53,6 +53,7 @@ export class AuthService {
         createdAt: true,
       },
     });
+
     console.log("Data being passed to Prisma:", {
       email,
       name,
@@ -157,9 +158,11 @@ export class AuthService {
               email: true,
               name: true,
               subscription_type: true,
+              age: true,
+              weight_kg: true,
+              height_cm: true,
               aiRequestsCount: true,
               aiRequestsResetAt: true,
-              meals: true,
               createdAt: true,
             },
           },
@@ -190,5 +193,16 @@ export class AuthService {
     };
 
     return permissions[role as keyof typeof permissions] || permissions.FREE;
+  }
+
+  // Helper method to create secure cookie options
+  static getCookieOptions() {
+    return {
+      httpOnly: true, // Prevent XSS attacks
+      secure: process.env.NODE_ENV === "production", // HTTPS only in production
+      sameSite: "lax" as const, // CSRF protection
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
+      path: "/", // Available on all paths
+    };
   }
 }

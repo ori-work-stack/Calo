@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
+import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import { errorHandler } from "./middleware/errorHandler";
 import { authRoutes } from "./routes/auth";
@@ -18,7 +19,7 @@ console.error(process.env.PORT);
 // Middleware
 app.use(helmet());
 
-// CORS configuration for Expo Go
+// CORS configuration for Expo Go with credentials support
 app.use(
   cors({
     origin: [
@@ -29,9 +30,12 @@ app.use(
       "http://192.168.1.56:8081", // Your computer's IP
       // Add more IP variations if needed
     ],
-    credentials: true,
+    credentials: true, // CRITICAL: Enable credentials for cookies
   })
 );
+
+// Cookie parser middleware - MUST be before routes
+app.use(cookieParser());
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
@@ -59,6 +63,7 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`📊 Database: Supabase PostgreSQL`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
   console.log(`📱 Access from phone: http://192.168.1.56:${PORT}`);
+  console.log(`🍪 Cookie-based authentication enabled`);
 });
 
 export default app;

@@ -21,7 +21,6 @@ import {
   updateMeal,
   clearPendingMeal,
   clearError,
-  setPendingMealForUpdate,
 } from "@/src/store/mealSlice";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -35,6 +34,7 @@ export default function CameraScreen() {
   const [facing, setFacing] = useState<CameraType>("back");
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [updateText, setUpdateText] = useState("");
+  const [postedMealId, setPostedMealId] = useState<string | null>(null);
   const cameraRef = useRef<CameraView>(null);
 
   // Handle errors
@@ -75,6 +75,7 @@ export default function CameraScreen() {
         if (photo && photo.base64) {
           console.log("✅ Picture taken, analyzing...");
           setShowCamera(false);
+          setPostedMealId(null); // Reset posted meal ID
           dispatch(analyzeMeal(photo.base64));
         } else {
           Alert.alert("Error", "Failed to capture image data");
@@ -104,6 +105,7 @@ export default function CameraScreen() {
         console.log("✅ Image selected, processing...");
 
         if (asset.base64) {
+          setPostedMealId(null); // Reset posted meal ID
           dispatch(analyzeMeal(asset.base64));
         } else {
           Alert.alert("Error", "Failed to process selected image");
@@ -119,24 +121,39 @@ export default function CameraScreen() {
     if (pendingMeal && !isPosting) {
       const result = await dispatch(postMeal());
       if (postMeal.fulfilled.match(result)) {
-        Alert.alert("Success", "Meal posted successfully!");
+        // Store the meal ID from the posted meal
+        const mealId =
+          result.payload?.id || result.payload?.meal_id?.toString();
+        setPostedMealId(mealId);
+        Alert.alert(
+          "Success",
+          "Meal posted successfully! You can now update it if needed."
+        );
       }
     }
   };
 
   const handleUpdate = () => {
+    if (!postedMealId) {
+      Alert.alert(
+        "Post Required",
+        "Please post the meal first before updating it.",
+        [{ text: "OK" }]
+      );
+      return;
+    }
     setShowUpdateModal(true);
     setUpdateText(""); // Reset update text when opening modal
   };
 
   const handleUpdateSubmit = async () => {
-    if (pendingMeal?.meal_id && updateText.trim()) {
+    if (postedMealId && updateText.trim()) {
       console.log("🔄 Submitting update with text:", updateText.trim());
-      console.log("🆔 Meal ID:", pendingMeal.meal_id);
+      console.log("🆔 Meal ID:", postedMealId);
 
       const result = await dispatch(
         updateMeal({
-          meal_id: pendingMeal.meal_id,
+          meal_id: postedMealId,
           updateText: updateText.trim(),
         })
       );
@@ -146,7 +163,9 @@ export default function CameraScreen() {
         // Close modal and reset state
         setShowUpdateModal(false);
         setUpdateText("");
-        // The pending meal will be cleared automatically by the reducer
+        // Clear the pending meal and posted meal ID
+        dispatch(clearPendingMeal());
+        setPostedMealId(null);
       } else {
         console.error("❌ Update failed:", result.payload);
         Alert.alert(
@@ -154,7 +173,7 @@ export default function CameraScreen() {
           "Failed to update meal: " + (result.payload || "Unknown error")
         );
       }
-    } else if (!pendingMeal?.meal_id) {
+    } else if (!postedMealId) {
       Alert.alert("Error", "Cannot update - no meal ID found");
     } else {
       Alert.alert("Error", "Please enter update text");
@@ -175,7 +194,10 @@ export default function CameraScreen() {
         {
           text: "Discard",
           style: "destructive",
-          onPress: () => dispatch(clearPendingMeal()),
+          onPress: () => {
+            dispatch(clearPendingMeal());
+            setPostedMealId(null);
+          },
         },
       ]
     );
@@ -221,6 +243,8 @@ export default function CameraScreen() {
   }
 
   if (pendingMeal) {
+    const isPosted = !!postedMealId;
+
     return (
       <ScrollView style={styles.container}>
         <View style={styles.analysisContainer}>
@@ -235,7 +259,9 @@ export default function CameraScreen() {
           />
 
           <View style={styles.analysisResults}>
-            <Text style={styles.analysisTitle}>Analysis Results</Text>
+            <Text style={styles.analysisTitle}>
+              {isPosted ? "Posted Meal" : "Analysis Results"}
+            </Text>
 
             <Text style={styles.mealName}>
               {pendingMeal.analysis?.description ||
@@ -295,6 +321,13 @@ export default function CameraScreen() {
                 <Text style={styles.nutritionLabel}>Fat</Text>
               </View>
             </View>
+
+            {isPosted && (
+              <View style={styles.statusContainer}>
+                <Ionicons name="checkmark-circle" size={20} color="#28a745" />
+                <Text style={styles.statusText}>Meal saved successfully!</Text>
+              </View>
+            )}
           </View>
 
           <View style={styles.actionButtons}>
@@ -303,32 +336,36 @@ export default function CameraScreen() {
               onPress={handleDiscard}
               disabled={isPosting || isUpdating}
             >
-              <Text style={styles.discardButtonText}>Discard</Text>
+              <Text style={styles.discardButtonText}>
+                {isPosted ? "Clear" : "Discard"}
+              </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.actionButton, styles.updateButton]}
-              onPress={handleUpdate}
-              disabled={isPosting || isUpdating}
-            >
-              {isUpdating ? (
-                <ActivityIndicator color="white" size="small" />
-              ) : (
-                <Text style={styles.updateButtonText}>Update</Text>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.actionButton, styles.postButton]}
-              onPress={handlePost}
-              disabled={isPosting || isUpdating}
-            >
-              {isPosting ? (
-                <ActivityIndicator color="white" />
-              ) : (
-                <Text style={styles.postButtonText}>Post Meal</Text>
-              )}
-            </TouchableOpacity>
+            {!isPosted ? (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.postButton]}
+                onPress={handlePost}
+                disabled={isPosting || isUpdating}
+              >
+                {isPosting ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text style={styles.postButtonText}>Post Meal</Text>
+                )}
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.updateButton]}
+                onPress={handleUpdate}
+                disabled={isPosting || isUpdating}
+              >
+                {isUpdating ? (
+                  <ActivityIndicator color="white" size="small" />
+                ) : (
+                  <Text style={styles.updateButtonText}>Update Meal</Text>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -591,6 +628,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#666",
     marginTop: 5,
+  },
+  statusContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 15,
+    padding: 10,
+    backgroundColor: "#d4edda",
+    borderRadius: 8,
+  },
+  statusText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: "#155724",
+    fontWeight: "500",
   },
   actionButtons: {
     flexDirection: "row",

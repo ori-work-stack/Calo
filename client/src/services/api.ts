@@ -2,6 +2,10 @@ import axios from "axios";
 import { SignInData, SignUpData, MealAnalysisData, Meal } from "../types";
 import * as Keychain from "react-native-keychain";
 import { Platform } from "react-native";
+import Cookies from "universal-cookie";
+
+// Initialize cookies
+const cookies = new Cookies();
 
 // Get the correct API URL based on platform
 const getApiBaseUrl = () => {
@@ -11,7 +15,7 @@ const getApiBaseUrl = () => {
   } else {
     // For mobile devices, use your computer's IP address
     // Replace this with your actual computer's IP address
-    return "http://192.168.1.56:5000/api"; // Change this to your computer's IP
+    return "http://192.168.1.56:5000/api";
   }
 };
 
@@ -24,21 +28,28 @@ const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+  withCredentials: true, // CRITICAL: Enable cookies for all requests
 });
 
-// Helper function to get token - ALWAYS use Keychain for security
+// Helper function to get token - Use cookies for web, Keychain for mobile
 const getAuthToken = async (): Promise<string | null> => {
   try {
     if (Platform.OS === "web") {
-      // For web, we need to handle differently since Keychain might not work
-      // This is a temporary fallback - in production, use secure web storage
-      const token = localStorage.getItem("temp_auth_token");
-      console.log("🌐 Web token retrieved:", token ? "Found" : "Not found");
-      return token;
+      // For web, use cookies
+      const token = cookies.get("auth_token");
+      console.log(
+        "🌐 Web token retrieved from cookie:",
+        token ? "Found" : "Not found"
+      );
+      return token || null;
     } else {
+      // For mobile, use Keychain as fallback
       const credentials = await Keychain.getInternetCredentials("myapp_auth");
       const token = credentials ? credentials.password : null;
-      console.log("📱 Mobile token retrieved:", token ? "Found" : "Not found");
+      console.log(
+        "📱 Mobile token retrieved from keychain:",
+        token ? "Found" : "Not found"
+      );
       return token;
     }
   } catch (error) {
@@ -47,16 +58,23 @@ const getAuthToken = async (): Promise<string | null> => {
   }
 };
 
-// Helper function to store token - ALWAYS use Keychain for security
+// Helper function to store token - Use cookies for web, Keychain for mobile
 const storeAuthToken = async (token: string): Promise<void> => {
   try {
     if (Platform.OS === "web") {
-      // For web, temporary fallback
-      localStorage.setItem("temp_auth_token", token);
-      console.log("🌐 Web token stored");
+      // For web, cookies are automatically handled by the server
+      // But we can also set it manually for immediate access
+      cookies.set("auth_token", token, {
+        path: "/",
+        maxAge: 7 * 24 * 60 * 60, // 7 days in seconds
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+      });
+      console.log("🌐 Web token stored in cookie");
     } else {
+      // For mobile, store in Keychain as fallback
       await Keychain.setInternetCredentials("myapp_auth", "token", token);
-      console.log("📱 Mobile token stored securely");
+      console.log("📱 Mobile token stored in keychain");
     }
     console.log("🔐 Token stored securely");
   } catch (error) {
@@ -64,15 +82,17 @@ const storeAuthToken = async (token: string): Promise<void> => {
   }
 };
 
-// Helper function to clear token - ALWAYS use Keychain for security
+// Helper function to clear token - Use cookies for web, Keychain for mobile
 const clearAuthToken = async (): Promise<void> => {
   try {
     if (Platform.OS === "web") {
-      localStorage.removeItem("temp_auth_token");
-      console.log("🌐 Web token cleared");
+      // For web, remove cookie
+      cookies.remove("auth_token", { path: "/" });
+      console.log("🌐 Web token cleared from cookie");
     } else {
-      await Keychain.resetInternetCredentials("myapp_auth");
-      console.log("📱 Mobile token cleared");
+      // For mobile, clear Keychain
+      await Keychain.resetInternetCredentials({ server: "myapp_auth" });
+      console.log("📱 Mobile token cleared from keychain");
     }
     console.log("🗑️ Token cleared securely");
   } catch (error) {
@@ -143,16 +163,22 @@ const transformMealData = (serverMeal: any): Meal => {
   return transformed;
 };
 
-// Request interceptor to add auth token
+// Request interceptor to add auth token for mobile
 api.interceptors.request.use(
   async (config) => {
     try {
-      const token = await getAuthToken();
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-        console.log("🔐 Adding auth token to request");
+      // For web, cookies are automatically sent
+      // For mobile, we need to add the Authorization header
+      if (Platform.OS !== "web") {
+        const token = await getAuthToken();
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+          console.log("📱 Adding auth token to mobile request");
+        } else {
+          console.log("⚠️ No auth token found for mobile request");
+        }
       } else {
-        console.log("⚠️ No auth token found for request");
+        console.log("🌐 Web request - cookies will be sent automatically");
       }
     } catch (error) {
       console.warn("⚠️ Failed to get auth token for request:", error);
@@ -195,10 +221,16 @@ export const authAPI = {
       console.log("🔑 Attempting sign in...");
       const response = await api.post("/auth/signin", data);
 
-      // Store token if sign-in is successful
-      if (response.data.success && response.data.token) {
+      // For mobile, store token in Keychain as fallback
+      if (
+        Platform.OS !== "web" &&
+        response.data.success &&
+        response.data.token
+      ) {
         await storeAuthToken(response.data.token);
         console.log("✅ Sign in successful, token stored securely");
+      } else if (Platform.OS === "web") {
+        console.log("✅ Sign in successful, cookie set by server");
       }
 
       return response.data;
@@ -213,10 +245,16 @@ export const authAPI = {
       console.log("📝 Attempting sign up...");
       const response = await api.post("/auth/signup", data);
 
-      // Store token if sign-up is successful
-      if (response.data.success && response.data.token) {
+      // For mobile, store token in Keychain as fallback
+      if (
+        Platform.OS !== "web" &&
+        response.data.success &&
+        response.data.token
+      ) {
         await storeAuthToken(response.data.token);
         console.log("✅ Sign up successful, token stored securely");
+      } else if (Platform.OS === "web") {
+        console.log("✅ Sign up successful, cookie set by server");
       }
 
       return response.data;
@@ -228,10 +266,16 @@ export const authAPI = {
 
   signOut: async () => {
     try {
+      // Call server signout endpoint to clear server-side session and cookie
+      await api.post("/auth/signout");
+
+      // Clear local storage
       await clearAuthToken();
       console.log("🔓 Auth token cleared securely");
     } catch (error) {
       console.error("💥 Sign out error:", error);
+      // Even if server call fails, clear local storage
+      await clearAuthToken();
       throw error;
     }
   },
