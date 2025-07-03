@@ -1,78 +1,102 @@
 import { Tabs } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import React from "react";
+import { Platform } from "react-native";
+
+import { HapticTab } from "@/components/HapticTab";
+import { IconSymbol } from "@/components/ui/IconSymbol";
+import TabBarBackground from "@/components/ui/TabBarBackground";
+import { Colors } from "@/constants/Colors";
+import { useColorScheme } from "@/hooks/useColorScheme";
 
 export default function TabLayout() {
+  const colorScheme = useColorScheme();
+
   return (
     <Tabs
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName: keyof typeof Ionicons.glyphMap;
-
-          if (route.name === "index") {
-            iconName = focused ? "home" : "home-outline";
-          } else if (route.name === "camera") {
-            iconName = focused ? "camera" : "camera-outline";
-          } else if (route.name === "meals") {
-            iconName = focused ? "restaurant" : "restaurant-outline";
-          } else if (route.name === "history") {
-            iconName = focused ? "time" : "time-outline";
-          } else if (route.name === "calendar") {
-            iconName = focused ? "calendar" : "calendar-outline";
-          } else if (route.name === "devices") {
-            iconName = focused ? "watch" : "watch-outline";
-          } else if (route.name === "profile") {
-            iconName = focused ? "person" : "person-outline";
-          } else {
-            iconName = "ellipse";
-          }
-
-          return <Ionicons name={iconName} size={size} color={color} />;
-        },
-        tabBarActiveTintColor: "#007AFF",
-        tabBarInactiveTintColor: "gray",
-        headerShown: true,
-      })}
+      screenOptions={{
+        tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
+        headerShown: false,
+        tabBarButton: HapticTab,
+        tabBarBackground: TabBarBackground,
+        tabBarStyle: Platform.select({
+          ios: {
+            // Use a transparent background on iOS to show the blur effect
+            position: "absolute",
+          },
+          default: {},
+        }),
+      }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: "Dashboard",
-        }}
-      />
-      <Tabs.Screen
-        name="camera"
-        options={{
-          title: "Analyze",
+          title: "Home",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="house.fill" color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="meals"
         options={{
           title: "Meals",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="fork.knife" color={color} />
+          ),
         }}
       />
       <Tabs.Screen
-        name="history"
+        name="camera"
         options={{
-          title: "History",
+          title: "Camera",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="camera.fill" color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="statistics"
+        options={{
+          title: "Statistics",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="chart.bar.fill" color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="calendar"
         options={{
           title: "Calendar",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="calendar" color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="devices"
         options={{
           title: "Devices",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="watch.digital" color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="history"
+        options={{
+          title: "History",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="clock.fill" color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: "Profile",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="person.fill" color={color} />
+          ),
         }}
       />
     </Tabs>

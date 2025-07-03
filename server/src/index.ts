@@ -9,6 +9,7 @@ import { nutritionRoutes } from "./routes/nutrition";
 import { userRoutes } from "./routes/user";
 import { calendarRoutes } from "./routes/calendar";
 import { deviceRoutes } from "./routes/devices";
+import statisticsRoutes from "./routes/statistics";
 import "./services/cron";
 
 // Load environment variables
@@ -81,8 +82,9 @@ app.get("/test", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/nutrition", nutritionRoutes);
 app.use("/api/user", userRoutes);
-app.use("/api/calendar", calendarRoutes);
 app.use("/api/devices", deviceRoutes);
+app.use("/api/calendar", calendarRoutes);
+app.use("/api", statisticsRoutes);
 
 // Error handler
 app.use(errorHandler);

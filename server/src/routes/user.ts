@@ -80,8 +80,14 @@ router.get(
     try {
       console.log("📊 Global statistics request from user:", req.user.user_id);
 
-      const statistics =
-        await StatisticsService.getGlobalNutritionalStatistics();
+      // You can optionally accept a query param ?period=week|month|custom
+      const period =
+        (req.query.period as "week" | "month" | "custom") || "week";
+
+      const statistics = await StatisticsService.getNutritionStatistics(
+        req.user.user_id,
+        period
+      );
 
       res.json({
         success: true,

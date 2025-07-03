@@ -76,7 +76,7 @@ Please recalculate the nutritional values and respond in JSON format with the sa
       "carbs": "Updated carbohydrate content in grams", 
       "fat": "Updated fat content in grams",
       "fiber": "Updated fiber content in grams",
-      "sugar": "Updated sugar content in grams"
+      "sugar": "Sugar content in grams"
     }
   ],
   "totalCalories": "Updated total calories for the entire meal",
@@ -107,7 +107,7 @@ Make sure to add the nutritional values from the additional items mentioned by t
       "carbs": "תכולת פחמימות מעודכנת בגרמים",
       "fat": "תכולת שומן מעודכנת בגרמים", 
       "fiber": "תכולת סיבים מעודכנת בגרמים",
-      "sugar": "תכולת סוכר מעודכנת בגרמים"
+      "sugar": "תכולת סוכר בגרמים"
     }
   ],
   "totalCalories": "סך כל הקלוריות המעודכנות לארוחה השלמה",
@@ -129,6 +129,87 @@ export class OpenAIService {
     this.openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
+  }
+
+  static async generateNutritionPlan(
+    userProfile: any,
+    goals: any
+  ): Promise<string> {
+    try {
+      const openaiInstance = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+      });
+
+      const completion = await openaiInstance.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          {
+            role: "system",
+            content: `You are a professional nutritionist. Generate a personalized nutrition plan in Hebrew based on user profile and goals.`,
+          },
+          {
+            role: "user",
+            content: `User Profile: ${JSON.stringify(userProfile)}
+Goals: ${JSON.stringify(goals)}
+
+Please provide a detailed nutrition plan in Hebrew.`,
+          },
+        ],
+        max_tokens: 1000,
+        temperature: 0.7,
+      });
+
+      return (
+        completion.choices[0]?.message?.content ||
+        "לא הצלחנו ליצור תוכנית תזונה כעת"
+      );
+    } catch (error) {
+      console.error("Error generating nutrition plan:", error);
+      throw new Error("Failed to generate nutrition plan");
+    }
+  }
+
+  static async generateNutritionInsights(
+    meals: any[],
+    stats: any
+  ): Promise<string[]> {
+    try {
+      const openaiInstance = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+      });
+      const completion = await openaiInstance.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          {
+            role: "system",
+            content: `You are a professional nutritionist. Analyze the nutrition data and provide insights in Hebrew. Return insights as an array of strings.`,
+          },
+          {
+            role: "user",
+            content: `Nutrition Statistics: ${JSON.stringify(stats)}
+Recent Meals: ${JSON.stringify(meals.slice(0, 10))}
+
+Please provide 3-5 personalized nutrition insights in Hebrew as a JSON array of strings.`,
+          },
+        ],
+        max_tokens: 500,
+        temperature: 0.7,
+      });
+
+      const content = completion.choices[0]?.message?.content;
+      if (content) {
+        try {
+          return JSON.parse(content);
+        } catch {
+          // If parsing fails, return as single insight
+          return [content];
+        }
+      }
+      return [];
+    } catch (error) {
+      console.error("Error generating nutrition insights:", error);
+      return [];
+    }
   }
 
   async analyzeFood(

@@ -1,179 +1,469 @@
 import { prisma } from "../lib/database";
+import { OpenAIService } from "./openai";
 
-interface NutritionalStatistics {
-  generalStats: {
-    averageCaloriesPerMeal: number;
-    averageProteinPerMeal: number;
-    averageCarbsPerMeal: number;
-    averageFatPerMeal: number;
-    mostCommonMealTime: string;
-    averageMealsPerDay: number;
+export interface NutritionStatistics {
+  averageCaloriesDaily: number;
+  calorieGoalAchievementPercent: number;
+  averageProteinDaily: number;
+  averageCarbsDaily: number;
+  averageFatsDaily: number;
+  averageFiberDaily: number;
+  averageSodiumDaily: number;
+  averageSugarDaily: number;
+  averageFluidsDaily: number;
+  processedFoodPercentage: number;
+  alcoholCaffeineIntake: number;
+  vegetableFruitIntake: number;
+  fullLoggingPercentage: number;
+  allergenAlerts: string[];
+  healthRiskPercentage: number;
+  averageEatingHours: { start: string; end: string };
+  intermittentFastingHours: number;
+  missedMealsAlert: number;
+  nutritionScore: number;
+  weeklyTrends: {
+    calories: number[];
+    protein: number[];
+    carbs: number[];
+    fats: number[];
   };
-  healthInsights: {
-    proteinAdequacy: string;
-    calorieDistribution: string;
-    fiberIntake: string;
-    sugarConsumption: string;
-  };
-  behavioralPatterns: {
-    weekdayVsWeekend: string;
-    seasonalTrends: string;
-    mealFrequency: string;
-  };
-  recommendations: {
-    nutritionalTips: string[];
-    mealTimingTips: string[];
-    portionControlTips: string[];
-  };
+  insights: string[];
+  recommendations: string[];
 }
 
 export class StatisticsService {
-  static async getGlobalNutritionalStatistics(): Promise<NutritionalStatistics> {
-    try {
-      console.log("📊 Generating global nutritional statistics...");
+  static async getNutritionStatistics(
+    userId: string,
+    period: "week" | "month" | "custom"
+  ): Promise<NutritionStatistics> {
+    const daysBack = period === "week" ? 7 : period === "month" ? 30 : 90;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - daysBack);
 
-      // Get aggregated data from all users (anonymized)
-      const mealStats = await prisma.meal.aggregate({
-        _avg: {
-          calories: true,
-          protein_g: true,
-          carbs_g: true,
-          fats_g: true,
-          fiber_g: true,
-          sugar_g: true,
-        },
-        _count: {
-          meal_id: true,
-        },
-      });
-
-      // Get meal timing patterns
-      const mealTimingData = await prisma.meal.findMany({
-        select: {
-          upload_time: true,
-        },
-        take: 1000, // Sample for performance
-      });
-
-      // Calculate statistics
-      const generalStats = {
-        averageCaloriesPerMeal: Math.round(mealStats._avg.calories || 0),
-        averageProteinPerMeal: Math.round(mealStats._avg.protein_g || 0),
-        averageCarbsPerMeal: Math.round(mealStats._avg.carbs_g || 0),
-        averageFatPerMeal: Math.round(mealStats._avg.fats_g || 0),
-        mostCommonMealTime: this.calculateMostCommonMealTime(mealTimingData),
-        averageMealsPerDay: 2.8, // Statistical average
-      };
-
-      // Generate health insights based on data
-      const healthInsights = {
-        proteinAdequacy: this.generateProteinInsight(generalStats.averageProteinPerMeal),
-        calorieDistribution: this.generateCalorieInsight(generalStats.averageCaloriesPerMeal),
-        fiberIntake: this.generateFiberInsight(mealStats._avg.fiber_g || 0),
-        sugarConsumption: this.generateSugarInsight(mealStats._avg.sugar_g || 0),
-      };
-
-      // Generate behavioral patterns
-      const behavioralPatterns = {
-        weekdayVsWeekend: "Users tend to consume 15% more calories on weekends compared to weekdays",
-        seasonalTrends: "Protein intake increases by 12% during winter months",
-        mealFrequency: "Most users log 2-3 meals per day, with lunch being the most tracked meal",
-      };
-
-      // Generate recommendations
-      const recommendations = {
-        nutritionalTips: [
-          "Aim for 25-30g of protein per meal for optimal muscle maintenance",
-          "Include fiber-rich foods to reach 25-35g daily fiber intake",
-          "Balance your plate: 50% vegetables, 25% protein, 25% complex carbs",
-          "Stay hydrated with 8-10 glasses of water daily",
-        ],
-        mealTimingTips: [
-          "Eat your largest meal when you're most active",
-          "Allow 3-4 hours between main meals",
-          "Consider a protein-rich breakfast to stabilize blood sugar",
-          "Stop eating 2-3 hours before bedtime for better sleep",
-        ],
-        portionControlTips: [
-          "Use smaller plates to naturally reduce portion sizes",
-          "Fill half your plate with vegetables first",
-          "Eat slowly and mindfully to recognize fullness cues",
-          "Pre-portion snacks to avoid overeating",
-        ],
-      };
-
-      const statistics: NutritionalStatistics = {
-        generalStats,
-        healthInsights,
-        behavioralPatterns,
-        recommendations,
-      };
-
-      console.log("✅ Generated global statistics");
-      return statistics;
-    } catch (error) {
-      console.error("💥 Error generating statistics:", error);
-      throw new Error("Failed to generate nutritional statistics");
-    }
-  }
-
-  private static calculateMostCommonMealTime(mealData: { upload_time: Date }[]): string {
-    const hourCounts: Record<number, number> = {};
-    
-    mealData.forEach((meal) => {
-      const hour = meal.upload_time.getHours();
-      hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+    // Get user's meal data from the Meal table using correct field names
+    const meals = await prisma.meal.findMany({
+      where: {
+        user_id: userId,
+        createdAt: { gte: startDate },
+      },
+      orderBy: { createdAt: "desc" },
     });
 
-    const mostCommonHour = Object.entries(hourCounts)
-      .sort(([,a], [,b]) => b - a)[0]?.[0];
+    // Get user and nutrition plan
+    const user = await prisma.user.findUnique({
+      where: { user_id: userId },
+    });
 
-    if (!mostCommonHour) return "12:00 PM";
+    const nutritionPlan = await prisma.nutritionPlan.findFirst({
+      where: { user_id: userId },
+      orderBy: { createdAt: "desc" },
+    });
 
-    const hour = parseInt(mostCommonHour);
-    const period = hour >= 12 ? "PM" : "AM";
-    const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-    
-    return `${displayHour}:00 ${period}`;
+    const dailyCalorieGoal = nutritionPlan?.goal_calories || 2000;
+
+    // Calculate statistics
+    const stats = this.calculateStatistics(meals, dailyCalorieGoal);
+
+    // Generate insights using AI
+    const insights = await this.generateAIInsights(meals, stats);
+
+    // Generate recommendations
+    const recommendations = await this.generateRecommendations(stats, user);
+
+    return {
+      ...stats,
+      insights,
+      recommendations,
+    };
   }
 
-  private static generateProteinInsight(avgProtein: number): string {
-    if (avgProtein >= 25) {
-      return "Excellent protein intake! Most users are meeting their protein goals effectively.";
-    } else if (avgProtein >= 15) {
-      return "Good protein levels, but there's room for improvement. Consider adding lean proteins.";
-    } else {
-      return "Protein intake could be higher. Focus on including protein sources in every meal.";
+  private static calculateStatistics(
+    meals: any[],
+    dailyCalorieGoal: number
+  ): Omit<NutritionStatistics, "insights" | "recommendations"> {
+    if (meals.length === 0) {
+      return this.getEmptyStatistics();
     }
+
+    // Group meals by day
+    const dailyData = new Map<string, any[]>();
+    meals.forEach((meal) => {
+      const day = meal.createdAt.toISOString().split("T")[0];
+      if (!dailyData.has(day)) {
+        dailyData.set(day, []);
+      }
+      dailyData.get(day)!.push(meal);
+    });
+
+    const days = Array.from(dailyData.values());
+    const totalDays = days.length;
+
+    // Calculate daily totals using correct field names from Meal table
+    const dailyTotals = days.map((dayMeals) => ({
+      calories: dayMeals.reduce((sum, meal) => sum + (meal.calories || 0), 0),
+      protein: dayMeals.reduce((sum, meal) => sum + (meal.protein_g || 0), 0),
+      carbs: dayMeals.reduce((sum, meal) => sum + (meal.carbs_g || 0), 0),
+      fats: dayMeals.reduce((sum, meal) => sum + (meal.fats_g || 0), 0),
+      fiber: dayMeals.reduce((sum, meal) => sum + (meal.fiber_g || 0), 0),
+      sodium: dayMeals.reduce((sum, meal) => sum + (meal.sodium_mg || 0), 0),
+      sugar: dayMeals.reduce((sum, meal) => sum + (meal.sugar_g || 0), 0),
+      mealCount: dayMeals.length,
+    }));
+
+    // Calculate averages
+    const averageCaloriesDaily = Math.round(
+      dailyTotals.reduce((sum, day) => sum + day.calories, 0) / totalDays
+    );
+
+    const averageProteinDaily = Math.round(
+      dailyTotals.reduce((sum, day) => sum + day.protein, 0) / totalDays
+    );
+
+    const averageCarbsDaily = Math.round(
+      dailyTotals.reduce((sum, day) => sum + day.carbs, 0) / totalDays
+    );
+
+    const averageFatsDaily = Math.round(
+      dailyTotals.reduce((sum, day) => sum + day.fats, 0) / totalDays
+    );
+
+    const averageFiberDaily = Math.round(
+      dailyTotals.reduce((sum, day) => sum + day.fiber, 0) / totalDays
+    );
+
+    const averageSodiumDaily = Math.round(
+      dailyTotals.reduce((sum, day) => sum + day.sodium, 0) / totalDays
+    );
+
+    const averageSugarDaily = Math.round(
+      dailyTotals.reduce((sum, day) => sum + day.sugar, 0) / totalDays
+    );
+
+    // Calculate calorie goal achievement
+    const calorieGoalAchievementPercent = Math.round(
+      (dailyTotals.filter(
+        (day) =>
+          day.calories >= dailyCalorieGoal * 0.9 &&
+          day.calories <= dailyCalorieGoal * 1.1
+      ).length /
+        totalDays) *
+        100
+    );
+
+    // Calculate processed food percentage using correct field names
+    const processedFoodCount = meals.filter(
+      (meal) =>
+        meal.processing_level === "HIGHLY_PROCESSED" ||
+        meal.processing_level === "PROCESSED" ||
+        (meal.health_warnings && meal.health_warnings.includes("מעובד"))
+    ).length;
+    const processedFoodPercentage = Math.round(
+      (processedFoodCount / meals.length) * 100
+    );
+
+    // Calculate full logging percentage (3+ meals per day)
+    const fullLoggingDays = dailyTotals.filter(
+      (day) => day.mealCount >= 3
+    ).length;
+    const fullLoggingPercentage = Math.round(
+      (fullLoggingDays / totalDays) * 100
+    );
+
+    // Calculate eating hours
+    const eatingTimes = meals
+      .map((meal) => meal.createdAt.getHours())
+      .filter((hour) => hour !== null);
+
+    const averageEatingHours = {
+      start:
+        eatingTimes.length > 0 ? `${Math.min(...eatingTimes)}:00` : "08:00",
+      end: eatingTimes.length > 0 ? `${Math.max(...eatingTimes)}:00` : "20:00",
+    };
+
+    // Calculate intermittent fasting
+    const fastingHours =
+      eatingTimes.length >= 2
+        ? 24 - (Math.max(...eatingTimes) - Math.min(...eatingTimes))
+        : 0;
+
+    // Calculate alcohol and caffeine intake using correct field names
+    const alcoholCaffeineIntake = Math.round(
+      meals.reduce(
+        (sum, meal) =>
+          sum + (meal.alcohol_g || 0) + (meal.caffeine_mg || 0) / 100,
+        0
+      ) / totalDays
+    );
+
+    // Calculate vegetable/fruit intake (simplified)
+    const vegetableFruitIntake = Math.round(
+      (meals.filter(
+        (meal) =>
+          meal.description?.includes("vegetable") ||
+          meal.description?.includes("fruit") ||
+          meal.description?.includes("ירק") ||
+          meal.description?.includes("פרי")
+      ).length /
+        meals.length) *
+        100
+    );
+
+    // Get allergen alerts using correct field name
+    const allergenAlerts: string[] = [];
+    meals.forEach((meal) => {
+      if (meal.allergens) {
+        try {
+          const allergens =
+            typeof meal.allergens === "string"
+              ? JSON.parse(meal.allergens)
+              : meal.allergens;
+          if (Array.isArray(allergens)) {
+            allergens.forEach((allergen) => {
+              if (!allergenAlerts.includes(allergen)) {
+                allergenAlerts.push(allergen);
+              }
+            });
+          }
+        } catch (e) {
+          console.error("Error parsing allergens JSON:", e);
+        }
+      }
+    });
+
+    // Calculate health risk percentage
+    const healthRiskMeals = meals.filter((meal) => meal.health_warnings).length;
+    const healthRiskPercentage = Math.round(
+      (healthRiskMeals / meals.length) * 100
+    );
+
+    // Calculate nutrition score
+    const nutritionScore = this.calculateNutritionScore({
+      calorieGoalAchievementPercent,
+      processedFoodPercentage,
+      fullLoggingPercentage,
+      fiberIntake: averageFiberDaily,
+      sodiumIntake: averageSodiumDaily,
+    });
+
+    // Calculate weekly trends (last 7 days)
+    const last7Days = dailyTotals.slice(-7);
+    const weeklyTrends = {
+      calories: last7Days.map((day) => day.calories),
+      protein: last7Days.map((day) => day.protein),
+      carbs: last7Days.map((day) => day.carbs),
+      fats: last7Days.map((day) => day.fats),
+    };
+
+    // Calculate missed meals alert
+    const expectedMealsPerWeek = 21; // 3 meals * 7 days
+    const actualMealsThisWeek = dailyTotals
+      .slice(-7)
+      .reduce((sum, day) => sum + day.mealCount, 0);
+    const missedMealsAlert = Math.max(
+      0,
+      expectedMealsPerWeek - actualMealsThisWeek
+    );
+
+    return {
+      averageCaloriesDaily,
+      calorieGoalAchievementPercent,
+      averageProteinDaily,
+      averageCarbsDaily,
+      averageFatsDaily,
+      averageFiberDaily,
+      averageSodiumDaily,
+      averageSugarDaily,
+      averageFluidsDaily: 2000, // Default value, would need actual tracking
+      processedFoodPercentage,
+      alcoholCaffeineIntake,
+      vegetableFruitIntake,
+      fullLoggingPercentage,
+      allergenAlerts,
+      healthRiskPercentage,
+      averageEatingHours,
+      intermittentFastingHours: fastingHours,
+      missedMealsAlert,
+      nutritionScore,
+      weeklyTrends,
+    };
   }
 
-  private static generateCalorieInsight(avgCalories: number): string {
-    if (avgCalories >= 400 && avgCalories <= 600) {
-      return "Well-balanced meal sizes! Most users are maintaining appropriate portion sizes.";
-    } else if (avgCalories > 600) {
-      return "Meal sizes tend to be on the larger side. Consider portion control strategies.";
-    } else {
-      return "Meal sizes are generally smaller. Ensure you're getting adequate nutrition.";
-    }
+  private static calculateNutritionScore(metrics: {
+    calorieGoalAchievementPercent: number;
+    processedFoodPercentage: number;
+    fullLoggingPercentage: number;
+    fiberIntake: number;
+    sodiumIntake: number;
+  }): number {
+    let score = 0;
+
+    // Calorie goal achievement (25 points)
+    score += Math.min(25, metrics.calorieGoalAchievementPercent * 0.25);
+
+    // Processed food penalty (25 points)
+    score += Math.max(0, 25 - metrics.processedFoodPercentage * 0.5);
+
+    // Full logging bonus (20 points)
+    score += metrics.fullLoggingPercentage * 0.2;
+
+    // Fiber intake (15 points) - target 25g/day
+    score += Math.min(15, (metrics.fiberIntake / 25) * 15);
+
+    // Sodium intake penalty (15 points) - target under 2300mg
+    score += Math.max(0, 15 - Math.max(0, (metrics.sodiumIntake - 2300) / 100));
+
+    return Math.round(Math.min(100, Math.max(0, score)));
   }
 
-  private static generateFiberInsight(avgFiber: number): string {
-    if (avgFiber >= 8) {
-      return "Great fiber intake per meal! Users are including plenty of vegetables and whole grains.";
-    } else if (avgFiber >= 4) {
-      return "Moderate fiber intake. Try adding more vegetables and fruits to meals.";
-    } else {
-      return "Fiber intake could be improved. Focus on whole grains, vegetables, and legumes.";
-    }
+  private static getEmptyStatistics(): Omit<
+    NutritionStatistics,
+    "insights" | "recommendations"
+  > {
+    return {
+      averageCaloriesDaily: 0,
+      calorieGoalAchievementPercent: 0,
+      averageProteinDaily: 0,
+      averageCarbsDaily: 0,
+      averageFatsDaily: 0,
+      averageFiberDaily: 0,
+      averageSodiumDaily: 0,
+      averageSugarDaily: 0,
+      averageFluidsDaily: 0,
+      processedFoodPercentage: 0,
+      alcoholCaffeineIntake: 0,
+      vegetableFruitIntake: 0,
+      fullLoggingPercentage: 0,
+      allergenAlerts: [],
+      healthRiskPercentage: 0,
+      averageEatingHours: { start: "08:00", end: "20:00" },
+      intermittentFastingHours: 0,
+      missedMealsAlert: 0,
+      nutritionScore: 0,
+      weeklyTrends: {
+        calories: [],
+        protein: [],
+        carbs: [],
+        fats: [],
+      },
+    };
   }
 
-  private static generateSugarInsight(avgSugar: number): string {
-    if (avgSugar <= 10) {
-      return "Excellent sugar control! Most users are keeping added sugars to a minimum.";
-    } else if (avgSugar <= 20) {
-      return "Moderate sugar intake. Be mindful of hidden sugars in processed foods.";
-    } else {
-      return "Sugar intake is on the higher side. Consider reducing sugary drinks and desserts.";
+  static async generateAIInsights(meals: any[], stats: any): Promise<string[]> {
+    const insights: string[] = [];
+
+    // Calorie insights
+    if (stats.calorieGoalAchievementPercent < 50) {
+      insights.push(
+        "נבחן כי קשה לך לעמוד ביעד הקלורי היומי. מומלץ לתכנן ארוחות מראש"
+      );
+    } else if (stats.calorieGoalAchievementPercent > 80) {
+      insights.push("מעולה! אתה עומד ביעד הקלורי ברוב הימים. המשך כך!");
     }
+
+    // Processed food insights
+    if (stats.processedFoodPercentage > 30) {
+      insights.push(
+        "שיעור המזון המעובד שלך גבוה מהמומלץ. נסה להוסיף יותר מזונות טבעיים"
+      );
+    }
+
+    // Timing insights
+    if (stats.intermittentFastingHours > 16) {
+      insights.push(
+        `הצום היומי שלך נמשך ${stats.intermittentFastingHours} שעות - זה מעולה לבריאות המטבולית`
+      );
+    }
+
+    // Logging insights
+    if (stats.fullLoggingPercentage < 70) {
+      insights.push("תיעוד עקבי יותר יעזור לנו לתת לך תובנות מדויקות יותר");
+    }
+
+    // Fiber insights
+    if (stats.averageFiberDaily < 25) {
+      insights.push("צריכת הסיבים שלך נמוכה מהמומלץ. הוסף יותר ירקות וקטניות");
+    }
+
+    // Sodium insights
+    if (stats.averageSodiumDaily > 2300) {
+      insights.push("צריכת הנתרן שלך גבוהה. צמצם מזונות מעובדים ומלח מוסף");
+    }
+
+    try {
+      // Generate AI insights using OpenAI
+      const aiInsights = await OpenAIService.generateNutritionInsights(
+        meals,
+        stats
+      );
+
+      insights.push(...aiInsights);
+    } catch (error) {
+      console.error("Error generating AI insights:", error);
+    }
+
+    return insights;
+  }
+
+  static async generateRecommendations(
+    stats: any,
+    user: any
+  ): Promise<string[]> {
+    const recommendations: string[] = [];
+
+    // Personalized recommendations based on statistics
+    if (stats.averageFiberDaily < 25) {
+      recommendations.push(
+        "הוסף יותר ירקות עלים ירוקים וקטניות לתפריט לשיפור צריכת הסיבים"
+      );
+    }
+
+    if (stats.averageSodiumDaily > 2300) {
+      recommendations.push(
+        "צמצם מזונות מעובדים ותבלינים מלוחים להפחתת צריכת הנתרן"
+      );
+    }
+
+    if (stats.averageProteinDaily < (user?.weight_kg || 70) * 0.8) {
+      recommendations.push(
+        "הגבר צריכת חלבון באמצעות עוף רזה, דגים, קטניות וביצים"
+      );
+    }
+
+    if (stats.processedFoodPercentage > 25) {
+      recommendations.push(
+        "התמקד במזונות טבעיים ובישול בבית לשיפור איכות התזונה"
+      );
+    }
+
+    if (stats.vegetableFruitIntake < 50) {
+      recommendations.push("הגבר צריכת ירקות ופירות - מטרה של 5 מנות ביום");
+    }
+
+    if (stats.missedMealsAlert > 5) {
+      recommendations.push(
+        "שמר על קביעות בארוחות - 3 ארוחות ביום לשמירה על רמת הסוכר"
+      );
+    }
+
+    return recommendations;
+  }
+
+  static async generatePDFReport(userId: string): Promise<Buffer> {
+    // In a real implementation, you would use a library like puppeteer or jsPDF
+    // For now, return a mock PDF buffer
+    const mockPDFContent = `דו"ח תזונה אישי למשתמש ${userId}`;
+    return Buffer.from(mockPDFContent, "utf8");
+  }
+
+  static async generateInsights(userId: string): Promise<{
+    insights: string[];
+    recommendations: string[];
+  }> {
+    const stats = await this.getNutritionStatistics(userId, "week");
+
+    return {
+      insights: stats.insights,
+      recommendations: stats.recommendations,
+    };
   }
 }
