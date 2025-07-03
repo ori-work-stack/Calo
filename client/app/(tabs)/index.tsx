@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -8,102 +8,46 @@ import {
   RefreshControl,
   TouchableOpacity,
 } from "react-native";
-import { useSelector, useDispatch } from "react-redux";
-import { RootState, AppDispatch } from "@/src/store";
-import { fetchMeals } from "@/src/store/mealSlice";
-import { nutritionAPI, userAPI } from "@/src/services/api";
+import { useSelector } from "react-redux";
+import { RootState } from "@/src/store";
 import { Ionicons } from "@expo/vector-icons";
-
-interface DailyStats {
-  calories: number;
-  protein: number;
-  carbs: number;
-  fat: number;
-  mealCount: number;
-}
-
-interface GlobalStatistics {
-  generalStats: {
-    averageCaloriesPerMeal: number;
-    averageProteinPerMeal: number;
-    averageCarbsPerMeal: number;
-    averageFatPerMeal: number;
-    mostCommonMealTime: string;
-    averageMealsPerDay: number;
-  };
-  healthInsights: {
-    proteinAdequacy: string;
-    calorieDistribution: string;
-    fiberIntake: string;
-    sugarConsumption: string;
-  };
-  behavioralPatterns: {
-    weekdayVsWeekend: string;
-    seasonalTrends: string;
-    mealFrequency: string;
-  };
-  recommendations: {
-    nutritionalTips: string[];
-    mealTimingTips: string[];
-    portionControlTips: string[];
-  };
-}
+import { useMeals, useDailyStats, useGlobalStats } from "@/hooks/useQueries";
 
 export default function Dashboard() {
-  const dispatch = useDispatch<AppDispatch>();
-  const { meals, isLoading } = useSelector((state: RootState) => {
-    const data = state.meal.meals;
-    return {
-      meals: Array.isArray(data) ? data : [],
-      isLoading: state.meal.isLoading,
-    };
-  });
   const { user } = useSelector((state: RootState) => state.auth);
-
-  const [dailyStats, setDailyStats] = useState<DailyStats | null>(null);
-  const [globalStats, setGlobalStats] = useState<GlobalStatistics | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [loadingGlobalStats, setLoadingGlobalStats] = useState(false);
   const [showGlobalStats, setShowGlobalStats] = useState(false);
 
-  const loadDailyStats = async () => {
-    try {
-      const today = new Date().toISOString().split("T")[0];
-      const stats = await nutritionAPI.getDailyStats(today);
-      setDailyStats(stats);
-    } catch (error) {
-      console.error("Failed to load daily stats:", error);
-    }
-  };
+  // Get today's date
+  const today = new Date().toISOString().split("T")[0];
 
-  const loadGlobalStats = async () => {
-    try {
-      setLoadingGlobalStats(true);
-      const stats = await userAPI.getGlobalStatistics();
-      setGlobalStats(stats);
-    } catch (error) {
-      console.error("Failed to load global stats:", error);
-    } finally {
-      setLoadingGlobalStats(false);
-    }
-  };
+  // React Query hooks
+  const {
+    data: meals = [],
+    isLoading: mealsLoading,
+    refetch: refetchMeals,
+  } = useMeals();
+
+  const {
+    data: dailyStats,
+    isLoading: dailyStatsLoading,
+    refetch: refetchDailyStats,
+  } = useDailyStats(today);
+
+  const {
+    data: globalStats,
+    isLoading: globalStatsLoading,
+    refetch: refetchGlobalStats,
+  } = useGlobalStats();
+
+  const isLoading = mealsLoading || dailyStatsLoading;
 
   const onRefresh = async () => {
-    setRefreshing(true);
     await Promise.all([
-      dispatch(fetchMeals()),
-      loadDailyStats(),
-      showGlobalStats ? loadGlobalStats() : Promise.resolve(),
+      refetchMeals(),
+      refetchDailyStats(),
+      showGlobalStats ? refetchGlobalStats() : Promise.resolve(),
     ]);
-    setRefreshing(false);
   };
-
-  useEffect(() => {
-    dispatch(fetchMeals());
-    loadDailyStats();
-    // Load global stats on app start for efficiency
-    loadGlobalStats();
-  }, [dispatch]);
 
   const renderGlobalStatistics = () => {
     if (!globalStats) return null;
@@ -174,19 +118,50 @@ export default function Dashboard() {
           <View style={styles.tipsList}>
             {globalStats.recommendations.nutritionalTips
               .slice(0, 2)
-              .map((tip, index) => (
-                <View key={index} style={styles.tipItem}>
-                  <Text style={styles.tipBullet}>•</Text>
-                  <Text style={styles.tipText}>{tip}</Text>
-                </View>
-              ))}
+              .map(
+                (
+                  tip:
+                    | string
+                    | number
+                    | bigint
+                    | boolean
+                    | React.ReactElement<
+                        unknown,
+                        string | React.JSXElementConstructor<any>
+                      >
+                    | Iterable<React.ReactNode>
+                    | React.ReactPortal
+                    | Promise<
+                        | string
+                        | number
+                        | bigint
+                        | boolean
+                        | React.ReactPortal
+                        | React.ReactElement<
+                            unknown,
+                            string | React.JSXElementConstructor<any>
+                          >
+                        | Iterable<React.ReactNode>
+                        | null
+                        | undefined
+                      >
+                    | null
+                    | undefined,
+                  index: React.Key | null | undefined
+                ) => (
+                  <View key={index} style={styles.tipItem}>
+                    <Text style={styles.tipBullet}>•</Text>
+                    <Text style={styles.tipText}>{tip}</Text>
+                  </View>
+                )
+              )}
           </View>
         </View>
       </View>
     );
   };
 
-  if (isLoading && !meals.length) {
+  if (isLoading && !meals.length && !dailyStats) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#007AFF" />
@@ -198,7 +173,7 @@ export default function Dashboard() {
     <ScrollView
       style={styles.container}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        <RefreshControl refreshing={isLoading} onRefresh={onRefresh} />
       }
     >
       <Text style={styles.welcome}>Welcome back, {user?.name}!</Text>
@@ -243,7 +218,7 @@ export default function Dashboard() {
         <TouchableOpacity
           style={styles.toggleButton}
           onPress={() => setShowGlobalStats(!showGlobalStats)}
-          disabled={loadingGlobalStats}
+          disabled={globalStatsLoading}
         >
           <Ionicons
             name={showGlobalStats ? "chevron-up" : "chevron-down"}
@@ -253,7 +228,7 @@ export default function Dashboard() {
           <Text style={styles.toggleButtonText}>
             {showGlobalStats ? "Hide" : "Show"} Community Insights
           </Text>
-          {loadingGlobalStats && (
+          {globalStatsLoading && (
             <ActivityIndicator
               size="small"
               color="#007AFF"
@@ -272,7 +247,7 @@ export default function Dashboard() {
           <View key={meal.id} style={styles.mealCard}>
             <Text style={styles.mealName}>{meal.name}</Text>
             <Text style={styles.mealCalories}>
-              {Math.round(meal.calories)} cal
+              {Math.round(Number(meal.calories))} cal
             </Text>
           </View>
         ))}

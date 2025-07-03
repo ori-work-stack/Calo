@@ -20,7 +20,7 @@ const API_BASE_URL = getApiBaseUrl();
 console.log("🌐 API Base URL:", API_BASE_URL);
 console.log("📱 Platform:", Platform.OS);
 
-// Create axios instance
+// Create axios instance with optimizations
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
@@ -28,7 +28,19 @@ const api = axios.create({
     "Content-Type": "application/json",
   },
   withCredentials: Platform.OS === "web", // Only enable credentials for web (cookies)
+  maxRedirects: 3,
+  // Remove maxConcurrency, it's invalid here
 });
+
+// Request deduplication map
+const pendingRequests = new Map<string, Promise<any>>();
+
+// Helper function to create request key for deduplication
+const createRequestKey = (config: any): string => {
+  return `${config.method?.toUpperCase()}-${config.url}-${JSON.stringify(
+    config.params || {}
+  )}-${JSON.stringify(config.data || {})}`;
+};
 
 // SECURE TOKEN STORAGE - Use SecureStore for mobile, cookies for web
 const STORAGE_KEY = "auth_token_secure";
@@ -183,12 +195,21 @@ const transformMealData = (serverMeal: any): Meal => {
   return transformed;
 };
 
-// Request interceptor to add auth token for mobile
+// Request interceptor with deduplication and auth token
 api.interceptors.request.use(
   async (config) => {
     try {
       console.log("🔄 Making request to:", config.url);
       console.log("📱 Platform:", Platform.OS);
+
+      // Add request deduplication for GET requests
+      if (config.method?.toLowerCase() === "get") {
+        const requestKey = createRequestKey(config);
+        if (pendingRequests.has(requestKey)) {
+          console.log("⚡ Using deduplicated request for:", config.url);
+          return pendingRequests.get(requestKey);
+        }
+      }
 
       if (Platform.OS !== "web") {
         // Only add Authorization header for mobile
@@ -213,10 +234,17 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor for error handling
+// Response interceptor with deduplication cleanup and error handling
 api.interceptors.response.use(
   (response) => {
     console.log("✅ API Response success:", response.config.url);
+
+    // Clean up pending request for GET requests
+    if (response.config.method?.toLowerCase() === "get") {
+      const requestKey = createRequestKey(response.config);
+      pendingRequests.delete(requestKey);
+    }
+
     return response;
   },
   async (error) => {
@@ -228,6 +256,12 @@ api.interceptors.response.use(
       method: error.config?.method,
       message: error.message,
     });
+
+    // Clean up pending request on error
+    if (error.config?.method?.toLowerCase() === "get") {
+      const requestKey = createRequestKey(error.config);
+      pendingRequests.delete(requestKey);
+    }
 
     // Check for network errors
     if (error.code === "NETWORK_ERROR" || error.message === "Network Error") {
