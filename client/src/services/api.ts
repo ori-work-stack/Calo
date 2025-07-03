@@ -11,7 +11,7 @@ const getApiBaseUrl = () => {
   } else {
     // For mobile devices, use your computer's IP address
     // Updated with your correct IP address
-    return "http://192.168.1.61:5000/api";
+    return "http://192.168.1.70:5000/api";
   }
 };
 

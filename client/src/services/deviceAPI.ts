@@ -1,7 +1,8 @@
-import { healthKitService, HealthData } from "./healthKit"; // Assuming healthKit.ts exists and exports HealthData
-import { deviceConnectionService } from "./deviceConnections"; // Updated import
-import { nutritionAPI } from "./api"; // Assuming api.ts exists and exports nutritionAPI
-import axios, { AxiosInstance } from "axios"; // Combined import
+import { healthKitService, HealthData } from "./healthKit";
+import { deviceConnectionService } from "./deviceConnections";
+import { nutritionAPI } from "./api";
+import axios from "axios";
+import { Platform } from "react-native";
 
 export interface ConnectedDevice {
   id: string;
@@ -26,11 +27,20 @@ export interface DailyBalance {
   balanceStatus: "balanced" | "slight_imbalance" | "significant_imbalance";
 }
 
+// Get the correct API URL based on platform
+const getApiBaseUrl = () => {
+  if (Platform.OS === "web") {
+    return "http://localhost:5000/api";
+  } else {
+    return "http://192.168.1.70:5000/api";
+  }
+};
+
 // Create API instance for device endpoints
-const deviceAxiosInstance: AxiosInstance = axios.create({
-  baseURL: process.env.EXPO_PUBLIC_API_URL || "http://192.168.1.61:5000/api",
+const deviceAxios = axios.create({
+  baseURL: getApiBaseUrl(),
   timeout: 30000,
-  withCredentials: true,
+  withCredentials: Platform.OS === "web",
 });
 
 class DeviceAPIService {
@@ -40,7 +50,7 @@ class DeviceAPIService {
 
       // First check server for connected devices
       try {
-        const response = await deviceAxiosInstance.get("/devices");
+        const response = await deviceAxios.get("/devices");
         if (response.data.success) {
           const serverDevices = response.data.data.map((device: any) => ({
             id: device.connected_device_id,
@@ -97,7 +107,7 @@ class DeviceAPIService {
         if (success) {
           // Register with server
           try {
-            await deviceAxiosInstance.post("/devices/connect", {
+            await deviceAxios.post("/devices/connect", {
               deviceType: "APPLE_HEALTH",
               deviceName: "Apple Health",
             });
@@ -117,12 +127,10 @@ class DeviceAPIService {
       if (result.success && result.accessToken) {
         // Register with server
         try {
-          await deviceAxiosInstance.post("/devices/connect", {
+          await deviceAxios.post("/devices/connect", {
             deviceType,
-            // Access display name from deviceConnectionService's config
             deviceName:
-              deviceConnectionService.getDeviceConfig(deviceType).name ||
-              `${deviceType} Device`,
+              result.deviceData?.displayName || `${deviceType} Device`,
             accessToken: result.accessToken,
             refreshToken: result.refreshToken,
           });
@@ -153,7 +161,7 @@ class DeviceAPIService {
 
         // Send to server
         try {
-          await deviceAxiosInstance.post(`/devices/${deviceId}/sync`, {
+          await deviceAxios.post(`/devices/${deviceId}/sync`, {
             activityData: {
               steps: healthData.steps,
               caloriesBurned: healthData.caloriesBurned,
@@ -161,6 +169,7 @@ class DeviceAPIService {
               bmr: 1800, // Default BMR estimate
               heartRate: healthData.heartRate,
               weight: healthData.weight,
+              distance: healthData.distance,
             },
           });
         } catch (serverError) {
@@ -181,7 +190,7 @@ class DeviceAPIService {
       }
 
       const today = new Date().toISOString().split("T")[0];
-      let activityData: HealthData | null = null;
+      let activityData = null;
 
       // Get stored tokens
       const tokens = await deviceConnectionService.getDeviceTokens(device.type);
@@ -218,10 +227,9 @@ class DeviceAPIService {
           );
           break;
         case "GARMIN":
-          // Garmin fetch requires refresh token as well for OAuth 1.0a
           activityData = await deviceConnectionService.fetchGarminData(
             tokens.accessToken,
-            tokens.refreshToken || "", // Ensure refreshToken is a string
+            tokens.refreshToken || "",
             today
           );
           break;
@@ -233,13 +241,14 @@ class DeviceAPIService {
       if (activityData) {
         // Send to server
         try {
-          await deviceAxiosInstance.post(`/devices/${deviceId}/sync`, {
+          await deviceAxios.post(`/devices/${deviceId}/sync`, {
             activityData: {
               steps: activityData.steps || 0,
               caloriesBurned: activityData.caloriesBurned || 0,
               activeMinutes: activityData.activeMinutes || 0,
               bmr: 1800, // Default BMR estimate
-              distance: activityData.distance || 0,
+              distance: activityData.distance,
+              heartRate: activityData.heartRate,
             },
           });
         } catch (serverError) {
@@ -263,7 +272,7 @@ class DeviceAPIService {
 
       // Try server first
       try {
-        const response = await deviceAxiosInstance.get(
+        const response = await deviceAxios.get(
           `/devices/activity/${date}/${date}`
         );
         if (response.data.success && response.data.data.length > 0) {
@@ -274,6 +283,7 @@ class DeviceAPIService {
             activeMinutes: serverData.active_minutes || 0,
             heartRate: serverData.heart_rate_avg,
             weight: serverData.weight_kg,
+            distance: serverData.distance_km,
             date,
           };
         }
@@ -286,12 +296,41 @@ class DeviceAPIService {
 
       // Fallback to local devices
       const devices = await this.getConnectedDevices();
-      const appleHealthDevice = devices.find(
-        (d) => d.type === "APPLE_HEALTH" && d.status === "CONNECTED"
-      );
+      const connectedDevice = devices.find((d) => d.status === "CONNECTED");
 
-      if (appleHealthDevice) {
-        return await healthKitService.getHealthDataForDate(date);
+      if (connectedDevice) {
+        if (connectedDevice.type === "APPLE_HEALTH") {
+          return await healthKitService.getHealthDataForDate(date);
+        } else {
+          // Try to get data from other connected devices
+          const tokens = await deviceConnectionService.getDeviceTokens(
+            connectedDevice.type
+          );
+          if (tokens.accessToken) {
+            switch (connectedDevice.type) {
+              case "GOOGLE_FIT":
+                return await deviceConnectionService.fetchGoogleFitData(
+                  tokens.accessToken,
+                  date
+                );
+              case "FITBIT":
+                return await deviceConnectionService.fetchFitbitData(
+                  tokens.accessToken,
+                  date
+                );
+              case "WHOOP":
+                return await deviceConnectionService.fetchWhoopData(
+                  tokens.accessToken,
+                  date
+                );
+              case "POLAR":
+                return await deviceConnectionService.fetchPolarData(
+                  tokens.accessToken,
+                  date
+                );
+            }
+          }
+        }
       }
 
       console.log("⚠️ No connected devices found");
@@ -308,9 +347,7 @@ class DeviceAPIService {
 
       // Try server first
       try {
-        const response = await deviceAxiosInstance.get(
-          `/devices/balance/${date}`
-        );
+        const response = await deviceAxios.get(`/devices/balance/${date}`);
         if (response.data.success) {
           console.log("✅ Daily balance from server:", response.data.data);
           return response.data.data;
@@ -382,7 +419,7 @@ class DeviceAPIService {
 
       // Disconnect from server
       try {
-        await deviceAxiosInstance.delete(`/devices/${deviceId}`);
+        await deviceAxios.delete(`/devices/${deviceId}`);
       } catch (serverError) {
         console.warn("⚠️ Failed to disconnect from server:", serverError);
       }
@@ -391,49 +428,6 @@ class DeviceAPIService {
       return true;
     } catch (error) {
       console.error("💥 Error disconnecting device:", error);
-      return false;
-    }
-  }
-
-  // TOKEN REFRESH METHODS
-  async refreshDeviceTokens(deviceType: string): Promise<boolean> {
-    try {
-      console.log("🔄 Refreshing tokens for:", deviceType);
-
-      const tokens = await deviceConnectionService.getDeviceTokens(deviceType);
-
-      if (!tokens.refreshToken) {
-        console.error("❌ No refresh token found for:", deviceType);
-        return false;
-      }
-
-      let newAccessToken: string | null = null;
-
-      switch (deviceType) {
-        case "GOOGLE_FIT":
-          newAccessToken = await deviceConnectionService.refreshGoogleFitToken(
-            tokens.refreshToken
-          );
-          break;
-        case "FITBIT":
-          newAccessToken = await deviceConnectionService.refreshFitbitToken(
-            tokens.refreshToken
-          );
-          break;
-        // Add other refresh methods as needed
-        default:
-          console.warn("⚠️ Token refresh not implemented for:", deviceType);
-          return false;
-      }
-
-      if (newAccessToken) {
-        console.log("✅ Tokens refreshed successfully for:", deviceType);
-        return true;
-      }
-
-      return false;
-    } catch (error) {
-      console.error("💥 Error refreshing tokens:", error);
       return false;
     }
   }

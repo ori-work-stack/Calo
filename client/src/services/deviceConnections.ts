@@ -1,12 +1,9 @@
-// deviceConnections.ts (Fixed)
 import { Platform, Linking, Alert } from "react-native";
 import * as WebBrowser from "expo-web-browser";
-import { makeRedirectUri, AuthRequest } from "expo-auth-session";
-// For persistent storage in a real app, you'd use something like:
-// import * as SecureStore from 'expo-secure-store';
-// import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as AuthSession from "expo-auth-session";
+import * as SecureStore from "expo-secure-store";
 
-// Device API configurations
+// Device API configurations with REAL endpoints
 const DEVICE_CONFIGS = {
   GARMIN: {
     name: "Garmin Connect",
@@ -15,7 +12,8 @@ const DEVICE_CONFIGS = {
     clientSecret:
       process.env.EXPO_PUBLIC_GARMIN_CLIENT_SECRET || "your-garmin-secret",
     authUrl: "https://connect.garmin.com/oauthConfirm",
-    tokenUrl: "https://connectapi.garmin.com/oauth-service/oauth/request_token",
+    requestTokenUrl:
+      "https://connectapi.garmin.com/oauth-service/oauth/request_token",
     accessTokenUrl:
       "https://connectapi.garmin.com/oauth-service/oauth/access_token",
     apiUrl: "https://apis.garmin.com/wellness-api/rest",
@@ -25,6 +23,8 @@ const DEVICE_CONFIGS = {
     name: "Google Fit",
     clientId:
       process.env.EXPO_PUBLIC_GOOGLE_FIT_CLIENT_ID || "your-google-client-id",
+    clientSecret:
+      process.env.EXPO_PUBLIC_GOOGLE_FIT_CLIENT_SECRET || "your-google-secret",
     authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
     tokenUrl: "https://oauth2.googleapis.com/token",
     apiUrl: "https://www.googleapis.com/fitness/v1",
@@ -32,6 +32,7 @@ const DEVICE_CONFIGS = {
       "https://www.googleapis.com/auth/fitness.activity.read",
       "https://www.googleapis.com/auth/fitness.body.read",
       "https://www.googleapis.com/auth/fitness.heart_rate.read",
+      "https://www.googleapis.com/auth/fitness.location.read",
     ],
   },
   FITBIT: {
@@ -62,11 +63,6 @@ const DEVICE_CONFIGS = {
     apiUrl: "https://api.prod.whoop.com/developer/v1",
     scopes: ["read:recovery", "read:cycles", "read:workout", "read:sleep"],
   },
-  SAMSUNG_HEALTH: {
-    name: "Samsung Health",
-    packageName: "com.sec.android.app.shealth",
-    available: Platform.OS === "android",
-  },
   POLAR: {
     name: "Polar",
     clientId: process.env.EXPO_PUBLIC_POLAR_CLIENT_ID || "your-polar-client-id",
@@ -77,29 +73,26 @@ const DEVICE_CONFIGS = {
     apiUrl: "https://www.polaraccesslink.com/v3",
     scopes: ["accesslink.read_all"],
   },
+  SAMSUNG_HEALTH: {
+    name: "Samsung Health",
+    packageName: "com.sec.android.app.shealth",
+    available: Platform.OS === "android",
+  },
 } as const;
 
 export interface DeviceConnectionResult {
   success: boolean;
-  accessToken?: string | null;
-  refreshToken?: string | null;
+  accessToken?: string;
+  refreshToken?: string;
   expiresIn?: number;
   error?: string;
-  deviceData?: {
-    displayName?: string;
-  };
-}
-
-export interface DeviceTokens {
-  accessToken: string | null;
-  refreshToken: string | null;
-  expiresIn?: number;
+  deviceData?: any;
 }
 
 export interface HealthData {
-  steps?: number;
-  caloriesBurned?: number;
-  activeMinutes?: number;
+  steps: number;
+  caloriesBurned: number;
+  activeMinutes: number;
   heartRate?: number;
   weight?: number;
   distance?: number;
@@ -107,167 +100,101 @@ export interface HealthData {
 }
 
 class DeviceConnectionService {
-  private _tokenStore: Map<
-    string,
-    { accessToken: string; refreshToken?: string; expiresIn?: number }
-  > = new Map();
-
-  constructor() {
-    WebBrowser.maybeCompleteAuthSession();
-  }
-
-  // TOKEN STORAGE METHODS
-  async setDeviceTokens(
+  // SECURE TOKEN STORAGE
+  private async storeDeviceTokens(
     deviceType: string,
-    tokens: { accessToken: string; refreshToken?: string; expiresIn?: number }
+    accessToken: string,
+    refreshToken?: string
   ) {
-    console.log(`🔒 Storing tokens for ${deviceType}`);
-    this._tokenStore.set(deviceType, tokens);
+    try {
+      const tokenKey = `device_token_${deviceType}`;
+      const refreshKey = `device_refresh_${deviceType}`;
+
+      await SecureStore.setItemAsync(tokenKey, accessToken);
+      if (refreshToken) {
+        await SecureStore.setItemAsync(refreshKey, refreshToken);
+      }
+
+      console.log("🔐 Device tokens stored securely for", deviceType);
+    } catch (error) {
+      console.error("💥 Failed to store device tokens:", error);
+    }
   }
 
-  async getDeviceTokens(deviceType: string): Promise<DeviceTokens> {
-    console.log(`🔑 Retrieving tokens for ${deviceType}`);
-    const stored = this._tokenStore.get(deviceType);
-    return {
-      accessToken: stored?.accessToken || null,
-      refreshToken: stored?.refreshToken || null,
-      expiresIn: stored?.expiresIn,
-    };
+  async getDeviceTokens(deviceType: string): Promise<{
+    accessToken?: string;
+    refreshToken?: string;
+  }> {
+    try {
+      const tokenKey = `device_token_${deviceType}`;
+      const refreshKey = `device_refresh_${deviceType}`;
+
+      const accessToken = await SecureStore.getItemAsync(tokenKey);
+      const refreshToken = await SecureStore.getItemAsync(refreshKey);
+
+      return {
+        accessToken: accessToken || undefined,
+        refreshToken: refreshToken || undefined,
+      };
+    } catch (error) {
+      console.error("💥 Failed to get device tokens:", error);
+      return {};
+    }
   }
 
   async clearDeviceTokens(deviceType: string) {
-    console.log(`🗑️ Clearing tokens for ${deviceType}`);
-    this._tokenStore.delete(deviceType);
-  }
-
-  // OAUTH CONNECTION METHODS
-  async connectGarmin(): Promise<DeviceConnectionResult> {
     try {
-      console.log("🔗 Connecting to Garmin...");
+      const tokenKey = `device_token_${deviceType}`;
+      const refreshKey = `device_refresh_${deviceType}`;
 
-      const config = DEVICE_CONFIGS.GARMIN;
-      const redirectUri = makeRedirectUri();
+      await SecureStore.deleteItemAsync(tokenKey);
+      await SecureStore.deleteItemAsync(refreshKey);
 
-      // Note: Garmin uses OAuth 1.0a which is more complex
-      // This is a simplified implementation
-      const oauth1AuthUrl =
-        `${config.authUrl}?` +
-        `oauth_consumer_key=${config.clientId}&` +
-        `oauth_signature_method=HMAC-SHA1&` +
-        `oauth_timestamp=${Math.floor(Date.now() / 1000)}&` +
-        `oauth_nonce=${Math.random().toString(36).substring(2, 12)}&` +
-        `oauth_version=1.0&` +
-        `oauth_callback=${encodeURIComponent(redirectUri)}`;
-
-      const request = new AuthRequest(
-        {
-          clientId: config.clientId,
-          redirectUri: redirectUri,
-          responseType: "code",
-          scopes: [],
-        },
-        { authorizationEndpoint: oauth1AuthUrl }
-      );
-
-      const result = await request.promptAsync({ returnUrl: redirectUri });
-
-      if (
-        result.type === "success" &&
-        result.params.oauth_token &&
-        result.params.oauth_verifier
-      ) {
-        const tokenResponse = await this.exchangeGarminToken(
-          result.params.oauth_token as string,
-          result.params.oauth_verifier as string
-        );
-
-        if (tokenResponse.oauth_token && tokenResponse.oauth_token_secret) {
-          await this.setDeviceTokens(config.name, {
-            accessToken: tokenResponse.oauth_token,
-            refreshToken: tokenResponse.oauth_token_secret,
-          });
-          return {
-            success: true,
-            accessToken: tokenResponse.oauth_token,
-            refreshToken: tokenResponse.oauth_token_secret,
-            deviceData: { displayName: config.name },
-          };
-        }
-      }
-
-      return {
-        success: false,
-        error: "Garmin authorization cancelled or failed.",
-      };
-    } catch (error: any) {
-      console.error("💥 Garmin connection error:", error);
-      return {
-        success: false,
-        error: `Failed to connect to Garmin: ${error.message}`,
-      };
-    }
-  }
-
-  private async exchangeGarminToken(oauthToken: string, oauthVerifier: string) {
-    const config = DEVICE_CONFIGS.GARMIN;
-
-    try {
-      const response = await fetch(config.accessTokenUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: `oauth_token=${oauthToken}&oauth_verifier=${oauthVerifier}`,
-      });
-
-      const text = await response.text();
-      const params = new URLSearchParams(text);
-
-      return {
-        oauth_token: params.get("oauth_token"),
-        oauth_token_secret: params.get("oauth_token_secret"),
-      };
+      console.log("🗑️ Device tokens cleared for", deviceType);
     } catch (error) {
-      console.error("💥 Garmin token exchange error:", error);
-      return { oauth_token: null, oauth_token_secret: null };
+      console.error("💥 Failed to clear device tokens:", error);
     }
   }
 
+  getDeviceConfig(deviceType: string) {
+    return DEVICE_CONFIGS[deviceType as keyof typeof DEVICE_CONFIGS];
+  }
+
+  // GOOGLE FIT INTEGRATION
   async connectGoogleFit(): Promise<DeviceConnectionResult> {
     try {
       console.log("🔗 Connecting to Google Fit...");
 
       const config = DEVICE_CONFIGS.GOOGLE_FIT;
-      const redirectUri = makeRedirectUri();
+      const redirectUri = AuthSession.makeRedirectUri({ useProxy: true });
 
-      const request = new AuthRequest(
-        {
-          clientId: config.clientId,
-          scopes: config.scopes,
-          redirectUri: redirectUri,
-          responseType: "code",
-          extraParams: {
-            access_type: "offline",
-            prompt: "consent",
-          },
-        },
-        { authorizationEndpoint: config.authUrl }
-      );
+      const authUrl =
+        `${config.authUrl}?` +
+        `client_id=${config.clientId}&` +
+        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+        `response_type=code&` +
+        `scope=${encodeURIComponent(config.scopes.join(" "))}&` +
+        `access_type=offline&` +
+        `prompt=consent`;
 
-      const result = await request.promptAsync({ returnUrl: redirectUri });
+      const result = await AuthSession.startAsync({
+        authUrl,
+        returnUrl: redirectUri,
+      });
 
       if (result.type === "success" && result.params.code) {
-        const tokenResponse = await this.exchangeGoogleFitToken(
-          result.params.code as string,
+        const tokenResponse = await this.exchangeGoogleFitCode(
+          result.params.code,
           redirectUri
         );
 
         if (tokenResponse.access_token) {
-          await this.setDeviceTokens(config.name, {
-            accessToken: tokenResponse.access_token,
-            refreshToken: tokenResponse.refresh_token,
-            expiresIn: tokenResponse.expires_in,
-          });
+          await this.storeDeviceTokens(
+            "GOOGLE_FIT",
+            tokenResponse.access_token,
+            tokenResponse.refresh_token
+          );
+
           return {
             success: true,
             accessToken: tokenResponse.access_token,
@@ -278,76 +205,122 @@ class DeviceConnectionService {
         }
       }
 
-      return {
-        success: false,
-        error: "Google Fit authorization cancelled or failed.",
-      };
-    } catch (error: any) {
+      return { success: false, error: "Google Fit authorization cancelled" };
+    } catch (error) {
       console.error("💥 Google Fit connection error:", error);
-      return {
-        success: false,
-        error: `Failed to connect to Google Fit: ${error.message}`,
-      };
+      return { success: false, error: "Failed to connect to Google Fit" };
     }
   }
 
-  private async exchangeGoogleFitToken(code: string, redirectUri: string) {
+  private async exchangeGoogleFitCode(code: string, redirectUri: string) {
     const config = DEVICE_CONFIGS.GOOGLE_FIT;
 
-    try {
-      const response = await fetch(config.tokenUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body:
-          `code=${code}&` +
-          `client_id=${config.clientId}&` +
-          `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-          `grant_type=authorization_code`,
-      });
+    const response = await fetch(config.tokenUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        client_id: config.clientId,
+        client_secret: config.clientSecret,
+        code,
+        grant_type: "authorization_code",
+        redirect_uri: redirectUri,
+      }),
+    });
 
-      return await response.json();
+    return await response.json();
+  }
+
+  async fetchGoogleFitData(
+    accessToken: string,
+    date: string
+  ): Promise<HealthData | null> {
+    try {
+      const config = DEVICE_CONFIGS.GOOGLE_FIT;
+      const startTime = new Date(date).getTime() * 1000000; // nanoseconds
+      const endTime = startTime + 24 * 60 * 60 * 1000 * 1000000; // 24 hours
+
+      // Fetch steps
+      const stepsResponse = await fetch(
+        `${config.apiUrl}/users/me/dataSources/derived:com.google.step_count.delta:com.google.android.gms:estimated_steps/datasets/${startTime}-${endTime}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      const stepsData = await stepsResponse.json();
+      const steps =
+        stepsData.point?.reduce(
+          (sum: number, point: any) => sum + (point.value?.[0]?.intVal || 0),
+          0
+        ) || 0;
+
+      // Fetch calories
+      const caloriesResponse = await fetch(
+        `${config.apiUrl}/users/me/dataSources/derived:com.google.calories.expended:com.google.android.gms:merge_calories_expended/datasets/${startTime}-${endTime}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      const caloriesData = await caloriesResponse.json();
+      const calories =
+        caloriesData.point?.reduce(
+          (sum: number, point: any) => sum + (point.value?.[0]?.fpVal || 0),
+          0
+        ) || 0;
+
+      return {
+        steps,
+        caloriesBurned: Math.round(calories),
+        activeMinutes: Math.round(steps / 100), // Rough estimate
+        date,
+      };
     } catch (error) {
-      console.error("💥 Google Fit token exchange error:", error);
-      return {};
+      console.error("💥 Error fetching Google Fit data:", error);
+      return null;
     }
   }
 
+  // FITBIT INTEGRATION
   async connectFitbit(): Promise<DeviceConnectionResult> {
     try {
       console.log("🔗 Connecting to Fitbit...");
 
       const config = DEVICE_CONFIGS.FITBIT;
-      const redirectUri = makeRedirectUri();
+      const redirectUri = AuthSession.makeRedirectUri({ useProxy: true });
 
-      const request = new AuthRequest(
-        {
-          clientId: config.clientId,
-          scopes: config.scopes,
-          redirectUri: redirectUri,
-          responseType: "code",
-          extraParams: {
-            expires_in: "604800",
-          },
-        },
-        { authorizationEndpoint: config.authUrl }
-      );
+      const authUrl =
+        `${config.authUrl}?` +
+        `client_id=${config.clientId}&` +
+        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+        `response_type=code&` +
+        `scope=${encodeURIComponent(config.scopes.join(" "))}&` +
+        `expires_in=604800`; // 1 week
 
-      const result = await request.promptAsync({ returnUrl: redirectUri });
+      const result = await AuthSession.startAsync({
+        authUrl,
+        returnUrl: redirectUri,
+      });
 
       if (result.type === "success" && result.params.code) {
-        const tokenResponse = await this.exchangeFitbitToken(
-          result.params.code as string,
+        const tokenResponse = await this.exchangeFitbitCode(
+          result.params.code,
           redirectUri
         );
 
         if (tokenResponse.access_token) {
-          await this.setDeviceTokens(config.name, {
-            accessToken: tokenResponse.access_token,
-            refreshToken: tokenResponse.refresh_token,
-            expiresIn: tokenResponse.expires_in,
-          });
+          await this.storeDeviceTokens(
+            "FITBIT",
+            tokenResponse.access_token,
+            tokenResponse.refresh_token
+          );
+
           return {
             success: true,
             accessToken: tokenResponse.access_token,
@@ -358,79 +331,101 @@ class DeviceConnectionService {
         }
       }
 
-      return {
-        success: false,
-        error: "Fitbit authorization cancelled or failed.",
-      };
-    } catch (error: any) {
+      return { success: false, error: "Fitbit authorization cancelled" };
+    } catch (error) {
       console.error("💥 Fitbit connection error:", error);
-      return {
-        success: false,
-        error: `Failed to connect to Fitbit: ${error.message}`,
-      };
+      return { success: false, error: "Failed to connect to Fitbit" };
     }
   }
 
-  private async exchangeFitbitToken(code: string, redirectUri: string) {
+  private async exchangeFitbitCode(code: string, redirectUri: string) {
     const config = DEVICE_CONFIGS.FITBIT;
 
+    const credentials = btoa(`${config.clientId}:${config.clientSecret}`);
+
+    const response = await fetch(config.tokenUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${credentials}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        client_id: config.clientId,
+        code,
+        grant_type: "authorization_code",
+        redirect_uri: redirectUri,
+      }),
+    });
+
+    return await response.json();
+  }
+
+  async fetchFitbitData(
+    accessToken: string,
+    date: string
+  ): Promise<HealthData | null> {
     try {
-      const credentials = btoa(`${config.clientId}:${config.clientSecret}`);
+      const config = DEVICE_CONFIGS.FITBIT;
 
-      const response = await fetch(config.tokenUrl, {
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${credentials}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body:
-          `client_id=${config.clientId}&` +
-          `grant_type=authorization_code&` +
-          `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-          `code=${code}`,
-      });
+      const response = await fetch(
+        `${config.apiUrl}/user/-/activities/date/${date}.json`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
 
-      return await response.json();
+      const data = await response.json();
+      const summary = data.summary;
+
+      return {
+        steps: summary.steps || 0,
+        caloriesBurned: summary.caloriesOut || 0,
+        activeMinutes:
+          (summary.veryActiveMinutes || 0) + (summary.fairlyActiveMinutes || 0),
+        distance: summary.distances?.[0]?.distance || 0,
+        date,
+      };
     } catch (error) {
-      console.error("💥 Fitbit token exchange error:", error);
-      return {};
+      console.error("💥 Error fetching Fitbit data:", error);
+      return null;
     }
   }
 
+  // WHOOP INTEGRATION
   async connectWhoop(): Promise<DeviceConnectionResult> {
     try {
       console.log("🔗 Connecting to Whoop...");
 
       const config = DEVICE_CONFIGS.WHOOP;
-      const redirectUri = makeRedirectUri();
+      const redirectUri = AuthSession.makeRedirectUri({ useProxy: true });
 
-      const request = new AuthRequest(
-        {
-          clientId: config.clientId,
-          scopes: config.scopes,
-          redirectUri: redirectUri,
-          responseType: "code",
-          extraParams: {
-            state: Math.random().toString(36).substring(2, 12),
-          },
-        },
-        { authorizationEndpoint: config.authUrl }
-      );
+      const authUrl =
+        `${config.authUrl}?` +
+        `client_id=${config.clientId}&` +
+        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+        `response_type=code&` +
+        `scope=${encodeURIComponent(config.scopes.join(" "))}`;
 
-      const result = await request.promptAsync({ returnUrl: redirectUri });
+      const result = await AuthSession.startAsync({
+        authUrl,
+        returnUrl: redirectUri,
+      });
 
       if (result.type === "success" && result.params.code) {
-        const tokenResponse = await this.exchangeWhoopToken(
-          result.params.code as string,
+        const tokenResponse = await this.exchangeWhoopCode(
+          result.params.code,
           redirectUri
         );
 
         if (tokenResponse.access_token) {
-          await this.setDeviceTokens(config.name, {
-            accessToken: tokenResponse.access_token,
-            refreshToken: tokenResponse.refresh_token,
-            expiresIn: tokenResponse.expires_in,
-          });
+          await this.storeDeviceTokens(
+            "WHOOP",
+            tokenResponse.access_token,
+            tokenResponse.refresh_token
+          );
+
           return {
             success: true,
             accessToken: tokenResponse.access_token,
@@ -441,75 +436,108 @@ class DeviceConnectionService {
         }
       }
 
-      return {
-        success: false,
-        error: "Whoop authorization cancelled or failed.",
-      };
-    } catch (error: any) {
+      return { success: false, error: "Whoop authorization cancelled" };
+    } catch (error) {
       console.error("💥 Whoop connection error:", error);
-      return {
-        success: false,
-        error: `Failed to connect to Whoop: ${error.message}`,
-      };
+      return { success: false, error: "Failed to connect to Whoop" };
     }
   }
 
-  private async exchangeWhoopToken(code: string, redirectUri: string) {
+  private async exchangeWhoopCode(code: string, redirectUri: string) {
     const config = DEVICE_CONFIGS.WHOOP;
 
-    try {
-      const response = await fetch(config.tokenUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          grant_type: "authorization_code",
-          client_id: config.clientId,
-          client_secret: config.clientSecret,
-          code: code,
-          redirect_uri: redirectUri,
-        }),
-      });
+    const response = await fetch(config.tokenUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        client_id: config.clientId,
+        client_secret: config.clientSecret,
+        code,
+        grant_type: "authorization_code",
+        redirect_uri: redirectUri,
+      }),
+    });
 
-      return await response.json();
+    return await response.json();
+  }
+
+  async fetchWhoopData(
+    accessToken: string,
+    date: string
+  ): Promise<HealthData | null> {
+    try {
+      const config = DEVICE_CONFIGS.WHOOP;
+      const startDate = new Date(date).toISOString();
+      const endDate = new Date(
+        new Date(date).getTime() + 24 * 60 * 60 * 1000
+      ).toISOString();
+
+      const response = await fetch(
+        `${config.apiUrl}/cycle?start=${startDate}&end=${endDate}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+      const cycle = data.records?.[0];
+
+      if (cycle) {
+        return {
+          steps: 0, // Whoop doesn't track steps
+          caloriesBurned: cycle.strain?.kilojoule || 0,
+          activeMinutes: cycle.strain?.workouts_duration_milli
+            ? Math.round(cycle.strain.workouts_duration_milli / 60000)
+            : 0,
+          heartRate: cycle.recovery?.heart_rate_variability_rmssd || 0,
+          date,
+        };
+      }
+
+      return null;
     } catch (error) {
-      console.error("💥 Whoop token exchange error:", error);
-      return {};
+      console.error("💥 Error fetching Whoop data:", error);
+      return null;
     }
   }
 
+  // POLAR INTEGRATION
   async connectPolar(): Promise<DeviceConnectionResult> {
     try {
       console.log("🔗 Connecting to Polar...");
 
       const config = DEVICE_CONFIGS.POLAR;
-      const redirectUri = makeRedirectUri();
+      const redirectUri = AuthSession.makeRedirectUri({ useProxy: true });
 
-      const request = new AuthRequest(
-        {
-          clientId: config.clientId,
-          scopes: config.scopes,
-          redirectUri: redirectUri,
-          responseType: "code",
-        },
-        { authorizationEndpoint: config.authUrl }
-      );
+      const authUrl =
+        `${config.authUrl}?` +
+        `client_id=${config.clientId}&` +
+        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+        `response_type=code&` +
+        `scope=${encodeURIComponent(config.scopes.join(" "))}`;
 
-      const result = await request.promptAsync({ returnUrl: redirectUri });
+      const result = await AuthSession.startAsync({
+        authUrl,
+        returnUrl: redirectUri,
+      });
 
       if (result.type === "success" && result.params.code) {
-        const tokenResponse = await this.exchangePolarToken(
-          result.params.code as string,
+        const tokenResponse = await this.exchangePolarCode(
+          result.params.code,
           redirectUri
         );
 
         if (tokenResponse.access_token) {
-          await this.setDeviceTokens(config.name, {
-            accessToken: tokenResponse.access_token,
-            refreshToken: tokenResponse.refresh_token,
-            expiresIn: tokenResponse.expires_in,
-          });
+          await this.storeDeviceTokens(
+            "POLAR",
+            tokenResponse.access_token,
+            tokenResponse.refresh_token
+          );
+
           return {
             success: true,
             accessToken: tokenResponse.access_token,
@@ -520,44 +548,106 @@ class DeviceConnectionService {
         }
       }
 
-      return {
-        success: false,
-        error: "Polar authorization cancelled or failed.",
-      };
-    } catch (error: any) {
+      return { success: false, error: "Polar authorization cancelled" };
+    } catch (error) {
       console.error("💥 Polar connection error:", error);
-      return {
-        success: false,
-        error: `Failed to connect to Polar: ${error.message}`,
-      };
+      return { success: false, error: "Failed to connect to Polar" };
     }
   }
 
-  private async exchangePolarToken(code: string, redirectUri: string) {
+  private async exchangePolarCode(code: string, redirectUri: string) {
     const config = DEVICE_CONFIGS.POLAR;
 
+    const response = await fetch(config.tokenUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: `Basic ${btoa(
+          `${config.clientId}:${config.clientSecret}`
+        )}`,
+      },
+      body: new URLSearchParams({
+        code,
+        grant_type: "authorization_code",
+        redirect_uri: redirectUri,
+      }),
+    });
+
+    return await response.json();
+  }
+
+  async fetchPolarData(
+    accessToken: string,
+    date: string
+  ): Promise<HealthData | null> {
     try {
-      const credentials = btoa(`${config.clientId}:${config.clientSecret}`);
+      const config = DEVICE_CONFIGS.POLAR;
 
-      const response = await fetch(config.tokenUrl, {
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${credentials}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body:
-          `grant_type=authorization_code&` +
-          `code=${code}&` +
-          `redirect_uri=${encodeURIComponent(redirectUri)}`,
-      });
+      const response = await fetch(
+        `${config.apiUrl}/users/daily-activity?date=${date}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
 
-      return await response.json();
+      const data = await response.json();
+      const activity = data.data?.[0];
+
+      if (activity) {
+        return {
+          steps: activity.steps || 0,
+          caloriesBurned: activity.calories || 0,
+          activeMinutes: activity.active_time_seconds
+            ? Math.round(activity.active_time_seconds / 60)
+            : 0,
+          heartRate: activity.heart_rate_avg || 0,
+          date,
+        };
+      }
+
+      return null;
     } catch (error) {
-      console.error("💥 Polar token exchange error:", error);
-      return {};
+      console.error("💥 Error fetching Polar data:", error);
+      return null;
     }
   }
 
+  // GARMIN INTEGRATION (OAuth 1.0a)
+  async connectGarmin(): Promise<DeviceConnectionResult> {
+    try {
+      console.log("🔗 Connecting to Garmin...");
+
+      // Garmin uses OAuth 1.0a which is more complex
+      // For now, return a placeholder implementation
+      Alert.alert(
+        "Garmin Integration",
+        "Garmin integration requires OAuth 1.0a implementation. Please contact support for setup assistance.",
+        [{ text: "OK" }]
+      );
+
+      return {
+        success: false,
+        error: "Garmin OAuth 1.0a implementation required",
+      };
+    } catch (error) {
+      console.error("💥 Garmin connection error:", error);
+      return { success: false, error: "Failed to connect to Garmin" };
+    }
+  }
+
+  async fetchGarminData(
+    accessToken: string,
+    tokenSecret: string,
+    date: string
+  ): Promise<HealthData | null> {
+    // Placeholder for Garmin data fetching
+    console.log("📊 Garmin data fetching requires OAuth 1.0a signing");
+    return null;
+  }
+
+  // SAMSUNG HEALTH INTEGRATION
   async connectSamsungHealth(): Promise<DeviceConnectionResult> {
     try {
       console.log("🔗 Connecting to Samsung Health...");
@@ -569,12 +659,11 @@ class DeviceConnectionService {
         };
       }
 
-      const config = DEVICE_CONFIGS.SAMSUNG_HEALTH;
+      const canOpen = await Linking.canOpenURL("shealth://");
 
-      const canOpen = await Linking.canOpenURL(`shealth://`);
       if (!canOpen) {
         Alert.alert(
-          "Samsung Health Not Found",
+          "Samsung Health Required",
           "Please install Samsung Health from the Google Play Store",
           [
             { text: "Cancel", style: "cancel" },
@@ -592,155 +681,17 @@ class DeviceConnectionService {
 
       Alert.alert(
         "Samsung Health Integration",
-        "Samsung Health integration requires additional SDK setup. Please refer to Samsung Health SDK documentation.",
+        "Samsung Health integration requires the Samsung Health SDK. Please contact support for setup assistance.",
         [{ text: "OK" }]
       );
 
-      return { success: false, error: "SDK integration required" };
-    } catch (error: any) {
-      console.error("💥 Samsung Health connection error:", error);
       return {
         success: false,
-        error: `Failed to connect to Samsung Health: ${error.message}`,
-      };
-    }
-  }
-
-  // DATA FETCHING METHODS
-  async fetchGoogleFitData(
-    accessToken: string,
-    date: string
-  ): Promise<HealthData | null> {
-    console.log(
-      `Fetching Google Fit data for ${date} with token: ${accessToken.substring(
-        0,
-        10
-      )}...`
-    );
-
-    try {
-      // For now, return dummy data. In a real implementation, make API calls here
-      return {
-        date,
-        steps: Math.floor(Math.random() * 10000) + 5000,
-        caloriesBurned: Math.floor(Math.random() * 1000) + 1500,
-        activeMinutes: Math.floor(Math.random() * 120) + 30,
-        heartRate: Math.floor(Math.random() * 30) + 70,
-        weight: 70 + Math.random() * 5,
-        distance: Math.floor(Math.random() * 10) + 2,
+        error: "Samsung Health SDK implementation required",
       };
     } catch (error) {
-      console.error("💥 Google Fit data fetch error:", error);
-      return null;
-    }
-  }
-
-  async fetchFitbitData(
-    accessToken: string,
-    date: string
-  ): Promise<HealthData | null> {
-    console.log(
-      `Fetching Fitbit data for ${date} with token: ${accessToken.substring(
-        0,
-        10
-      )}...`
-    );
-
-    try {
-      return {
-        date,
-        steps: Math.floor(Math.random() * 9000) + 4000,
-        caloriesBurned: Math.floor(Math.random() * 900) + 1400,
-        activeMinutes: Math.floor(Math.random() * 100) + 20,
-        heartRate: Math.floor(Math.random() * 25) + 65,
-        weight: 65 + Math.random() * 7,
-        distance: Math.floor(Math.random() * 8) + 1,
-      };
-    } catch (error) {
-      console.error("💥 Fitbit data fetch error:", error);
-      return null;
-    }
-  }
-
-  async fetchWhoopData(
-    accessToken: string,
-    date: string
-  ): Promise<HealthData | null> {
-    console.log(
-      `Fetching Whoop data for ${date} with token: ${accessToken.substring(
-        0,
-        10
-      )}...`
-    );
-
-    try {
-      return {
-        date,
-        steps: Math.floor(Math.random() * 7000) + 3000,
-        caloriesBurned: Math.floor(Math.random() * 800) + 1300,
-        activeMinutes: Math.floor(Math.random() * 90) + 15,
-        heartRate: Math.floor(Math.random() * 20) + 60,
-        weight: 75 + Math.random() * 3,
-        distance: Math.floor(Math.random() * 7) + 1,
-      };
-    } catch (error) {
-      console.error("💥 Whoop data fetch error:", error);
-      return null;
-    }
-  }
-
-  async fetchPolarData(
-    accessToken: string,
-    date: string
-  ): Promise<HealthData | null> {
-    console.log(
-      `Fetching Polar data for ${date} with token: ${accessToken.substring(
-        0,
-        10
-      )}...`
-    );
-
-    try {
-      return {
-        date,
-        steps: Math.floor(Math.random() * 8000) + 4500,
-        caloriesBurned: Math.floor(Math.random() * 950) + 1600,
-        activeMinutes: Math.floor(Math.random() * 110) + 25,
-        heartRate: Math.floor(Math.random() * 28) + 68,
-        weight: 68 + Math.random() * 6,
-        distance: Math.floor(Math.random() * 9) + 1.5,
-      };
-    } catch (error) {
-      console.error("💥 Polar data fetch error:", error);
-      return null;
-    }
-  }
-
-  async fetchGarminData(
-    accessToken: string,
-    refreshToken: string,
-    date: string
-  ): Promise<HealthData | null> {
-    console.log(
-      `Fetching Garmin data for ${date} with access token: ${accessToken.substring(
-        0,
-        10
-      )}...`
-    );
-
-    try {
-      return {
-        date,
-        steps: Math.floor(Math.random() * 12000) + 6000,
-        caloriesBurned: Math.floor(Math.random() * 1100) + 1800,
-        activeMinutes: Math.floor(Math.random() * 150) + 40,
-        heartRate: Math.floor(Math.random() * 35) + 75,
-        weight: 72 + Math.random() * 4,
-        distance: Math.floor(Math.random() * 12) + 3,
-      };
-    } catch (error) {
-      console.error("💥 Garmin data fetch error:", error);
-      return null;
+      console.error("💥 Samsung Health connection error:", error);
+      return { success: false, error: "Failed to connect to Samsung Health" };
     }
   }
 
@@ -754,24 +705,28 @@ class DeviceConnectionService {
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
         },
-        body:
-          `refresh_token=${refreshToken}&` +
-          `client_id=${config.clientId}&` +
-          `grant_type=refresh_token`,
+        body: new URLSearchParams({
+          client_id: config.clientId,
+          client_secret: config.clientSecret,
+          refresh_token: refreshToken,
+          grant_type: "refresh_token",
+        }),
       });
 
-      const tokenData = await response.json();
-      if (tokenData.access_token) {
-        await this.setDeviceTokens(config.name, {
-          accessToken: tokenData.access_token,
-          refreshToken: tokenData.refresh_token || refreshToken,
-          expiresIn: tokenData.expires_in,
-        });
-        return tokenData.access_token;
+      const data = await response.json();
+
+      if (data.access_token) {
+        await this.storeDeviceTokens(
+          "GOOGLE_FIT",
+          data.access_token,
+          refreshToken
+        );
+        return data.access_token;
       }
+
       return null;
     } catch (error) {
-      console.error("💥 Google Fit token refresh error:", error);
+      console.error("💥 Error refreshing Google Fit token:", error);
       return null;
     }
   }
@@ -787,59 +742,56 @@ class DeviceConnectionService {
           Authorization: `Basic ${credentials}`,
           "Content-Type": "application/x-www-form-urlencoded",
         },
-        body: `grant_type=refresh_token&refresh_token=${refreshToken}`,
+        body: new URLSearchParams({
+          grant_type: "refresh_token",
+          refresh_token: refreshToken,
+        }),
       });
 
-      const tokenData = await response.json();
-      if (tokenData.access_token) {
-        await this.setDeviceTokens(config.name, {
-          accessToken: tokenData.access_token,
-          refreshToken: tokenData.refresh_token || refreshToken,
-          expiresIn: tokenData.expires_in,
-        });
-        return tokenData.access_token;
+      const data = await response.json();
+
+      if (data.access_token) {
+        await this.storeDeviceTokens(
+          "FITBIT",
+          data.access_token,
+          data.refresh_token
+        );
+        return data.access_token;
       }
+
       return null;
     } catch (error) {
-      console.error("💥 Fitbit token refresh error:", error);
+      console.error("💥 Error refreshing Fitbit token:", error);
       return null;
     }
   }
 
-  // UTILITY METHODS
-  getAvailableDevices(): string[] {
-    const devices = Object.keys(DEVICE_CONFIGS);
-    return devices.filter((device) => {
-      if (device === "SAMSUNG_HEALTH") {
-        return DEVICE_CONFIGS.SAMSUNG_HEALTH.available;
-      }
-      return true;
-    });
-  }
-
-  getDeviceConfig(deviceType: string) {
-    return DEVICE_CONFIGS[deviceType as keyof typeof DEVICE_CONFIGS];
-  }
-
+  // MAIN CONNECTION METHOD
   async connectDevice(deviceType: string): Promise<DeviceConnectionResult> {
-    switch (deviceType.toUpperCase()) {
-      case "GARMIN":
-        return this.connectGarmin();
-      case "GOOGLE_FIT":
-        return this.connectGoogleFit();
-      case "FITBIT":
-        return this.connectFitbit();
-      case "WHOOP":
-        return this.connectWhoop();
-      case "SAMSUNG_HEALTH":
-        return this.connectSamsungHealth();
-      case "POLAR":
-        return this.connectPolar();
-      default:
-        return { success: false, error: "Unsupported device type" };
+    console.log("🔗 Connecting to device:", deviceType);
+
+    try {
+      switch (deviceType) {
+        case "GARMIN":
+          return await this.connectGarmin();
+        case "GOOGLE_FIT":
+          return await this.connectGoogleFit();
+        case "FITBIT":
+          return await this.connectFitbit();
+        case "WHOOP":
+          return await this.connectWhoop();
+        case "POLAR":
+          return await this.connectPolar();
+        case "SAMSUNG_HEALTH":
+          return await this.connectSamsungHealth();
+        default:
+          return { success: false, error: "Unsupported device type" };
+      }
+    } catch (error) {
+      console.error("💥 Device connection error:", error);
+      return { success: false, error: "Connection failed" };
     }
   }
 }
 
 export const deviceConnectionService = new DeviceConnectionService();
-export default DeviceConnectionService;

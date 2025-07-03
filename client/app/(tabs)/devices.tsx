@@ -135,20 +135,27 @@ export default function DevicesScreen() {
   };
 
   const handleConnectDevice = async (deviceType: string) => {
+    console.log("🔍 handleConnectDevice called with:", deviceType);
+
     const deviceInfo = SUPPORTED_DEVICES.find((d) => d.type === deviceType);
+    console.log("📱 Device info found:", deviceInfo);
 
     if (!deviceInfo) {
+      console.log("❌ Device info not found for type:", deviceType);
       Alert.alert("Error", "Device type not found");
       return;
     }
 
     if (!deviceInfo.available) {
+      console.log("❌ Device not available:", deviceInfo.name);
       Alert.alert(
         "Not Available",
         `${deviceInfo.name} integration is not available on this platform.`
       );
       return;
     }
+
+    console.log("✅ About to show connection alert for:", deviceInfo.name);
 
     Alert.alert(
       "Connect Device",
@@ -158,10 +165,16 @@ export default function DevicesScreen() {
         {
           text: "Connect",
           onPress: async () => {
+            console.log("🔄 User pressed Connect for:", deviceType);
             setConnectingDevices((prev) => new Set(prev).add(deviceType));
 
             try {
+              console.log(
+                "📡 Calling deviceAPI.connectDevice with:",
+                deviceType
+              );
               const success = await deviceAPI.connectDevice(deviceType);
+              console.log("📡 deviceAPI.connectDevice result:", success);
 
               if (success) {
                 Alert.alert(
@@ -195,7 +208,6 @@ export default function DevicesScreen() {
       ]
     );
   };
-
   const handleDisconnectDevice = async (deviceId: string) => {
     const device = connectedDevices.find((d) => d.id === deviceId);
     if (!device) return;
@@ -395,7 +407,18 @@ export default function DevicesScreen() {
                 styles.availableDeviceCard,
                 !device.available && styles.unavailableDevice,
               ]}
-              onPress={() => handleConnectDevice(device.type)}
+              onPress={() => {
+                console.log(
+                  "🎯 TouchableOpacity pressed for device:",
+                  device.type
+                );
+                console.log("🎯 Device available:", device.available);
+                console.log(
+                  "🎯 Is connecting:",
+                  connectingDevices.has(device.type)
+                );
+                handleConnectDevice(device.type);
+              }}
               disabled={!device.available || isConnecting}
             >
               <Ionicons

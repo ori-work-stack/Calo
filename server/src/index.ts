@@ -31,9 +31,9 @@ app.use(
       process.env.CLIENT_URL || "http://localhost:8081",
       "http://localhost:19006", // Expo web
       "http://localhost:19000", // Expo DevTools
-      "http://192.168.1.61:19006", // Updated IP for web
-      "http://192.168.1.61:8081", // Updated IP for mobile
-      "http://192.168.1.61:*", // Allow any port on your IP
+      "http://192.168.1.70:19006", // Updated IP for web
+      "http://192.168.1.70:8081", // Updated IP for mobile
+      "http://192.168.1.70:*", // Allow any port on your IP
       // Add more IP variations if needed for different network configurations
       "http://10.0.0.0/8", // Private network range
       "http://172.16.0.0/12", // Private network range
@@ -92,10 +92,10 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Database: Supabase PostgreSQL`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
-  console.log(`📱 Access from phone: http://192.168.1.61:${PORT}`);
+  console.log(`📱 Access from phone: http://192.168.1.70:${PORT}`);
   console.log(`🍪 Cookie-based authentication enabled`);
-  console.log(`🧪 Test endpoint: http://192.168.1.61:${PORT}/test`);
-  console.log(`💚 Health check: http://192.168.1.61:${PORT}/health`);
+  console.log(`🧪 Test endpoint: http://192.168.1.70:${PORT}/test`);
+  console.log(`💚 Health check: http://192.168.1.70:${PORT}/health`);
 });
 
 export default app;
