@@ -8,6 +8,7 @@ import { authRoutes } from "./routes/auth";
 import { nutritionRoutes } from "./routes/nutrition";
 import { userRoutes } from "./routes/user";
 import { calendarRoutes } from "./routes/calendar";
+import { deviceRoutes } from "./routes/devices";
 import "./services/cron";
 
 // Load environment variables
@@ -81,6 +82,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/nutrition", nutritionRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/calendar", calendarRoutes);
+app.use("/api/devices", deviceRoutes);
 
 // Error handler
 app.use(errorHandler);

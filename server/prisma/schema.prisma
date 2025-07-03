@@ -1,6 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
-   binaryTargets = ["native", "rhel-openssl-1.0.x", "debian-openssl-1.1.x", "linux-musl"]
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-1.0.x", "debian-openssl-1.1.x", "linux-musl"]
 }
 
 datasource db {
@@ -27,7 +27,11 @@ model User {
   meals              Meal[]
   nutritionPlans     NutritionPlan[]
   payments           SubscriptionPayment[]
-  createdAt          DateTime              @default(now())
+
+  connectedDevices  ConnectedDevice[]
+  activitySummaries DailyActivitySummary[]
+
+  createdAt DateTime @default(now())
 
   Session Session[]
 }
@@ -45,6 +49,60 @@ model Session {
   updatedAt DateTime @updatedAt
 
   @@map("sessions")
+}
+
+model ConnectedDevice {
+  connected_device_id     String           @id @default(cuid())
+  user_id                 String
+  device_name             String
+  device_type             DeviceType
+  connection_status       ConnectionStatus @default(DISCONNECTED)
+  last_sync_time          DateTime?
+  sync_frequency_hours    Int?             @default(24)
+  is_primary_device       Boolean          @default(false)
+  device_settings         Json?
+  access_token_encrypted  String?
+  refresh_token_encrypted String?
+  token_expires_at        DateTime?
+  created_at              DateTime         @default(now())
+  updated_at              DateTime         @updatedAt
+
+  // Relationships
+  user              User                   @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  activitySummaries DailyActivitySummary[]
+
+  @@unique([user_id, device_type])
+  @@map("connected_devices")
+}
+
+model DailyActivitySummary {
+  daily_activity_id   String   @id @default(cuid())
+  user_id             String
+  device_id           String
+  date                DateTime @db.Date
+  steps               Int?     @default(0)
+  calories_burned     Float?   @default(0)
+  active_minutes      Int?     @default(0)
+  bmr_estimate        Float?   @default(0)
+  distance_km         Float?   @default(0)
+  heart_rate_avg      Int?
+  heart_rate_max      Int?
+  sleep_hours         Float?
+  water_intake_ml     Int?
+  weight_kg           Float?
+  body_fat_percentage Float?
+  source_device       String
+  sync_timestamp      DateTime @default(now())
+  raw_data            Json?
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+
+  // Relationships
+  user   User            @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  device ConnectedDevice @relation(fields: [device_id], references: [connected_device_id], onDelete: Cascade)
+
+  @@unique([user_id, device_id, date])
+  @@map("daily_activity_summary")
 }
 
 model UserQuestionnaire {
@@ -220,4 +278,26 @@ enum NotificationsPreference {
 enum AnalysisStatus {
   PENDING
   COMPLETED
+}
+
+enum ConnectionStatus {
+  CONNECTED
+  DISCONNECTED
+  SYNCING
+  ERROR
+}
+
+enum DeviceType {
+  APPLE_HEALTH
+  GOOGLE_FIT
+  FITBIT
+  GARMIN
+  WHOOP
+  SAMSUNG_HEALTH
+  POLAR
+  SUUNTO
+  WITHINGS
+  OURA
+  AMAZFIT
+  HUAWEI_HEALTH
 }

@@ -18,6 +18,8 @@ export default function TabLayout() {
             iconName = focused ? "time" : "time-outline";
           } else if (route.name === "calendar") {
             iconName = focused ? "calendar" : "calendar-outline";
+          } else if (route.name === "devices") {
+            iconName = focused ? "watch" : "watch-outline";
           } else if (route.name === "profile") {
             iconName = focused ? "person" : "person-outline";
           } else {
@@ -59,6 +61,12 @@ export default function TabLayout() {
         name="calendar"
         options={{
           title: "Calendar",
+        }}
+      />
+      <Tabs.Screen
+        name="devices"
+        options={{
+          title: "Devices",
         }}
       />
       <Tabs.Screen
