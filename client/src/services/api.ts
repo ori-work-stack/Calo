@@ -513,11 +513,13 @@ export const nutritionAPI = {
     }
   },
 
-  getMeals: async (): Promise<Meal[]> => {
+  getMeals: async (offset = 0, limit = 100): Promise<Meal[]> => {
     try {
       console.log("📥 Making get meals API request...");
 
-      const response = await api.get("/nutrition/meals");
+      const response = await api.get("/nutrition/meals", {
+        params: { offset, limit },
+      });
 
       console.log("🎯 RAW GET MEALS API RESPONSE:");
       console.log("=====================================");

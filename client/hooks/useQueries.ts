@@ -68,8 +68,31 @@ export function useSignOut() {
 export function useMeals() {
   return useQuery({
     queryKey: queryKeys.meals,
-    queryFn: nutritionAPI.getMeals,
-    staleTime: 1000 * 60 * 2, // 2 minutes
+    queryFn: () => nutritionAPI.getMeals(), // Wrap in arrow function
+    staleTime: 1000 * 60 * 15, // 15 minutes - longer cache
+    select: (data: Meal[]) => {
+      // Sort meals by upload_time for consistent ordering
+      return (
+        data?.sort(
+          (a: Meal, b: Meal) =>
+            new Date(b.upload_time || 0).getTime() -
+            new Date(a.upload_time || 0).getTime()
+        ) || []
+      );
+    },
+  });
+}
+
+export function useMealsInfinite(limit = 20) {
+  return useInfiniteQuery({
+    queryKey: [...queryKeys.meals, "infinite"],
+    queryFn: ({ pageParam = 0 }) => nutritionAPI.getMeals(pageParam, limit),
+    getNextPageParam: (lastPage, pages) => {
+      if (lastPage.length < limit) return undefined;
+      return pages.length * limit;
+    },
+    staleTime: 1000 * 60 * 15, // 15 minutes
+    initialPageParam: 0,
   });
 }
 
@@ -95,16 +118,80 @@ export function useSaveMeal() {
       mealData: MealAnalysisData;
       imageBase64?: string;
     }) => nutritionAPI.saveMeal(mealData, imageBase64),
-    onSuccess: (data, variables) => {
-      // Add the new meal to the cache optimistically
+    onMutate: async ({ mealData }) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: queryKeys.meals });
+
+      // Snapshot the previous value
+      const previousMeals = queryClient.getQueryData<Meal[]>(queryKeys.meals);
+
+      // Generate a temporary numeric ID for meal_id
+      const tempId = Date.now();
+
+      // Optimistically update to the new value
+      const optimisticMeal: Meal = {
+        // Primary fields matching Prisma schema
+        meal_id: tempId,
+        id: `temp-${tempId}`,
+        user_id: "temp-user",
+        image_url: "",
+        upload_time: new Date().toISOString(),
+        analysis_status: "COMPLETED" as const,
+        meal_name: mealData.name || "New Meal",
+        calories: mealData.calories || 0,
+        protein_g: mealData.protein || 0,
+        carbs_g: mealData.carbs || 0,
+        fats_g: mealData.fat || 0,
+        fiber_g: mealData.fiber || null,
+        sugar_g: mealData.sugar || null,
+        sodium_mg: mealData.sodium || null,
+        createdAt: new Date().toISOString(),
+
+        // Computed fields for compatibility
+        name: mealData.name || "New Meal",
+        description: mealData.description,
+        protein: mealData.protein || 0,
+        carbs: mealData.carbs || 0,
+        fat: mealData.fat || 0,
+        fiber: mealData.fiber,
+        sugar: mealData.sugar,
+        sodium: mealData.sodium,
+        userId: "temp-user",
+      };
+
       queryClient.setQueryData<Meal[]>(queryKeys.meals, (old) => {
-        if (!old) return [data];
-        return [data, ...old];
+        if (!old) return [optimisticMeal];
+        return [optimisticMeal, ...old];
       });
 
-      // Invalidate related queries
+      return { previousMeals };
+    },
+    onSuccess: (data, variables, context) => {
+      // Replace optimistic update with real data
+      queryClient.setQueryData<Meal[]>(queryKeys.meals, (old) => {
+        if (!old) return [data];
+        return [data, ...old.slice(1)]; // Remove the optimistic meal and add real one
+      });
+
+      // Invalidate related queries for fresh data
       const today = new Date().toISOString().split("T")[0];
       queryClient.invalidateQueries({ queryKey: queryKeys.dailyStats(today) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.globalStats });
+
+      // Also invalidate calendar data for today
+      const currentDate = new Date();
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.calendar(
+          currentDate.getFullYear(),
+          currentDate.getMonth() + 1
+        ),
+      });
+    },
+    onError: (err, variables, context) => {
+      // If the mutation fails, use the context returned from onMutate to roll back
+      if (context?.previousMeals) {
+        queryClient.setQueryData(queryKeys.meals, context.previousMeals);
+      }
     },
   });
 }

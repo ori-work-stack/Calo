@@ -29,7 +29,7 @@ TaskManager.defineTask(BACKGROUND_SYNC_TASK, async () => {
       // Prefetch meals if stale
       queryClient.prefetchQuery({
         queryKey: queryKeys.meals,
-        queryFn: nutritionAPI.getMeals,
+        queryFn: () => nutritionAPI.getMeals,
         staleTime: 1000 * 60 * 10, // 10 minutes
       }),
     ]);
