@@ -7,10 +7,12 @@ import { IconSymbol } from "@/components/ui/IconSymbol";
 import TabBarBackground from "@/components/ui/TabBarBackground";
 import { Colors } from "@/constants/Colors";
 import { useColorScheme } from "@/hooks/useColorScheme";
+import { ScrollableTabBar } from "@/components/ScrollableTabBar";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
-
+  
   return (
     <Tabs
       screenOptions={{
@@ -26,6 +28,7 @@ export default function TabLayout() {
           default: {},
         }),
       }}
+      tabBar={(props) => <ScrollableTabBar {...props} />}
     >
       <Tabs.Screen
         name="index"
@@ -51,6 +54,15 @@ export default function TabLayout() {
           title: "Camera",
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="camera.fill" color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="recommended-menus"
+        options={{
+          title: "Menus",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="fork.knife" color={color} />
           ),
         }}
       />

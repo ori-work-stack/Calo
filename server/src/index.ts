@@ -9,6 +9,7 @@ import { nutritionRoutes } from "./routes/nutrition";
 import { userRoutes } from "./routes/user";
 import { calendarRoutes } from "./routes/calendar";
 import { deviceRoutes } from "./routes/devices";
+import { mealPlanRoutes } from "./routes/mealPlans";
 import statisticsRoutes from "./routes/statistics";
 import "./services/cron";
 
@@ -84,6 +85,7 @@ app.use("/api/nutrition", nutritionRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/devices", deviceRoutes);
 app.use("/api/calendar", calendarRoutes);
+app.use("/api/meal-plans", mealPlanRoutes);
 app.use("/api", statisticsRoutes);
 
 // Error handler

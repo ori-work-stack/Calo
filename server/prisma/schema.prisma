@@ -31,6 +31,11 @@ model User {
   connectedDevices  ConnectedDevice[]
   activitySummaries DailyActivitySummary[]
 
+  // New meal plan relationships
+  mealPlans       UserMealPlan[]
+  mealPreferences UserMealPreference[]
+  shoppingLists   ShoppingList[]
+
   createdAt DateTime @default(now())
 
   Session Session[]
@@ -218,6 +223,131 @@ model AdminDashboard {
   createdAt       DateTime @default(now())
 }
 
+// NEW MEAL PLAN MODELS
+
+model MealTemplate {
+  template_id       String          @id @default(cuid())
+  name              String
+  description       String?
+  meal_timing       MealTiming
+  dietary_category  DietaryCategory
+  prep_time_minutes Int?
+  difficulty_level  Int?            @default(1)
+  calories          Float?
+  protein_g         Float?
+  carbs_g           Float?
+  fats_g            Float?
+  fiber_g           Float?
+  sugar_g           Float?
+  sodium_mg         Float?
+  ingredients_json  Json?
+  instructions_json Json?
+  allergens_json    Json?
+  image_url         String?
+  is_active         Boolean         @default(true)
+  created_at        DateTime        @default(now())
+  updated_at        DateTime        @updatedAt
+
+  // Relationships
+  schedules   MealPlanSchedule[]
+  preferences UserMealPreference[]
+
+  @@index([dietary_category])
+  @@index([meal_timing])
+  @@map("meal_templates")
+}
+
+model UserMealPlan {
+  plan_id                 String       @id @default(cuid())
+  user_id                 String
+  name                    String
+  plan_type               MealPlanType
+  meals_per_day           Int          @default(3)
+  snacks_per_day          Int          @default(0)
+  rotation_frequency_days Int          @default(7)
+  include_leftovers       Boolean      @default(false)
+  fixed_meal_times        Boolean      @default(false)
+  target_calories_daily   Float?
+  target_protein_daily    Float?
+  target_carbs_daily      Float?
+  target_fats_daily       Float?
+  dietary_preferences     Json?
+  excluded_ingredients    Json?
+  is_active               Boolean      @default(true)
+  start_date              DateTime?    @db.Date
+  end_date                DateTime?    @db.Date
+  created_at              DateTime     @default(now())
+  updated_at              DateTime     @updatedAt
+
+  // Relationships
+  user          User               @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  schedules     MealPlanSchedule[]
+  shoppingLists ShoppingList[]
+
+  @@index([user_id])
+  @@map("user_meal_plans")
+}
+
+model MealPlanSchedule {
+  schedule_id        String     @id @default(cuid())
+  plan_id            String
+  template_id        String
+  day_of_week        Int // 0 = Sunday, 1 = Monday, etc.
+  meal_timing        MealTiming
+  meal_order         Int        @default(1)
+  portion_multiplier Float      @default(1.0)
+  is_optional        Boolean    @default(false)
+  created_at         DateTime   @default(now())
+
+  // Relationships
+  plan     UserMealPlan @relation(fields: [plan_id], references: [plan_id], onDelete: Cascade)
+  template MealTemplate @relation(fields: [template_id], references: [template_id], onDelete: Cascade)
+
+  @@unique([plan_id, day_of_week, meal_timing, meal_order])
+  @@index([plan_id])
+  @@index([day_of_week, meal_timing])
+  @@map("meal_plan_schedules")
+}
+
+model UserMealPreference {
+  preference_id   String   @id @default(cuid())
+  user_id         String
+  template_id     String
+  preference_type String 
+  rating          Int?
+  notes           String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  // Relationships
+  user     User         @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  template MealTemplate @relation(fields: [template_id], references: [template_id], onDelete: Cascade)
+
+  @@unique([user_id, template_id, preference_type])
+  @@index([user_id, template_id])
+  @@map("user_meal_preferences")
+}
+
+model ShoppingList {
+  list_id              String    @id @default(cuid())
+  user_id              String
+  plan_id              String?
+  name                 String
+  week_start_date      DateTime? @db.Date
+  items_json           Json
+  total_estimated_cost Float?
+  is_completed         Boolean   @default(false)
+  created_at           DateTime  @default(now())
+  updated_at           DateTime  @updatedAt
+
+  // Relationships
+  user User          @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  plan UserMealPlan? @relation(fields: [plan_id], references: [plan_id], onDelete: SetNull)
+
+  @@index([user_id])
+  @@map("shopping_lists")
+}
+
 // ENUMS
 
 enum SubscriptionType {
@@ -300,4 +430,34 @@ enum DeviceType {
   OURA
   AMAZFIT
   HUAWEI_HEALTH
+}
+
+// NEW ENUMS FOR MEAL PLANS
+
+enum MealPlanType {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum MealTiming {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
+  MORNING_SNACK
+  AFTERNOON_SNACK
+}
+
+enum DietaryCategory {
+  VEGETARIAN
+  VEGAN
+  KETO
+  PALEO
+  MEDITERRANEAN
+  LOW_CARB
+  HIGH_PROTEIN
+  GLUTEN_FREE
+  DAIRY_FREE
+  BALANCED
 }

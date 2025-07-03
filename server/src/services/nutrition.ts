@@ -1,4 +1,4 @@
-import { openAIService } from "./openai";
+import { OpenAIService } from "./openai";
 import { prisma } from "../lib/database";
 import { MealAnalysisInput, MealUpdateInput } from "../types/nutrition";
 import { AuthService } from "./auth";
@@ -64,7 +64,7 @@ export class NutritionService {
     }
 
     try {
-      const analysis = await openAIService.analyzeFood(cleanBase64, language);
+      const analysis = await OpenAIService.analyzeMealImage(cleanBase64, language);
 
       await prisma.user.update({
         where: { user_id: user_id },
@@ -183,7 +183,7 @@ export class NutritionService {
       console.log("🔍 Re-analyzing meal with update text...");
 
       // Re-analyze the meal with the update text
-      const updatedAnalysis = await openAIService.analyzeFood(
+      const updatedAnalysis = await OpenAIService.analyzeMealImage(
         imageBase64,
         language,
         updateText
