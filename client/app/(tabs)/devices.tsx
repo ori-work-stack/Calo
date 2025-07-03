@@ -18,11 +18,29 @@ import {
 } from "../../src/services/deviceAPI";
 import { HealthData } from "../../src/services/healthKit";
 
-const SUPPORTED_DEVICES = [
+type DeviceType =
+  | "APPLE_HEALTH"
+  | "GOOGLE_FIT"
+  | "FITBIT"
+  | "GARMIN"
+  | "WHOOP"
+  | "POLAR"
+  | "SAMSUNG_HEALTH";
+
+interface SupportedDevice {
+  type: DeviceType;
+  name: string;
+  icon: React.ComponentProps<typeof Ionicons>["name"];
+  color: string;
+  available: boolean;
+  description: string;
+}
+
+const SUPPORTED_DEVICES: SupportedDevice[] = [
   {
     type: "APPLE_HEALTH",
     name: "Apple Health",
-    icon: "logo-apple" as const,
+    icon: "logo-apple",
     color: "#000000",
     available: Platform.OS === "ios",
     description: "Sync steps, calories, heart rate, and more from Apple Health",
@@ -30,7 +48,7 @@ const SUPPORTED_DEVICES = [
   {
     type: "GOOGLE_FIT",
     name: "Google Fit",
-    icon: "fitness" as const,
+    icon: "fitness",
     color: "#4285F4",
     available: Platform.OS === "android",
     description:

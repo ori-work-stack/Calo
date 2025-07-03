@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Platform,
 } from "react-native";
 import { LineChart, BarChart, PieChart } from "react-native-chart-kit";
 
@@ -58,26 +59,50 @@ export default function StatisticsScreen() {
     try {
       setLoading(true);
 
-      const response = await fetch(
-        `http://192.168.1.70:5000/api/statistics?period=${period}`,
-        {
-          method: "GET",
-          credentials: "include", // Include cookies for authentication
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      // Use your existing API service with proper authentication handling
+      const axios = (await import("axios")).default;
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch statistics");
+      // Create API instance with same configuration as your api.ts
+      const getApiBaseUrl = () => {
+        if (Platform.OS === "web") {
+          return "http://localhost:5000/api";
+        } else {
+          return "http://192.168.1.70:5000/api";
+        }
+      };
+
+      const apiInstance = axios.create({
+        baseURL: getApiBaseUrl(),
+        timeout: 30000,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        withCredentials: Platform.OS === "web",
+      });
+
+      // Add authentication for mobile
+      if (Platform.OS !== "web") {
+        const { authAPI } = await import("../../src/services/api");
+        const token = await authAPI.getStoredToken();
+        if (token) {
+          apiInstance.defaults.headers.common[
+            "Authorization"
+          ] = `Bearer ${token}`;
+        }
       }
 
-      const data = await response.json();
-      setStatistics(data);
-    } catch (error) {
+      const response = await apiInstance.get(`/statistics?period=${period}`);
+
+      console.log("Statistics loaded successfully:", response.data);
+      setStatistics(response.data);
+    } catch (error: any) {
       console.error("Error fetching statistics:", error);
-      Alert.alert("שגיאה", "לא הצלחנו לטעון את הסטטיסטיקות");
+      Alert.alert(
+        "שגיאה",
+        error.response?.data?.message ||
+          error.message ||
+          "לא הצלחנו לטעון את הסטטיסטיקות"
+      );
     } finally {
       setLoading(false);
     }
@@ -123,21 +148,21 @@ export default function StatisticsScreen() {
   const macroData = [
     {
       name: "חלבון",
-      population: statistics.averageProteinDaily,
+      population: Math.max(1, statistics.averageProteinDaily || 0),
       color: "#FF6B6B",
       legendFontColor: "#333",
       legendFontSize: 12,
     },
     {
       name: "פחמימות",
-      population: statistics.averageCarbsDaily,
+      population: Math.max(1, statistics.averageCarbsDaily || 0),
       color: "#4ECDC4",
       legendFontColor: "#333",
       legendFontSize: 12,
     },
     {
       name: "שומנים",
-      population: statistics.averageFatsDaily,
+      population: Math.max(1, statistics.averageFatsDaily || 0),
       color: "#45B7D1",
       legendFontColor: "#333",
       legendFontSize: 12,
@@ -150,7 +175,7 @@ export default function StatisticsScreen() {
       {
         data:
           statistics.weeklyTrends.calories.length > 0
-            ? statistics.weeklyTrends.calories
+            ? statistics.weeklyTrends.calories.map((cal) => cal || 0)
             : [0, 0, 0, 0, 0, 0, 0],
       },
     ],

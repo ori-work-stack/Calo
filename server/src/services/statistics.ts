@@ -36,45 +36,72 @@ export class StatisticsService {
     userId: string,
     period: "week" | "month" | "custom"
   ): Promise<NutritionStatistics> {
-    const daysBack = period === "week" ? 7 : period === "month" ? 30 : 90;
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - daysBack);
+    try {
+      console.log(
+        `📊 Getting nutrition statistics for user: ${userId}, period: ${period}`
+      );
 
-    // Get user's meal data from the Meal table using correct field names
-    const meals = await prisma.meal.findMany({
-      where: {
-        user_id: userId,
-        createdAt: { gte: startDate },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+      const daysBack = period === "week" ? 7 : period === "month" ? 30 : 90;
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - daysBack);
 
-    // Get user and nutrition plan
-    const user = await prisma.user.findUnique({
-      where: { user_id: userId },
-    });
+      // Get user's meal data from the Meal table using correct field names
+      const meals = await prisma.meal.findMany({
+        where: {
+          user_id: userId,
+          createdAt: { gte: startDate },
+        },
+        orderBy: { createdAt: "desc" },
+      });
 
-    const nutritionPlan = await prisma.nutritionPlan.findFirst({
-      where: { user_id: userId },
-      orderBy: { createdAt: "desc" },
-    });
+      console.log(`✅ Found ${meals.length} meals for statistics`);
 
-    const dailyCalorieGoal = nutritionPlan?.goal_calories || 2000;
+      // Get user and nutrition plan
+      const user = await prisma.user.findUnique({
+        where: { user_id: userId },
+      });
 
-    // Calculate statistics
-    const stats = this.calculateStatistics(meals, dailyCalorieGoal);
+      const nutritionPlan = await prisma.nutritionPlan.findFirst({
+        where: { user_id: userId },
+        orderBy: { createdAt: "desc" },
+      });
 
-    // Generate insights using AI
-    const insights = await this.generateAIInsights(meals, stats);
+      const dailyCalorieGoal = nutritionPlan?.goal_calories || 2000;
 
-    // Generate recommendations
-    const recommendations = await this.generateRecommendations(stats, user);
+      // Calculate statistics
+      const stats = this.calculateStatistics(meals, dailyCalorieGoal);
 
-    return {
-      ...stats,
-      insights,
-      recommendations,
-    };
+      // Generate insights using AI
+      let insights: string[] = [];
+      try {
+        insights = await this.generateAIInsights(meals, stats);
+      } catch (error) {
+        console.error("Error generating AI insights:", error);
+        insights = this.getDefaultInsights(stats);
+      }
+
+      // Generate recommendations
+      let recommendations: string[] = [];
+      try {
+        recommendations = await this.generateRecommendations(stats, user);
+      } catch (error) {
+        console.error("Error generating recommendations:", error);
+        recommendations = this.getDefaultRecommendations();
+      }
+
+      const result = {
+        ...stats,
+        insights,
+        recommendations,
+      };
+
+      console.log(`📊 Statistics generated successfully for user: ${userId}`);
+      return result;
+    } catch (error) {
+      console.error("Error in getNutritionStatistics:", error);
+      // Return default empty statistics if there's an error
+      return this.getEmptyStatisticsWithDefaults();
+    }
   }
 
   private static calculateStatistics(
@@ -464,6 +491,69 @@ export class StatisticsService {
     return {
       insights: stats.insights,
       recommendations: stats.recommendations,
+    };
+  }
+
+  private static getDefaultInsights(stats: any): string[] {
+    const insights: string[] = [];
+
+    if (stats.nutritionScore > 80) {
+      insights.push("אתה שומר על תזונה בריאה! המשך כך!");
+    } else if (stats.nutritionScore > 60) {
+      insights.push("יש לך בסיס טוב, אבל יש מקום לשיפור בתזונה");
+    } else {
+      insights.push("כדאי להתמקד בשיפור הרגלי התזונה");
+    }
+
+    if (stats.averageCaloriesDaily === 0) {
+      insights.push("התחל לתעד ארוחות כדי לקבל תובנות מדויקות יותר");
+    }
+
+    return insights;
+  }
+
+  private static getDefaultRecommendations(): string[] {
+    return [
+      "שתה יותר מים במהלך היום",
+      "הוסף יותר ירקות לארוחות",
+      "נסה לשמור על שעות קבועות לארוחות",
+      "צמצם מזונות מעובדים",
+    ];
+  }
+
+  private static getEmptyStatisticsWithDefaults(): NutritionStatistics {
+    return {
+      averageCaloriesDaily: 0,
+      calorieGoalAchievementPercent: 0,
+      averageProteinDaily: 0,
+      averageCarbsDaily: 0,
+      averageFatsDaily: 0,
+      averageFiberDaily: 0,
+      averageSodiumDaily: 0,
+      averageSugarDaily: 0,
+      averageFluidsDaily: 0,
+      processedFoodPercentage: 0,
+      alcoholCaffeineIntake: 0,
+      vegetableFruitIntake: 0,
+      fullLoggingPercentage: 0,
+      allergenAlerts: [],
+      healthRiskPercentage: 0,
+      averageEatingHours: { start: "08:00", end: "20:00" },
+      intermittentFastingHours: 0,
+      missedMealsAlert: 0,
+      nutritionScore: 0,
+      weeklyTrends: {
+        calories: [0, 0, 0, 0, 0, 0, 0],
+        protein: [0, 0, 0, 0, 0, 0, 0],
+        carbs: [0, 0, 0, 0, 0, 0, 0],
+        fats: [0, 0, 0, 0, 0, 0, 0],
+      },
+      insights: ["התחל לתעד ארוחות כדי לקבל תובנות מדויקות"],
+      recommendations: [
+        "שתה יותר מים במהלך היום",
+        "הוסף יותר ירקות לארוחות",
+        "שמור על שעות קבועות לארוחות",
+      ],
     };
   }
 }

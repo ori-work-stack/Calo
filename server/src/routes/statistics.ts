@@ -15,19 +15,40 @@ router.get(
     const userId = req.user?.user_id?.toString();
 
     if (!userId) {
+      console.error("❌ Statistics request without user ID");
       return res.status(401).json({ error: "User not authenticated" });
     }
 
     try {
+      console.log(
+        `📊 Statistics request for user: ${userId}, period: ${
+          req.query.period || "week"
+        }`
+      );
+
       const period = periodSchema.parse(req.query.period || "week");
       const statistics = await StatisticsService.getNutritionStatistics(
         userId,
         period
       );
+
+      console.log(`✅ Statistics fetched successfully for user: ${userId}`);
       res.json(statistics);
     } catch (error) {
-      console.error("Error fetching statistics:", error);
-      res.status(500).json({ error: "Failed to fetch statistics" });
+      console.error("❌ Error fetching statistics:", error);
+
+      // Return a more detailed error response
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          error: "Invalid period parameter",
+          details: error.errors,
+        });
+      }
+
+      res.status(500).json({
+        error: "Failed to fetch statistics",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
     }
   }
 );
