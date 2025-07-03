@@ -74,23 +74,6 @@ class DeviceAPIService {
       // Fallback to local device checking
       const devices: ConnectedDevice[] = [];
 
-      // Check Apple Health availability
-      if (await healthKitService.isAvailable()) {
-        const isInitialized = await healthKitService.initialize();
-
-        if (isInitialized) {
-          devices.push({
-            id: "apple_health",
-            name: "Apple Health",
-            type: "APPLE_HEALTH",
-            status: "CONNECTED",
-            lastSync: new Date().toISOString(),
-            isPrimary: true,
-          });
-        }
-      }
-
-      console.log("✅ Found", devices.length, "local devices");
       return devices;
     } catch (error) {
       console.error("💥 Error getting connected devices:", error);
