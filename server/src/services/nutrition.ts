@@ -64,7 +64,10 @@ export class NutritionService {
     }
 
     try {
-      const analysis = await OpenAIService.analyzeMealImage(cleanBase64, language);
+      const analysis = await OpenAIService.analyzeMealImage(
+        cleanBase64,
+        language
+      );
 
       await prisma.user.update({
         where: { user_id: user_id },
