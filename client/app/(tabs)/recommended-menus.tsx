@@ -55,12 +55,14 @@ interface MealPlanConfig {
   excluded_ingredients: string[];
 }
 
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
+
 // Get the correct API URL based on platform
 const getApiBaseUrl = () => {
   if (Platform.OS === "web") {
     return "http://localhost:5000/api";
   } else {
-    return "http://192.168.1.70:5000/api";
+    return API_URL;
   }
 };
 
@@ -89,8 +91,22 @@ export default function RecommendedMenusScreen() {
     excluded_ingredients: [],
   });
 
-  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-  const mealTimings = ["BREAKFAST", "LUNCH", "DINNER", "MORNING_SNACK", "AFTERNOON_SNACK"];
+  const dayNames = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
+  const mealTimings = [
+    "BREAKFAST",
+    "LUNCH",
+    "DINNER",
+    "MORNING_SNACK",
+    "AFTERNOON_SNACK",
+  ];
 
   useEffect(() => {
     loadMealPlan();
@@ -114,19 +130,25 @@ export default function RecommendedMenusScreen() {
   const loadMealPlan = async () => {
     try {
       setIsLoading(true);
-      
+
       const headers = await getAuthHeaders();
-      const response = await axios.get(`${getApiBaseUrl()}/meal-plans/current`, {
-        headers,
-        withCredentials: Platform.OS === "web",
-      });
+      const response = await axios.get(
+        `${getApiBaseUrl()}/meal-plans/current`,
+        {
+          headers,
+          withCredentials: Platform.OS === "web",
+        }
+      );
 
       if (response.data.success) {
         setWeeklyPlan(response.data.data);
       }
     } catch (error: any) {
       console.error("💥 Error loading meal plan:", error);
-      if (error.response?.status === 404 || error.response?.data?.error?.includes("No active meal plan")) {
+      if (
+        error.response?.status === 404 ||
+        error.response?.data?.error?.includes("No active meal plan")
+      ) {
         // No meal plan exists yet - this is normal for new users
         setWeeklyPlan({});
       } else {
@@ -140,7 +162,7 @@ export default function RecommendedMenusScreen() {
   const createAIMealPlan = async () => {
     try {
       setIsCreatingPlan(true);
-      
+
       const headers = await getAuthHeaders();
       const response = await axios.post(
         `${getApiBaseUrl()}/meal-plans/create`,
@@ -154,7 +176,7 @@ export default function RecommendedMenusScreen() {
       if (response.data.success) {
         setActivePlanId(response.data.data.plan_id);
         Alert.alert(
-          "Success!", 
+          "Success!",
           "Your AI-powered meal plan has been created! 🎉",
           [{ text: "OK", onPress: () => loadMealPlan() }]
         );
@@ -162,7 +184,8 @@ export default function RecommendedMenusScreen() {
       }
     } catch (error: any) {
       console.error("💥 Error creating AI meal plan:", error);
-      const errorMessage = error.response?.data?.error || "Failed to create meal plan";
+      const errorMessage =
+        error.response?.data?.error || "Failed to create meal plan";
       Alert.alert("Error", errorMessage);
     } finally {
       setIsCreatingPlan(false);
@@ -188,10 +211,10 @@ export default function RecommendedMenusScreen() {
 
     try {
       setIsReplacingMeal(true);
-      
+
       // Find the day and timing for this meal
       const dayIndex = dayNames.indexOf(currentDay);
-      
+
       const headers = await getAuthHeaders();
       const response = await axios.put(
         `${getApiBaseUrl()}/meal-plans/${activePlanId}/replace`,
@@ -211,7 +234,10 @@ export default function RecommendedMenusScreen() {
       );
 
       if (response.data.success) {
-        Alert.alert("Success!", "Meal replaced with AI-generated alternative! 🔄");
+        Alert.alert(
+          "Success!",
+          "Meal replaced with AI-generated alternative! 🔄"
+        );
         setShowMealModal(false);
         await loadMealPlan();
       }
@@ -241,7 +267,10 @@ export default function RecommendedMenusScreen() {
         }
       );
 
-      Alert.alert("Success!", "Meal marked as favorite! This will improve future AI recommendations. ❤️");
+      Alert.alert(
+        "Success!",
+        "Meal marked as favorite! This will improve future AI recommendations. ❤️"
+      );
     } catch (error) {
       console.error("💥 Error marking favorite:", error);
       Alert.alert("Error", "Failed to mark as favorite");
@@ -256,8 +285,10 @@ export default function RecommendedMenusScreen() {
 
     try {
       const today = new Date();
-      const startOfWeek = new Date(today.setDate(today.getDate() - today.getDay()));
-      const weekStartDate = startOfWeek.toISOString().split('T')[0];
+      const startOfWeek = new Date(
+        today.setDate(today.getDate() - today.getDay())
+      );
+      const weekStartDate = startOfWeek.toISOString().split("T")[0];
 
       const headers = await getAuthHeaders();
       const response = await axios.post(
@@ -272,7 +303,11 @@ export default function RecommendedMenusScreen() {
       if (response.data.success) {
         Alert.alert(
           "Shopping List Generated! 🛒",
-          `Your shopping list has been created with ${Object.keys(response.data.data.items_json).length} categories. Estimated cost: $${response.data.data.total_estimated_cost?.toFixed(2) || '0.00'}`
+          `Your shopping list has been created with ${
+            Object.keys(response.data.data.items_json).length
+          } categories. Estimated cost: $${
+            response.data.data.total_estimated_cost?.toFixed(2) || "0.00"
+          }`
         );
       }
     } catch (error) {
@@ -284,48 +319,82 @@ export default function RecommendedMenusScreen() {
   const renderMealCard = (meal: MealTemplate, day: string, timing: string) => {
     const getDifficultyColor = (level?: number) => {
       switch (level) {
-        case 1: return "#4CAF50";
-        case 2: return "#FF9800";
-        case 3: return "#F44336";
-        default: return "#9E9E9E";
+        case 1:
+          return "#4CAF50";
+        case 2:
+          return "#FF9800";
+        case 3:
+          return "#F44336";
+        default:
+          return "#9E9E9E";
       }
     };
 
     const getCategoryColor = (category: string) => {
       switch (category) {
-        case "VEGETARIAN": return "#8BC34A";
-        case "VEGAN": return "#4CAF50";
-        case "KETO": return "#9C27B0";
-        case "HIGH_PROTEIN": return "#FF5722";
-        case "MEDITERRANEAN": return "#2196F3";
-        case "LOW_CARB": return "#795548";
-        case "GLUTEN_FREE": return "#FFC107";
-        case "DAIRY_FREE": return "#E91E63";
-        default: return "#607D8B";
+        case "VEGETARIAN":
+          return "#8BC34A";
+        case "VEGAN":
+          return "#4CAF50";
+        case "KETO":
+          return "#9C27B0";
+        case "HIGH_PROTEIN":
+          return "#FF5722";
+        case "MEDITERRANEAN":
+          return "#2196F3";
+        case "LOW_CARB":
+          return "#795548";
+        case "GLUTEN_FREE":
+          return "#FFC107";
+        case "DAIRY_FREE":
+          return "#E91E63";
+        default:
+          return "#607D8B";
       }
     };
 
     return (
       <TouchableOpacity
         key={`${day}-${timing}-${meal.template_id}`}
-        style={[styles.mealCard, { borderLeftColor: getCategoryColor(meal.dietary_category) }]}
+        style={[
+          styles.mealCard,
+          { borderLeftColor: getCategoryColor(meal.dietary_category) },
+        ]}
         onPress={() => handleMealPress(meal)}
       >
         {meal.image_url && (
           <Image source={{ uri: meal.image_url }} style={styles.mealImage} />
         )}
-        
+
         <View style={styles.mealContent}>
           <View style={styles.mealHeader}>
             <Text style={styles.mealName}>{meal.name}</Text>
             <View style={styles.mealBadges}>
-              <View style={[styles.difficultyBadge, { backgroundColor: getDifficultyColor(meal.difficulty_level) }]}>
+              <View
+                style={[
+                  styles.difficultyBadge,
+                  {
+                    backgroundColor: getDifficultyColor(meal.difficulty_level),
+                  },
+                ]}
+              >
                 <Text style={styles.badgeText}>
-                  {meal.difficulty_level === 1 ? "Easy" : meal.difficulty_level === 2 ? "Medium" : "Hard"}
+                  {meal.difficulty_level === 1
+                    ? "Easy"
+                    : meal.difficulty_level === 2
+                    ? "Medium"
+                    : "Hard"}
                 </Text>
               </View>
-              <View style={[styles.categoryBadge, { backgroundColor: getCategoryColor(meal.dietary_category) }]}>
-                <Text style={styles.badgeText}>{meal.dietary_category.replace("_", " ")}</Text>
+              <View
+                style={[
+                  styles.categoryBadge,
+                  { backgroundColor: getCategoryColor(meal.dietary_category) },
+                ]}
+              >
+                <Text style={styles.badgeText}>
+                  {meal.dietary_category.replace("_", " ")}
+                </Text>
               </View>
             </View>
           </View>
@@ -339,17 +408,21 @@ export default function RecommendedMenusScreen() {
             </View>
             <View style={styles.infoItem}>
               <Ionicons name="flame-outline" size={16} color="#666" />
-              <Text style={styles.infoText}>{Math.round(meal.calories || 0)} cal</Text>
+              <Text style={styles.infoText}>
+                {Math.round(meal.calories || 0)} cal
+              </Text>
             </View>
             <View style={styles.infoItem}>
               <Ionicons name="fitness-outline" size={16} color="#666" />
-              <Text style={styles.infoText}>{Math.round(meal.protein_g || 0)}g protein</Text>
+              <Text style={styles.infoText}>
+                {Math.round(meal.protein_g || 0)}g protein
+              </Text>
             </View>
           </View>
 
           <View style={styles.mealActions}>
-            <TouchableOpacity 
-              style={styles.actionButton} 
+            <TouchableOpacity
+              style={styles.actionButton}
               onPress={handleReplaceMeal}
               disabled={isReplacingMeal}
             >
@@ -360,12 +433,15 @@ export default function RecommendedMenusScreen() {
               )}
               <Text style={styles.actionText}>AI Replace</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.actionButton} onPress={handleMarkFavorite}>
+
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={handleMarkFavorite}
+            >
               <Ionicons name="heart-outline" size={18} color="#FF6B6B" />
               <Text style={styles.actionText}>Favorite</Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity style={styles.actionButton}>
               <Ionicons name="star-outline" size={18} color="#FFD700" />
               <Text style={styles.actionText}>Rate</Text>
@@ -383,17 +459,20 @@ export default function RecommendedMenusScreen() {
     return (
       <View key={day} style={styles.dayContainer}>
         <Text style={styles.dayTitle}>{day}</Text>
-        
-        {mealTimings.map(timing => {
+
+        {mealTimings.map((timing) => {
           const meals = dayPlan[timing];
           if (!meals || meals.length === 0) return null;
 
           return (
             <View key={timing} style={styles.timingSection}>
               <Text style={styles.timingTitle}>
-                {timing.replace("_", " ").toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
+                {timing
+                  .replace("_", " ")
+                  .toLowerCase()
+                  .replace(/\b\w/g, (l) => l.toUpperCase())}
               </Text>
-              {meals.map(meal => renderMealCard(meal, day, timing))}
+              {meals.map((meal) => renderMealCard(meal, day, timing))}
             </View>
           );
         })}
@@ -416,43 +495,69 @@ export default function RecommendedMenusScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>AI Recommended Menus</Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.headerButton} onPress={() => setShowConfigModal(true)}>
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={() => setShowConfigModal(true)}
+          >
             <Ionicons name="settings-outline" size={24} color="#007AFF" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.headerButton} onPress={generateShoppingList}>
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={generateShoppingList}
+          >
             <Ionicons name="list-outline" size={24} color="#007AFF" />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Day Selector */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.daySelector}>
-        {dayNames.map(day => (
-          <TouchableOpacity
-            key={day}
-            style={[styles.dayButton, currentDay === day && styles.dayButtonActive]}
-            onPress={() => setCurrentDay(day)}
-          >
-            <Text style={[styles.dayButtonText, currentDay === day && styles.dayButtonTextActive]}>
-              {day.substring(0, 3)}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      {/* Compact Day Selector */}
+      <View style={styles.daySelector}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.daySelectorContent}
+        >
+          {dayNames.map((day) => (
+            <TouchableOpacity
+              key={day}
+              style={[
+                styles.dayButton,
+                currentDay === day && styles.dayButtonActive,
+              ]}
+              onPress={() => setCurrentDay(day)}
+            >
+              <Text
+                style={[
+                  styles.dayButtonText,
+                  currentDay === day && styles.dayButtonTextActive,
+                ]}
+              >
+                {day.substring(0, 3)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
 
       {/* Meal Plan Content */}
       <ScrollView
         style={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
         {Object.keys(weeklyPlan).length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="restaurant-outline" size={64} color="#ccc" />
             <Text style={styles.emptyTitle}>No AI Meal Plan Yet</Text>
             <Text style={styles.emptyText}>
-              Create your personalized AI-powered meal plan based on your preferences, goals, and dietary restrictions!
+              Create your personalized AI-powered meal plan based on your
+              preferences, goals, and dietary restrictions!
             </Text>
-            <TouchableOpacity style={styles.createButton} onPress={() => setShowConfigModal(true)}>
+            <TouchableOpacity
+              style={styles.createButton}
+              onPress={() => setShowConfigModal(true)}
+            >
               <Text style={styles.createButtonText}>Create AI Meal Plan</Text>
             </TouchableOpacity>
           </View>
@@ -481,27 +586,40 @@ export default function RecommendedMenusScreen() {
 
                 <ScrollView style={styles.modalBody}>
                   {selectedMeal.image_url && (
-                    <Image source={{ uri: selectedMeal.image_url }} style={styles.modalImage} />
+                    <Image
+                      source={{ uri: selectedMeal.image_url }}
+                      style={styles.modalImage}
+                    />
                   )}
 
-                  <Text style={styles.modalDescription}>{selectedMeal.description}</Text>
+                  <Text style={styles.modalDescription}>
+                    {selectedMeal.description}
+                  </Text>
 
                   {/* Nutrition Info */}
                   <View style={styles.nutritionGrid}>
                     <View style={styles.nutritionItem}>
-                      <Text style={styles.nutritionValue}>{Math.round(selectedMeal.calories || 0)}</Text>
+                      <Text style={styles.nutritionValue}>
+                        {Math.round(selectedMeal.calories || 0)}
+                      </Text>
                       <Text style={styles.nutritionLabel}>Calories</Text>
                     </View>
                     <View style={styles.nutritionItem}>
-                      <Text style={styles.nutritionValue}>{Math.round(selectedMeal.protein_g || 0)}g</Text>
+                      <Text style={styles.nutritionValue}>
+                        {Math.round(selectedMeal.protein_g || 0)}g
+                      </Text>
                       <Text style={styles.nutritionLabel}>Protein</Text>
                     </View>
                     <View style={styles.nutritionItem}>
-                      <Text style={styles.nutritionValue}>{Math.round(selectedMeal.carbs_g || 0)}g</Text>
+                      <Text style={styles.nutritionValue}>
+                        {Math.round(selectedMeal.carbs_g || 0)}g
+                      </Text>
                       <Text style={styles.nutritionLabel}>Carbs</Text>
                     </View>
                     <View style={styles.nutritionItem}>
-                      <Text style={styles.nutritionValue}>{Math.round(selectedMeal.fats_g || 0)}g</Text>
+                      <Text style={styles.nutritionValue}>
+                        {Math.round(selectedMeal.fats_g || 0)}g
+                      </Text>
                       <Text style={styles.nutritionLabel}>Fat</Text>
                     </View>
                   </View>
@@ -511,7 +629,8 @@ export default function RecommendedMenusScreen() {
                     <Text style={styles.sectionTitle}>Ingredients</Text>
                     {selectedMeal.ingredients.map((ingredient, index) => (
                       <Text key={index} style={styles.ingredientText}>
-                        • {ingredient.quantity} {ingredient.unit} {ingredient.name}
+                        • {ingredient.quantity} {ingredient.unit}{" "}
+                        {ingredient.name}
                       </Text>
                     ))}
                   </View>
@@ -542,20 +661,27 @@ export default function RecommendedMenusScreen() {
                 </ScrollView>
 
                 <View style={styles.modalActions}>
-                  <TouchableOpacity 
-                    style={styles.modalActionButton} 
+                  <TouchableOpacity
+                    style={styles.modalActionButton}
                     onPress={handleReplaceMeal}
                     disabled={isReplacingMeal}
                   >
                     {isReplacingMeal ? (
                       <ActivityIndicator size="small" color="#007AFF" />
                     ) : (
-                      <Ionicons name="refresh-outline" size={20} color="#007AFF" />
+                      <Ionicons
+                        name="refresh-outline"
+                        size={20}
+                        color="#007AFF"
+                      />
                     )}
                     <Text style={styles.modalActionText}>AI Replace</Text>
                   </TouchableOpacity>
-                  
-                  <TouchableOpacity style={styles.modalActionButton} onPress={handleMarkFavorite}>
+
+                  <TouchableOpacity
+                    style={styles.modalActionButton}
+                    onPress={handleMarkFavorite}
+                  >
                     <Ionicons name="heart-outline" size={20} color="#FF6B6B" />
                     <Text style={styles.modalActionText}>Favorite</Text>
                   </TouchableOpacity>
@@ -583,29 +709,42 @@ export default function RecommendedMenusScreen() {
             </View>
 
             <ScrollView style={styles.modalBody}>
-              <Text style={styles.configSectionTitle}>🤖 AI will create your personalized meal plan</Text>
-              <Text style={styles.configDescription}>
-                Based on your profile, preferences, and goals, our AI will generate a complete weekly meal plan with recipes, nutrition info, and shopping lists.
+              <Text style={styles.configSectionTitle}>
+                🤖 AI will create your personalized meal plan
               </Text>
-              
+              <Text style={styles.configDescription}>
+                Based on your profile, preferences, and goals, our AI will
+                generate a complete weekly meal plan with recipes, nutrition
+                info, and shopping lists.
+              </Text>
+
               <Text style={styles.configSectionTitle}>Meal Structure</Text>
-              
+
               <View style={styles.configOption}>
                 <Text style={styles.configLabel}>Meals per day</Text>
                 <View style={styles.configButtons}>
-                  {[2, 3, 4, 5].map(num => (
+                  {[2, 3, 4, 5].map((num) => (
                     <TouchableOpacity
                       key={num}
                       style={[
                         styles.configButton,
-                        mealPlanConfig.meals_per_day === num && styles.configButtonActive
+                        mealPlanConfig.meals_per_day === num &&
+                          styles.configButtonActive,
                       ]}
-                      onPress={() => setMealPlanConfig(prev => ({ ...prev, meals_per_day: num }))}
+                      onPress={() =>
+                        setMealPlanConfig((prev) => ({
+                          ...prev,
+                          meals_per_day: num,
+                        }))
+                      }
                     >
-                      <Text style={[
-                        styles.configButtonText,
-                        mealPlanConfig.meals_per_day === num && styles.configButtonTextActive
-                      ]}>
+                      <Text
+                        style={[
+                          styles.configButtonText,
+                          mealPlanConfig.meals_per_day === num &&
+                            styles.configButtonTextActive,
+                        ]}
+                      >
                         {num}
                       </Text>
                     </TouchableOpacity>
@@ -616,19 +755,28 @@ export default function RecommendedMenusScreen() {
               <View style={styles.configOption}>
                 <Text style={styles.configLabel}>Snacks per day</Text>
                 <View style={styles.configButtons}>
-                  {[0, 1, 2].map(num => (
+                  {[0, 1, 2].map((num) => (
                     <TouchableOpacity
                       key={num}
                       style={[
                         styles.configButton,
-                        mealPlanConfig.snacks_per_day === num && styles.configButtonActive
+                        mealPlanConfig.snacks_per_day === num &&
+                          styles.configButtonActive,
                       ]}
-                      onPress={() => setMealPlanConfig(prev => ({ ...prev, snacks_per_day: num }))}
+                      onPress={() =>
+                        setMealPlanConfig((prev) => ({
+                          ...prev,
+                          snacks_per_day: num,
+                        }))
+                      }
                     >
-                      <Text style={[
-                        styles.configButtonText,
-                        mealPlanConfig.snacks_per_day === num && styles.configButtonTextActive
-                      ]}>
+                      <Text
+                        style={[
+                          styles.configButtonText,
+                          mealPlanConfig.snacks_per_day === num &&
+                            styles.configButtonTextActive,
+                        ]}
+                      >
                         {num}
                       </Text>
                     </TouchableOpacity>
@@ -643,19 +791,28 @@ export default function RecommendedMenusScreen() {
                     { value: 1, label: "Daily" },
                     { value: 3, label: "3 days" },
                     { value: 7, label: "Weekly" },
-                  ].map(option => (
+                  ].map((option) => (
                     <TouchableOpacity
                       key={option.value}
                       style={[
                         styles.configButton,
-                        mealPlanConfig.rotation_frequency_days === option.value && styles.configButtonActive
+                        mealPlanConfig.rotation_frequency_days ===
+                          option.value && styles.configButtonActive,
                       ]}
-                      onPress={() => setMealPlanConfig(prev => ({ ...prev, rotation_frequency_days: option.value }))}
+                      onPress={() =>
+                        setMealPlanConfig((prev) => ({
+                          ...prev,
+                          rotation_frequency_days: option.value,
+                        }))
+                      }
                     >
-                      <Text style={[
-                        styles.configButtonText,
-                        mealPlanConfig.rotation_frequency_days === option.value && styles.configButtonTextActive
-                      ]}>
+                      <Text
+                        style={[
+                          styles.configButtonText,
+                          mealPlanConfig.rotation_frequency_days ===
+                            option.value && styles.configButtonTextActive,
+                        ]}
+                      >
                         {option.label}
                       </Text>
                     </TouchableOpacity>
@@ -671,7 +828,7 @@ export default function RecommendedMenusScreen() {
               >
                 <Text style={styles.modalActionText}>Cancel</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={[styles.modalActionButton, styles.primaryButton]}
                 onPress={createAIMealPlan}
@@ -680,7 +837,11 @@ export default function RecommendedMenusScreen() {
                 {isCreatingPlan ? (
                   <ActivityIndicator color="white" size="small" />
                 ) : (
-                  <Text style={[styles.modalActionText, styles.primaryButtonText]}>Create AI Plan</Text>
+                  <Text
+                    style={[styles.modalActionText, styles.primaryButtonText]}
+                  >
+                    Create AI Plan
+                  </Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -728,26 +889,34 @@ const styles = StyleSheet.create({
   headerButton: {
     padding: 5,
   },
+  // Enhanced Compact Day Selector Styles
   daySelector: {
     backgroundColor: "white",
-    paddingVertical: 15,
-    paddingHorizontal: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
+    paddingVertical: 4,
+  },
+  daySelectorContent: {
+    paddingHorizontal: 12,
+    alignItems: "center",
   },
   dayButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    marginHorizontal: 5,
-    borderRadius: 20,
-    backgroundColor: "#f8f9fa",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginHorizontal: 2,
+    borderRadius: 12,
+    backgroundColor: "#f0f0f0",
+    justifyContent: "center",
+    alignItems: "center",
+    minWidth: 44,
+    height: 28,
   },
   dayButtonActive: {
     backgroundColor: "#007AFF",
   },
   dayButtonText: {
-    fontSize: 14,
-    fontWeight: "500",
+    fontSize: 11,
+    fontWeight: "600",
     color: "#666",
   },
   dayButtonTextActive: {
@@ -1056,12 +1225,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#007AFF",
     borderColor: "#007AFF",
   },
+  // Added or adjusted from the previous context to ensure no errors
   configButtonText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#666",
+    // Ensure this style exists
+    color: "#333",
   },
   configButtonTextActive: {
+    // Ensure this style exists
     color: "white",
   },
 });

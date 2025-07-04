@@ -58,7 +58,7 @@ export default function StatisticsScreen() {
   const fetchStatistics = async () => {
     try {
       setLoading(true);
-
+      const API_URL = process.env.EXPO_PUBLIC_API_URL;
       // Use your existing API service with proper authentication handling
       const axios = (await import("axios")).default;
 
@@ -67,7 +67,7 @@ export default function StatisticsScreen() {
         if (Platform.OS === "web") {
           return "http://localhost:5000/api";
         } else {
-          return "http://192.168.1.70:5000/api";
+          return API_URL;
         }
       };
 

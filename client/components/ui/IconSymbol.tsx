@@ -11,7 +11,8 @@ type SupportedSymbolName =
   | "calendar"
   | "watch.digital"
   | "clock.fill"
-  | "person.fill";
+  | "person.fill"
+  | "dining"; 
 
 type IconMapping = Record<
   SupportedSymbolName,
@@ -20,14 +21,16 @@ type IconMapping = Record<
 
 const MAPPING: IconMapping = {
   "house.fill": "home",
-  "fork.knife": "restaurant", // closest MaterialIcon match
+  "fork.knife": "restaurant",
   "camera.fill": "photo-camera",
   "chart.bar.fill": "bar-chart",
   calendar: "calendar-today",
-  "watch.digital": "watch", // use a generic watch icon
-  "clock.fill": "access-time", // or "schedule"
+  "watch.digital": "watch",
+  "clock.fill": "access-time",
+  "dining": "dining", 
   "person.fill": "person",
 };
+
 
 export function IconSymbol({
   name,

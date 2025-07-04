@@ -18,32 +18,31 @@ dotenv.config();
 
 const app = express();
 const PORT = Number(process.env.PORT) || 5000;
+const API_BASE_URL = process.env.API_BASE_URL; // e.g. "http://192.168.1.70:5000/api"
 
+// Extract base origin (without /api)
+const apiOrigin = API_BASE_URL ? API_BASE_URL.replace(/\/api$/, "") : null;
+
+console.log(`API Base URL: ${API_BASE_URL}`);
 console.log("🚀 Starting server...");
 console.log("📊 Environment:", process.env.NODE_ENV || "development");
 console.log("🔌 Port:", PORT);
 
-// Middleware
 app.use(helmet());
 
-// CORS configuration for Expo Go with credentials support
+// CORS configuration - replace all hardcoded IPs with apiOrigin if available
 app.use(
   cors({
     origin: [
       process.env.CLIENT_URL || "http://localhost:8081",
-      "http://localhost:19006", // Expo web
-      "http://localhost:19000", // Expo DevTools
-      "http://192.168.1.70:19006", // Updated IP for web
-      "http://192.168.1.70:8081", // Updated IP for mobile
-      "http://192.168.1.70:*", // Allow any port on your IP
-      // Add more IP variations if needed for different network configurations
-      "http://10.0.0.0/8", // Private network range
-      "http://172.16.0.0/12", // Private network range
-      "http://192.168.0.0/16", // Private network range
-      // Allow all origins for development (remove in production)
-      "*",
+      "http://localhost:19006",
+      "http://localhost:19000",
+      apiOrigin || "http://192.168.1.70:19006",
+      apiOrigin || "http://192.168.1.70:8081",
+      // You can add more allowed origins if needed
+      "*", // (for development, remove this in production)
     ],
-    credentials: true, // Enable credentials for cookies
+    credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
   })

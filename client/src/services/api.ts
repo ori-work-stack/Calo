@@ -2,7 +2,7 @@ import axios from "axios";
 import { SignInData, SignUpData, MealAnalysisData, Meal } from "../types";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
-
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
 // Get the correct API URL based on platform
 const getApiBaseUrl = () => {
   if (Platform.OS === "web") {
@@ -11,7 +11,7 @@ const getApiBaseUrl = () => {
   } else {
     // For mobile devices, use your computer's IP address
     // Updated with your correct IP address
-    return "http://192.168.1.70:5000/api";
+    return API_URL;
   }
 };
 

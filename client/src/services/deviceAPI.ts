@@ -26,13 +26,13 @@ export interface DailyBalance {
   balance: number;
   balanceStatus: "balanced" | "slight_imbalance" | "significant_imbalance";
 }
-
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
 // Get the correct API URL based on platform
 const getApiBaseUrl = () => {
   if (Platform.OS === "web") {
     return "http://localhost:5000/api";
   } else {
-    return "http://192.168.1.70:5000/api";
+    return API_URL;
   }
 };
 
