@@ -1,3 +1,4 @@
+import { statisticsAPI } from "@/src/services/api";
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -7,8 +8,6 @@ import {
   Dimensions,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
-  Platform,
 } from "react-native";
 import { LineChart, BarChart, PieChart } from "react-native-chart-kit";
 
@@ -58,50 +57,15 @@ export default function StatisticsScreen() {
   const fetchStatistics = async () => {
     try {
       setLoading(true);
-      const API_URL = process.env.EXPO_PUBLIC_API_URL;
-      // Use your existing API service with proper authentication handling
-      const axios = (await import("axios")).default;
-
-      // Create API instance with same configuration as your api.ts
-      const getApiBaseUrl = () => {
-        if (Platform.OS === "web") {
-          return "http://localhost:5000/api";
-        } else {
-          return API_URL;
-        }
-      };
-
-      const apiInstance = axios.create({
-        baseURL: getApiBaseUrl(),
-        timeout: 30000,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        withCredentials: Platform.OS === "web",
-      });
-
-      // Add authentication for mobile
-      if (Platform.OS !== "web") {
-        const { authAPI } = await import("../../src/services/api");
-        const token = await authAPI.getStoredToken();
-        if (token) {
-          apiInstance.defaults.headers.common[
-            "Authorization"
-          ] = `Bearer ${token}`;
-        }
-      }
-
-      const response = await apiInstance.get(`/statistics?period=${period}`);
-
-      console.log("Statistics loaded successfully:", response.data);
-      setStatistics(response.data);
+      const data = await statisticsAPI.getStatistics(period);
+      console.log("Statistics loaded successfully:", data);
+      setStatistics(data);
     } catch (error: any) {
       console.error("Error fetching statistics:", error);
-      Alert.alert(
-        "שגיאה",
-        error.response?.data?.message ||
-          error.message ||
-          "לא הצלחנו לטעון את הסטטיסטיקות"
+      alert(
+        error?.response?.data?.message ||
+          error?.message ||
+          "שגיאה בטעינת הסטטיסטיקות"
       );
     } finally {
       setLoading(false);

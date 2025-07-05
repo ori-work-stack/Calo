@@ -795,3 +795,131 @@ export const userAPI = {
     }
   },
 };
+
+// MEAL PLAN API
+export const mealPlanAPI = {
+  loadMealPlan: async (): Promise<{
+    success: boolean;
+    data?: any;
+    error?: string;
+  }> => {
+    try {
+      console.log("🔄 Loading current meal plan");
+      const response = await api.get("/meal-plans/current");
+      console.log("✅ loadMealPlan response:", response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error("💥 loadMealPlan error:", error);
+      return {
+        success: false,
+        error:
+          error.response?.data?.error ||
+          error.message ||
+          "Failed to load meal plan",
+      };
+    }
+  },
+
+  createAIMealPlan: async (
+    config: any
+  ): Promise<{ success: boolean; data?: any; error?: string }> => {
+    try {
+      console.log("🤖 Creating AI meal plan with config:", config);
+      const response = await api.post("/meal-plans/create", config, {
+        timeout: 60000,
+      });
+      console.log("✅ createAIMealPlan response:", response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error("💥 createAIMealPlan error:", error);
+      const errMsg =
+        error.response?.data?.error ||
+        error.message ||
+        "Failed to create meal plan";
+      return { success: false, error: errMsg };
+    }
+  },
+
+  replaceMeal: async (
+    planId: string,
+    payload: {
+      day_of_week: number;
+      meal_timing: string;
+      meal_order: number;
+      preferences: any;
+    }
+  ): Promise<{ success: boolean; data?: any; error?: string }> => {
+    try {
+      console.log("🔄 Replacing meal with payload:", payload);
+      const response = await api.put(`/meal-plans/${planId}/replace`, payload, {
+        timeout: 30000,
+      });
+      console.log("✅ replaceMeal response:", response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error("💥 replaceMeal error:", error);
+      const errMsg =
+        error.response?.data?.error ||
+        error.message ||
+        "Failed to replace meal";
+      return { success: false, error: errMsg };
+    }
+  },
+
+  markMealAsFavorite: async (
+    template_id: string
+  ): Promise<{ success: boolean; data?: any; error?: string }> => {
+    try {
+      console.log("❤️ Marking meal as favorite:", template_id);
+      const response = await api.post("/meal-plans/preferences", {
+        template_id,
+        preference_type: "favorite",
+        rating: 5,
+      });
+      console.log("✅ markMealAsFavorite response:", response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error("💥 markMealAsFavorite error:", error);
+      const errMsg =
+        error.response?.data?.error ||
+        error.message ||
+        "Failed to mark as favorite";
+      return { success: false, error: errMsg };
+    }
+  },
+
+  generateShoppingList: async (
+    planId: string,
+    weekStartDate: string
+  ): Promise<{ success: boolean; data?: any; error?: string }> => {
+    try {
+      console.log(
+        "🛒 Generating shopping list for plan:",
+        planId,
+        "week:",
+        weekStartDate
+      );
+      const response = await api.post(
+        `/meal-plans/${planId}/shopping-list`,
+        { week_start_date: weekStartDate },
+        { timeout: 15000 }
+      );
+      console.log("✅ generateShoppingList response:", response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error("💥 generateShoppingList error:", error);
+      const errMsg =
+        error.response?.data?.error ||
+        error.message ||
+        "Failed to generate shopping list";
+      return { success: false, error: errMsg };
+    }
+  },
+};
+
+export const statisticsAPI = {
+  async getStatistics(period: "week" | "month" | "custom") {
+    const response = await api.get(`/statistics?period=${period}`);
+    return response.data;
+  },
+};

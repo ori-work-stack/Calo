@@ -28,7 +28,7 @@ router.post("/signup", async (req, res, next) => {
       console.log("🍪 Cookie set for web client");
     } else {
       console.log(
-        "📱 Mobile client detected - token will be stored in Keychain"
+        "📱 Mobile client detected - token will be stored in secure-store"
       );
     }
 
@@ -75,7 +75,7 @@ router.post("/signin", async (req, res, next) => {
       console.log("🍪 Cookie set for web client");
     } else {
       console.log(
-        "📱 Mobile client detected - token will be stored in Keychain"
+        "📱 Mobile client detected - token will be stored in secure-store"
       );
     }
 

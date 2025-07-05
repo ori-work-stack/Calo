@@ -1,76 +1,58 @@
 import { prisma } from "../lib/database";
+import {
+  AIMealPlanResponse,
+  MealPlanTemplate,
+  UserMealPlanConfig,
+  WeeklyMealPlan,
+} from "../types/mealPlans";
 import { OpenAIService } from "./openai";
 
-export interface MealPlanTemplate {
-  template_id: string;
-  name: string;
-  description?: string | null;
-  meal_timing: string;
-  dietary_category: string;
-  prep_time_minutes?: number | null;
-  difficulty_level?: number | null;
-  calories?: number | null;
-  protein_g?: number | null;
-  carbs_g?: number | null;
-  fats_g?: number | null;
-  fiber_g?: number | null;
-  sugar_g?: number | null;
-  sodium_mg?: number | null;
-  ingredients: any[];
-  instructions: any[];
-  allergens: string[];
-  image_url?: string | null;
+// Helper function to sanitize strings
+function sanitizeString(input: string): string {
+  if (!input || typeof input !== "string") return "";
+  return input.trim().replace(/[<>]/g, "");
 }
 
-export interface UserMealPlanConfig {
-  name: string;
-  meals_per_day: number;
-  snacks_per_day: number;
-  rotation_frequency_days: number;
-  include_leftovers: boolean;
-  fixed_meal_times: boolean;
-  dietary_preferences: string[];
-  excluded_ingredients: string[];
+// Helper function to validate arrays
+function validateArray<T>(input: any, fallback: T[] = []): T[] {
+  return Array.isArray(input) ? input : fallback;
 }
 
-export interface WeeklyMealPlan {
-  [day: string]: {
-    [mealTiming: string]: MealPlanTemplate[];
-  };
-}
-
-// Interface for AI response structure
-export interface AIMealPlanResponse {
-  weekly_plan: {
-    day: string;
-    meals: {
-      name: string;
-      description?: string;
-      meal_timing: string;
-      dietary_category: string;
-      prep_time_minutes?: number;
-      difficulty_level?: number;
-      calories?: number;
-      protein_g?: number;
-      carbs_g?: number;
-      fats_g?: number;
-      fiber_g?: number;
-      sugar_g?: number;
-      sodium_mg?: number;
-      ingredients: any[];
-      instructions: any[];
-      allergens: string[];
-      image_url?: string;
-      portion_multiplier?: number;
-      is_optional?: boolean;
-    }[];
-  }[];
+// Helper function to validate enums
+function validateEnum<T>(value: any, validValues: T[], fallback: T): T {
+  return validValues.includes(value) ? value : fallback;
 }
 
 export class MealPlanService {
+  // Valid enum values (should match your Prisma schema)
+  private static readonly VALID_MEAL_TIMINGS = [
+    "BREAKFAST",
+    "LUNCH",
+    "DINNER",
+    "SNACK",
+    "MORNING_SNACK",
+    "AFTERNOON_SNACK",
+  ];
+
+  private static readonly VALID_DIETARY_CATEGORIES = [
+    "VEGETARIAN",
+    "VEGAN",
+    "KETO",
+    "PALEO",
+    "MEDITERRANEAN",
+    "LOW_CARB",
+    "HIGH_PROTEIN",
+    "GLUTEN_FREE",
+    "DAIRY_FREE",
+    "BALANCED",
+  ];
+
   static async createUserMealPlan(user_id: string, config: UserMealPlanConfig) {
     try {
       console.log("🍽️ Creating AI-powered meal plan for user:", user_id);
+
+      // Validate and sanitize input
+      const sanitizedConfig = this.sanitizeConfig(config);
 
       // Get user's questionnaire data for personalization
       const questionnaire = await prisma.userQuestionnaire.findFirst({
@@ -94,9 +76,9 @@ export class MealPlanService {
         },
       });
 
-      // Generate AI meal plan
+      // Generate AI meal plan with error handling
       const aiMealPlan = await this.generateAIMealPlan(
-        config,
+        sanitizedConfig,
         questionnaire,
         nutritionPlan,
         user
@@ -111,33 +93,41 @@ export class MealPlanService {
         throw new Error("Invalid AI meal plan response structure");
       }
 
-      // Create the meal plan
-      const mealPlan = await prisma.userMealPlan.create({
-        data: {
-          user_id,
-          name: config.name,
-          plan_type: "WEEKLY",
-          meals_per_day: config.meals_per_day,
-          snacks_per_day: config.snacks_per_day,
-          rotation_frequency_days: config.rotation_frequency_days,
-          include_leftovers: config.include_leftovers,
-          fixed_meal_times: config.fixed_meal_times,
-          target_calories_daily: nutritionPlan?.goal_calories || 2000,
-          target_protein_daily: nutritionPlan?.goal_protein_g || 150,
-          target_carbs_daily: nutritionPlan?.goal_carbs_g || 250,
-          target_fats_daily: nutritionPlan?.goal_fats_g || 67,
-          dietary_preferences: config.dietary_preferences,
-          excluded_ingredients: config.excluded_ingredients,
-          start_date: new Date(),
-          is_active: true,
-        },
+      // Create the meal plan using transaction
+      const result = await prisma.$transaction(async (tx) => {
+        const mealPlan = await tx.userMealPlan.create({
+          data: {
+            user_id,
+            name: sanitizedConfig.name,
+            plan_type: "WEEKLY",
+            meals_per_day: sanitizedConfig.meals_per_day,
+            snacks_per_day: sanitizedConfig.snacks_per_day,
+            rotation_frequency_days: sanitizedConfig.rotation_frequency_days,
+            include_leftovers: sanitizedConfig.include_leftovers,
+            fixed_meal_times: sanitizedConfig.fixed_meal_times,
+            target_calories_daily: nutritionPlan?.goal_calories || 2000,
+            target_protein_daily: nutritionPlan?.goal_protein_g || 150,
+            target_carbs_daily: nutritionPlan?.goal_carbs_g || 250,
+            target_fats_daily: nutritionPlan?.goal_fats_g || 67,
+            dietary_preferences: sanitizedConfig.dietary_preferences,
+            excluded_ingredients: sanitizedConfig.excluded_ingredients,
+            start_date: new Date(),
+            is_active: true,
+          },
+        });
+
+        // Store AI-generated meal templates and create schedule
+        await this.storeAIMealTemplatesAndScheduleTransaction(
+          tx,
+          mealPlan.plan_id,
+          aiMealPlan
+        );
+
+        return mealPlan;
       });
 
-      // Store AI-generated meal templates and create schedule
-      await this.storeAIMealTemplatesAndSchedule(mealPlan.plan_id, aiMealPlan);
-
       console.log("✅ AI meal plan created successfully");
-      return mealPlan;
+      return result;
     } catch (error) {
       console.error("💥 Error creating AI meal plan:", error);
       throw new Error(
@@ -146,6 +136,36 @@ export class MealPlanService {
         }`
       );
     }
+  }
+
+  private static sanitizeConfig(
+    config: UserMealPlanConfig
+  ): UserMealPlanConfig {
+    return {
+      name: sanitizeString(config.name),
+      meals_per_day: Math.max(1, Math.min(6, Math.floor(config.meals_per_day))),
+      snacks_per_day: Math.max(
+        0,
+        Math.min(3, Math.floor(config.snacks_per_day))
+      ),
+      rotation_frequency_days: Math.max(
+        1,
+        Math.min(14, Math.floor(config.rotation_frequency_days))
+      ),
+      include_leftovers: Boolean(config.include_leftovers),
+      fixed_meal_times: Boolean(config.fixed_meal_times),
+      dietary_preferences: (
+        validateArray(config.dietary_preferences) as string[]
+      )
+        .map(sanitizeString)
+        .slice(0, 10),
+
+      excluded_ingredients: (
+        validateArray(config.excluded_ingredients) as string[]
+      )
+        .map(sanitizeString)
+        .slice(0, 20),
+    };
   }
 
   static async generateAIMealPlan(
@@ -165,7 +185,7 @@ export class MealPlanService {
         user
       );
 
-      // Generate meal plan using OpenAI
+      // Generate meal plan using OpenAI with error handling
       const aiResponse = await OpenAIService.generateMealPlan(userProfile);
 
       // Validate and structure the response
@@ -176,6 +196,7 @@ export class MealPlanService {
       return structuredResponse;
     } catch (error) {
       console.error("💥 Error generating AI meal plan:", error);
+      console.log("🔄 Falling back to default meal plan");
       // Return fallback meal plan if AI fails
       return this.generateFallbackMealPlan(config);
     }
@@ -202,34 +223,58 @@ export class MealPlanService {
 
           const validatedMeals = dayPlan.meals.map((meal: any) => {
             return {
-              name: meal.name || `Meal ${index + 1}`,
-              description: meal.description || null,
-              meal_timing: meal.meal_timing || "BREAKFAST",
-              dietary_category: meal.dietary_category || "BALANCED",
-              prep_time_minutes: meal.prep_time_minutes || 30,
-              difficulty_level: meal.difficulty_level || 2,
-              calories: meal.calories || 400,
-              protein_g: meal.protein_g || 20,
-              carbs_g: meal.carbs_g || 40,
-              fats_g: meal.fats_g || 15,
-              fiber_g: meal.fiber_g || 5,
-              sugar_g: meal.sugar_g || 10,
-              sodium_mg: meal.sodium_mg || 500,
-              ingredients: Array.isArray(meal.ingredients)
-                ? meal.ingredients
-                : [],
-              instructions: Array.isArray(meal.instructions)
-                ? meal.instructions
-                : [],
-              allergens: Array.isArray(meal.allergens) ? meal.allergens : [],
+              name: sanitizeString(meal.name) || `Meal ${index + 1}`,
+              description: meal.description
+                ? sanitizeString(meal.description)
+                : null,
+              meal_timing: validateEnum(
+                meal.meal_timing,
+                this.VALID_MEAL_TIMINGS,
+                "BREAKFAST"
+              ),
+              dietary_category: validateEnum(
+                meal.dietary_category,
+                this.VALID_DIETARY_CATEGORIES,
+                "BALANCED"
+              ),
+              prep_time_minutes: Math.max(
+                5,
+                Math.min(180, Number(meal.prep_time_minutes) || 30)
+              ),
+              difficulty_level: Math.max(
+                1,
+                Math.min(5, Number(meal.difficulty_level) || 2)
+              ),
+              calories: Math.max(
+                50,
+                Math.min(2000, Number(meal.calories) || 400)
+              ),
+              protein_g: Math.max(
+                0,
+                Math.min(100, Number(meal.protein_g) || 20)
+              ),
+              carbs_g: Math.max(0, Math.min(200, Number(meal.carbs_g) || 40)),
+              fats_g: Math.max(0, Math.min(100, Number(meal.fats_g) || 15)),
+              fiber_g: Math.max(0, Math.min(50, Number(meal.fiber_g) || 5)),
+              sugar_g: Math.max(0, Math.min(100, Number(meal.sugar_g) || 10)),
+              sodium_mg: Math.max(
+                0,
+                Math.min(5000, Number(meal.sodium_mg) || 500)
+              ),
+              ingredients: validateArray(meal.ingredients),
+              instructions: validateArray(meal.instructions),
+              allergens: validateArray<string>(meal.allergens),
               image_url: meal.image_url || null,
-              portion_multiplier: meal.portion_multiplier || 1.0,
-              is_optional: meal.is_optional || false,
+              portion_multiplier: Math.max(
+                0.1,
+                Math.min(3.0, Number(meal.portion_multiplier) || 1.0)
+              ),
+              is_optional: Boolean(meal.is_optional || false),
             };
           });
 
           return {
-            day: dayPlan.day || `Day ${index + 1}`,
+            day: sanitizeString(dayPlan.day) || `Day ${index + 1}`,
             meals: validatedMeals,
           };
         }
@@ -386,6 +431,7 @@ export class MealPlanService {
               ...baseMeal,
               name: `${baseMeal.name} - ${day}`,
               meal_timing: timing,
+              image_url: baseMeal.image_url ?? undefined,
             };
           }),
       })),
@@ -399,16 +445,16 @@ export class MealPlanService {
     user: any
   ) {
     return {
-      // Basic info
-      age: user?.age || 30,
-      weight_kg: user?.weight_kg || 70,
-      height_cm: user?.height_cm || 170,
+      // Basic info with null safety
+      age: user?.age ?? 30,
+      weight_kg: user?.weight_kg ?? 70,
+      height_cm: user?.height_cm ?? 170,
 
       // Nutrition goals
-      target_calories_daily: nutritionPlan?.goal_calories || 2000,
-      target_protein_daily: nutritionPlan?.goal_protein_g || 150,
-      target_carbs_daily: nutritionPlan?.goal_carbs_g || 250,
-      target_fats_daily: nutritionPlan?.goal_fats_g || 67,
+      target_calories_daily: nutritionPlan?.goal_calories ?? 2000,
+      target_protein_daily: nutritionPlan?.goal_protein_g ?? 150,
+      target_carbs_daily: nutritionPlan?.goal_carbs_g ?? 250,
+      target_fats_daily: nutritionPlan?.goal_fats_g ?? 67,
 
       // Meal structure preferences
       meals_per_day: config.meals_per_day,
@@ -417,12 +463,10 @@ export class MealPlanService {
       include_leftovers: config.include_leftovers,
       fixed_meal_times: config.fixed_meal_times,
 
-      // Dietary preferences and restrictions
+      // Dietary preferences and restrictions with safe array access
       dietary_preferences: config.dietary_preferences || [],
       excluded_ingredients: config.excluded_ingredients || [],
-      allergies: Array.isArray(questionnaire?.allergies)
-        ? questionnaire.allergies
-        : [],
+      allergies: validateArray(questionnaire?.allergies),
 
       // Lifestyle factors
       physical_activity_level:
@@ -431,14 +475,10 @@ export class MealPlanService {
       main_goal: questionnaire?.main_goal || "GENERAL_HEALTH",
 
       // Food preferences from questionnaire
-      dietary_preferences_questionnaire: Array.isArray(
+      dietary_preferences_questionnaire: validateArray(
         questionnaire?.dietary_preferences
-      )
-        ? questionnaire.dietary_preferences
-        : [],
-      avoided_foods: Array.isArray(questionnaire?.avoided_foods)
-        ? questionnaire.avoided_foods
-        : [],
+      ),
+      avoided_foods: validateArray(questionnaire?.avoided_foods),
       meal_texture_preference:
         questionnaire?.meal_texture_preference || "VARIED",
 
@@ -455,18 +495,32 @@ export class MealPlanService {
     plan_id: string,
     aiMealPlan: AIMealPlanResponse
   ) {
+    return await prisma.$transaction(async (tx) => {
+      return await this.storeAIMealTemplatesAndScheduleTransaction(
+        tx,
+        plan_id,
+        aiMealPlan
+      );
+    });
+  }
+
+  private static async storeAIMealTemplatesAndScheduleTransaction(
+    tx: any,
+    plan_id: string,
+    aiMealPlan: AIMealPlanResponse
+  ) {
     try {
       console.log("💾 Storing AI-generated meal templates and schedule...");
 
       const templateIds: Record<string, string> = {};
 
-      // Store each unique meal template
+      // Store each unique meal template with error handling
       for (const dayPlan of aiMealPlan.weekly_plan) {
         for (const meal of dayPlan.meals) {
           const templateKey = `${meal.name}-${meal.meal_timing}`;
           if (!templateIds[templateKey]) {
             try {
-              const template = await prisma.mealTemplate.create({
+              const template = await tx.mealTemplate.create({
                 data: {
                   name: meal.name,
                   description: meal.description,
@@ -490,13 +544,14 @@ export class MealPlanService {
               templateIds[templateKey] = template.template_id;
             } catch (error) {
               console.error(`Error creating template for ${meal.name}:`, error);
-              // Continue with other meals
+              // Continue with other meals instead of failing completely
+              continue;
             }
           }
         }
       }
 
-      // Create meal schedule
+      // Create meal schedule with error handling
       for (
         let dayIndex = 0;
         dayIndex < aiMealPlan.weekly_plan.length;
@@ -510,7 +565,7 @@ export class MealPlanService {
 
           if (templateIds[templateKey]) {
             try {
-              await prisma.mealPlanSchedule.create({
+              await tx.mealPlanSchedule.create({
                 data: {
                   plan_id,
                   template_id: templateIds[templateKey],
@@ -524,6 +579,7 @@ export class MealPlanService {
             } catch (error) {
               console.error(`Error creating schedule for ${meal.name}:`, error);
               // Continue with other meals
+              continue;
             }
           }
         }
@@ -591,6 +647,20 @@ export class MealPlanService {
         const timingGroups = daySchedules.reduce((acc, schedule) => {
           const timing = schedule.meal_timing;
           if (!acc[timing]) acc[timing] = [];
+
+          // Add type safety for JSON fields
+          const ingredients = Array.isArray(schedule.template.ingredients_json)
+            ? (schedule.template.ingredients_json as any[])
+            : [];
+          const instructions = Array.isArray(
+            schedule.template.instructions_json
+          )
+            ? (schedule.template.instructions_json as any[])
+            : [];
+          const allergens = Array.isArray(schedule.template.allergens_json)
+            ? (schedule.template.allergens_json as string[])
+            : [];
+
           acc[timing].push({
             template_id: schedule.template.template_id,
             name: schedule.template.name,
@@ -600,44 +670,46 @@ export class MealPlanService {
             prep_time_minutes: schedule.template.prep_time_minutes,
             difficulty_level: schedule.template.difficulty_level,
             calories: Math.round(
-              (schedule.template.calories || 0) * schedule.portion_multiplier
+              (Number(schedule.template.calories) || 0) *
+                schedule.portion_multiplier
             ),
             protein_g:
               Math.round(
-                (schedule.template.protein_g || 0) *
+                (Number(schedule.template.protein_g) || 0) *
                   schedule.portion_multiplier *
                   10
               ) / 10,
             carbs_g:
               Math.round(
-                (schedule.template.carbs_g || 0) *
+                (Number(schedule.template.carbs_g) || 0) *
                   schedule.portion_multiplier *
                   10
               ) / 10,
             fats_g:
               Math.round(
-                (schedule.template.fats_g || 0) *
+                (Number(schedule.template.fats_g) || 0) *
                   schedule.portion_multiplier *
                   10
               ) / 10,
             fiber_g:
               Math.round(
-                (schedule.template.fiber_g || 0) *
+                (Number(schedule.template.fiber_g) || 0) *
                   schedule.portion_multiplier *
                   10
               ) / 10,
             sugar_g:
               Math.round(
-                (schedule.template.sugar_g || 0) *
+                (Number(schedule.template.sugar_g) || 0) *
                   schedule.portion_multiplier *
                   10
               ) / 10,
             sodium_mg: Math.round(
-              (schedule.template.sodium_mg || 0) * schedule.portion_multiplier
+              (Number(schedule.template.sodium_mg) || 0) *
+                schedule.portion_multiplier
             ),
-            ingredients: (schedule.template.ingredients_json as any[]) || [],
-            instructions: (schedule.template.instructions_json as any[]) || [],
-            allergens: (schedule.template.allergens_json as string[]) || [],
+            ingredients,
+            instructions,
+            allergens,
             image_url: schedule.template.image_url,
           });
           return acc;
@@ -716,12 +788,13 @@ export class MealPlanService {
           fats_g: Number(currentMeal.fats_g) || 0,
         },
         user_preferences: {
-          dietary_preferences: (mealPlan.dietary_preferences as string[]) || [],
-          excluded_ingredients:
-            (mealPlan.excluded_ingredients as string[]) || [],
-          allergies: Array.isArray(questionnaire?.allergies)
-            ? questionnaire.allergies
-            : [],
+          dietary_preferences: validateArray(
+            mealPlan.dietary_preferences as any
+          ),
+          excluded_ingredients: validateArray(
+            mealPlan.excluded_ingredients as any
+          ),
+          allergies: validateArray(questionnaire?.allergies),
           preferred_dietary_category: preferences?.dietary_category,
           max_prep_time: preferences?.max_prep_time,
         },
@@ -731,44 +804,49 @@ export class MealPlanService {
         },
       });
 
-      // Create new template for replacement meal
-      const newTemplate = await prisma.mealTemplate.create({
-        data: {
-          name: replacementMeal.name,
-          description: replacementMeal.description,
-          meal_timing: replacementMeal.meal_timing as any,
-          dietary_category: replacementMeal.dietary_category as any,
-          prep_time_minutes: replacementMeal.prep_time_minutes,
-          difficulty_level: replacementMeal.difficulty_level,
-          calories: replacementMeal.calories,
-          protein_g: replacementMeal.protein_g,
-          carbs_g: replacementMeal.carbs_g,
-          fats_g: replacementMeal.fats_g,
-          fiber_g: replacementMeal.fiber_g,
-          sugar_g: replacementMeal.sugar_g,
-          sodium_mg: replacementMeal.sodium_mg,
-          ingredients_json: replacementMeal.ingredients,
-          instructions_json: replacementMeal.instructions,
-          allergens_json: replacementMeal.allergens,
-          image_url: replacementMeal.image_url,
-        },
-      });
+      // Use transaction for replacement
+      const result = await prisma.$transaction(async (tx) => {
+        // Create new template for replacement meal
+        const newTemplate = await tx.mealTemplate.create({
+          data: {
+            name: replacementMeal.name,
+            description: replacementMeal.description,
+            meal_timing: replacementMeal.meal_timing as any,
+            dietary_category: replacementMeal.dietary_category as any,
+            prep_time_minutes: replacementMeal.prep_time_minutes,
+            difficulty_level: replacementMeal.difficulty_level,
+            calories: replacementMeal.calories,
+            protein_g: replacementMeal.protein_g,
+            carbs_g: replacementMeal.carbs_g,
+            fats_g: replacementMeal.fats_g,
+            fiber_g: replacementMeal.fiber_g,
+            sugar_g: replacementMeal.sugar_g,
+            sodium_mg: replacementMeal.sodium_mg,
+            ingredients_json: replacementMeal.ingredients,
+            instructions_json: replacementMeal.instructions,
+            allergens_json: replacementMeal.allergens,
+            image_url: replacementMeal.image_url,
+          },
+        });
 
-      // Update the schedule
-      await prisma.mealPlanSchedule.updateMany({
-        where: {
-          plan_id,
-          day_of_week,
-          meal_timing: meal_timing as any,
-          meal_order,
-        },
-        data: {
-          template_id: newTemplate.template_id,
-        },
+        // Update the schedule
+        await tx.mealPlanSchedule.updateMany({
+          where: {
+            plan_id,
+            day_of_week,
+            meal_timing: meal_timing as any,
+            meal_order,
+          },
+          data: {
+            template_id: newTemplate.template_id,
+          },
+        });
+
+        return newTemplate;
       });
 
       console.log("✅ AI meal replacement completed successfully");
-      return { success: true, new_meal: newTemplate };
+      return { success: true, new_meal: result };
     } catch (error) {
       console.error("💥 Error replacing meal with AI:", error);
       throw error;
@@ -793,7 +871,6 @@ export class MealPlanService {
           },
         },
       });
-
       if (!mealPlan) {
         throw new Error("Meal plan not found");
       }

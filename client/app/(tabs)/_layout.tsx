@@ -2,10 +2,9 @@ import { Tabs } from "expo-router";
 import React from "react";
 import { Platform } from "react-native";
 
-// Assuming these components and hooks exist and are correctly implemented
 import { HapticTab } from "@/components/HapticTab";
 import { IconSymbol } from "@/components/ui/IconSymbol";
-import TabBarBackground from "@/components/ui/TabBarBackground"; 
+import TabBarBackground from "@/components/ui/TabBarBackground";
 import { Colors } from "@/constants/Colors";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { ScrollableTabBar } from "@/components/ScrollableTabBar";
@@ -22,14 +21,12 @@ export default function TabLayout() {
           ? "rgba(255, 255, 255, 0.6)"
           : "rgba(0, 0, 0, 0.6)",
         headerShown: false,
-        tabBarButton: HapticTab, // Use your custom HapticTab if desired
-        tabBarBackground: TabBarBackground, // Keep this if your TabBarBackground provides a specific blur/effect layer
-        // We are moving tabBarStyle logic into ScrollableTabBar for better control
-        // Forcing a fixed height for the custom tab bar, adjust as needed
+        tabBarButton: HapticTab,
+        tabBarBackground: TabBarBackground,
         tabBarStyle: {
-          height: Platform.OS === "ios" ? 90 : 60, // Base height, ScrollableTabBar will handle padding
-          backgroundColor: "transparent", // Make the default tabBarStyle transparent
-          borderTopWidth: 0, // Ensure no default border
+          height: Platform.OS === "ios" ? 90 : 60,
+          backgroundColor: "transparent",
+          borderTopWidth: 0,
         },
         tabBarLabelStyle: {
           fontSize: 11,
@@ -43,10 +40,8 @@ export default function TabLayout() {
           paddingVertical: 4,
         },
       }}
-      // Pass props to your custom tab bar component
       tabBar={(props) => <ScrollableTabBar {...props} />}
     >
-      {/* CORRECTED TAB ORDER */}
       <Tabs.Screen
         name="index"
         options={{
@@ -110,7 +105,6 @@ export default function TabLayout() {
           ),
         }}
       />
-      {/* RECOMMENDED MENUS IS NOW CORRECTLY PLACED BEFORE PROFILE */}
       <Tabs.Screen
         name="recommended-menus"
         options={{

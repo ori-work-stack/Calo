@@ -1,35 +1,5 @@
 import { prisma } from "../lib/database";
-
-interface DayData {
-  date: string;
-  caloriesGoal: number;
-  caloriesActual: number;
-  proteinGoal: number;
-  proteinActual: number;
-  carbsGoal: number;
-  carbsActual: number;
-  fatGoal: number;
-  fatActual: number;
-  mealCount: number;
-  qualityScore: number;
-  events: Array<{
-    id: string;
-    title: string;
-    type: string;
-  }>;
-}
-
-interface CalendarStats {
-  monthlyProgress: number;
-  streakDays: number;
-  bestWeek: string;
-  challengingWeek: string;
-  improvementPercent: number;
-  totalGoalDays: number;
-  averageCalories: number;
-  averageProtein: number;
-  motivationalMessage: string;
-}
+import { CalendarStats, DayData } from "../types/calendar";
 
 export class CalendarService {
   // Default nutritional goals (can be customized per user later)

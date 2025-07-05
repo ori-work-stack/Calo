@@ -2,7 +2,7 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { ComponentProps } from "react";
 import { OpaqueColorValue, StyleProp, TextStyle } from "react-native";
 
-// ✅ Add only the symbols you are actually using in TabLayout
+// Add all the symbols you are actually using in TabLayout
 type SupportedSymbolName =
   | "house.fill"
   | "fork.knife"
@@ -12,7 +12,7 @@ type SupportedSymbolName =
   | "watch.digital"
   | "clock.fill"
   | "person.fill"
-  | "dining"; 
+  | "dining";
 
 type IconMapping = Record<
   SupportedSymbolName,
@@ -27,10 +27,9 @@ const MAPPING: IconMapping = {
   calendar: "calendar-today",
   "watch.digital": "watch",
   "clock.fill": "access-time",
-  "dining": "dining", 
+  dining: "restaurant", // Fixed: was "dining" which doesn't exist in MaterialIcons
   "person.fill": "person",
 };
-
 
 export function IconSymbol({
   name,
@@ -47,7 +46,15 @@ export function IconSymbol({
 
   if (!mappedName) {
     console.warn(`Icon "${name}" is not mapped to a MaterialIcon.`);
-    return null;
+    // Return a fallback icon instead of null
+    return (
+      <MaterialIcons
+        name="help-outline"
+        size={size}
+        color={color}
+        style={style}
+      />
+    );
   }
 
   return (

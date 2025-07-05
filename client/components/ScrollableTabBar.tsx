@@ -45,7 +45,7 @@ export function ScrollableTabBar(props: BottomTabBarProps) {
     // Animate indicator position
     Animated.spring(indicatorTranslateX, {
       toValue: activeIndex * tabItemWidth,
-      useNativeDriver: true, // Use native driver for performance if possible
+      useNativeDriver: true,
       tension: 100,
       friction: 10,
     }).start();
@@ -53,24 +53,22 @@ export function ScrollableTabBar(props: BottomTabBarProps) {
     // Auto-scroll logic to center the active tab
     if (routesCount > MAX_ICONS_VISIBLE) {
       const scrollOffset =
-        activeIndex * tabItemWidth - (SCREEN_WIDTH / 2 - tabItemWidth / 2); // Centers the active tab
+        activeIndex * tabItemWidth - (SCREEN_WIDTH / 2 - tabItemWidth / 2);
 
       scrollViewRef.current?.scrollTo({
-        x: Math.max(0, scrollOffset), // Ensure scroll doesn't go negative
+        x: Math.max(0, scrollOffset),
         animated: true,
       });
     } else {
-      // If not scrollable, ensure it's at the beginning (no scroll)
       scrollViewRef.current?.scrollTo({ x: 0, animated: false });
     }
-  }, [state.index, state.routes.length]); // Depend on state.index and route count
+  }, [state.index, state.routes.length]);
 
   const isDarkMode = colorScheme === "dark";
 
-  // Using specific rgba values for a consistent translucent effect
   const backgroundColor = Platform.select({
     ios: isDarkMode ? "rgba(28, 28, 30, 0.9)" : "rgba(255, 255, 255, 0.9)",
-    android: isDarkMode ? Colors.dark.background : Colors.light.background, // Android typically doesn't use backdropFilter
+    android: isDarkMode ? Colors.dark.background : Colors.light.background,
     default: isDarkMode ? Colors.dark.background : Colors.light.background,
   });
 
@@ -78,8 +76,8 @@ export function ScrollableTabBar(props: BottomTabBarProps) {
     ? "rgba(255, 255, 255, 0.1)"
     : "rgba(0, 0, 0, 0.1)";
 
-  const tabContainerHeight = Platform.OS === "ios" ? 90 : 60; // Fixed height to match TabLayout
-  const bottomPadding = insets.bottom > 0 ? insets.bottom : 10; // Safe area padding
+  const tabContainerHeight = Platform.OS === "ios" ? 90 : 60;
+  const bottomPadding = insets.bottom > 0 ? insets.bottom : 10;
 
   return (
     <View
@@ -88,7 +86,6 @@ export function ScrollableTabBar(props: BottomTabBarProps) {
         {
           backgroundColor,
           borderTopColor: borderColor,
-          // Calculate actual height including safe area padding
           height: tabContainerHeight + bottomPadding,
           paddingBottom: bottomPadding,
         },
@@ -100,18 +97,16 @@ export function ScrollableTabBar(props: BottomTabBarProps) {
           styles.indicator,
           {
             backgroundColor: tintColor,
-            // Calculate width for indicator (e.g., 60% of tab item width, centered)
             width: getTabItemWidth(state.routes.length) * 0.6,
-            // Adjust translateX for centering the indicator within its tab
             transform: [
               {
                 translateX: indicatorTranslateX.interpolate({
-                  inputRange: [0, SCREEN_WIDTH], // Adjust inputRange if necessary based on max scroll
+                  inputRange: [0, SCREEN_WIDTH],
                   outputRange: [
-                    getTabItemWidth(state.routes.length) * 0.2, // Starting offset
-                    SCREEN_WIDTH + getTabItemWidth(state.routes.length) * 0.2, // Max offset
+                    getTabItemWidth(state.routes.length) * 0.2,
+                    SCREEN_WIDTH + getTabItemWidth(state.routes.length) * 0.2,
                   ],
-                  extrapolate: "clamp", // Prevent indicator from going beyond bounds
+                  extrapolate: "clamp",
                 }),
               },
             ],
@@ -125,11 +120,8 @@ export function ScrollableTabBar(props: BottomTabBarProps) {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={[
           styles.scrollViewContent,
-          // If fewer tabs than MAX_ICONS_VISIBLE, make them fill the screen width evenly
           state.routes.length <= MAX_ICONS_VISIBLE && { flexGrow: 1 },
         ]}
-        // Remove snapToInterval for smoother scrolling or adjust it carefully
-        // snapToInterval={getTabItemWidth(state.routes.length)} // Can cause issues if not perfectly aligned
         decelerationRate="fast"
         bounces={false}
       >
@@ -183,8 +175,8 @@ export function ScrollableTabBar(props: BottomTabBarProps) {
           return (
             <TouchableOpacity
               key={route.key}
-              accessibilityRole="tab" // ✅ Use "tab" here instead of "button"
-              accessibilityState={{ selected: isFocused, disabled: isDisabled }} // ✅ Show selected & disabled states
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isFocused, disabled: isDisabled }}
               onPress={onPress}
               onLongPress={onLongPress}
               style={[
@@ -201,7 +193,6 @@ export function ScrollableTabBar(props: BottomTabBarProps) {
                 style={[
                   styles.iconContainer,
                   {
-                    // Scale icon slightly when focused
                     transform: [
                       {
                         scale: isFocused ? 1.1 : 1,
@@ -230,7 +221,9 @@ export function ScrollableTabBar(props: BottomTabBarProps) {
                 numberOfLines={1}
                 allowFontScaling={false}
               >
-                {label.toString()}
+                {typeof label === "string"
+                  ? label
+                  : label?.toString() || route.name}
               </Text>
             </TouchableOpacity>
           );
@@ -242,37 +235,32 @@ export function ScrollableTabBar(props: BottomTabBarProps) {
 
 const styles = StyleSheet.create({
   container: {
-    // Styling of the overall tab bar container
     borderTopWidth: StyleSheet.hairlineWidth,
-    position: "relative", // Needed for absolute positioning of indicator
-    overflow: "hidden", // Helps with indicator animation
-    justifyContent: "flex-end", // Aligns content to the bottom
-    // The actual background and height are set dynamically in component
+    position: "relative",
+    overflow: "hidden",
+    justifyContent: "flex-end",
   },
   scrollViewContent: {
-    flexDirection: "row", // Ensure items are laid out horizontally
-    alignItems: "center", // Vertically center content in the scroll view
-    height: "100%", // Take full height of the container minus bottom padding
+    flexDirection: "row",
+    alignItems: "center",
+    height: "100%",
   },
   tabButton: {
-    flexDirection: "column", // Stack icon and label vertically
+    flexDirection: "column",
     justifyContent: "center",
     alignItems: "center",
     paddingVertical: 8,
-    // Width set dynamically in component
   },
   iconContainer: {
-    marginBottom: 2, // Space between icon and label
-    // No fixed height or width here, let icon size dictate it
+    marginBottom: 2,
   },
   label: {
     textAlign: "center",
   },
   indicator: {
     position: "absolute",
-    top: 0, // Position at the very top of the tab bar
+    top: 0,
     height: INDICATOR_HEIGHT,
     borderRadius: INDICATOR_HEIGHT / 2,
-    // Width and transform (left position) handled by Animated values
   },
 });

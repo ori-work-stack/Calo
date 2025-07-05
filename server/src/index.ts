@@ -2,6 +2,8 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
+import compression from "compression";
+import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
 import { errorHandler } from "./middleware/errorHandler";
 import { authRoutes } from "./routes/auth";
@@ -16,53 +18,87 @@ import "./services/cron";
 // Load environment variables
 dotenv.config();
 
+// Configuration
+const config = {
+  port: Number(process.env.PORT) || 3000,
+  nodeEnv: process.env.NODE_ENV || "development",
+  apiBaseUrl: process.env.API_BASE_URL,
+  clientUrl: process.env.CLIENT_URL,
+  openaiApiKey: process.env.OPENAI_API_KEY,
+  isDevelopment: process.env.NODE_ENV !== "production",
+  serverIp: process.env.SERVER_IP || "192.168.1.70",
+};
+
+// Derived configuration
+const apiOrigin = config.apiBaseUrl?.replace(/\/api$/, "");
+
+// Logging helper
+const log = {
+  info: (message: any, ...args: any) => console.log(`ℹ️  ${message}`, ...args),
+  warn: (message: any, ...args: any) => console.log(`⚠️  ${message}`, ...args),
+  success: (message: any, ...args: any) =>
+    console.log(`✅ ${message}`, ...args),
+  error: (message: any, ...args: any) => console.log(`❌ ${message}`, ...args),
+  rocket: (message: any, ...args: any) => console.log(`🚀 ${message}`, ...args),
+};
+
+// Initialize Express app
 const app = express();
-const PORT = Number(process.env.PORT) || 5000;
-const API_BASE_URL = process.env.API_BASE_URL; // e.g. "http://192.168.1.70:5000/api"
 
-// Extract base origin (without /api)
-const apiOrigin = API_BASE_URL ? API_BASE_URL.replace(/\/api$/, "") : null;
+// Trust proxy for accurate IP addresses
+app.set("trust proxy", 1);
 
-console.log(`API Base URL: ${API_BASE_URL}`);
-console.log("🚀 Starting server...");
-console.log("📊 Environment:", process.env.NODE_ENV || "development");
-console.log("🔌 Port:", PORT);
-
-// Check for OpenAI API key
-if (!process.env.OPENAI_API_KEY) {
-  console.log(
-    "⚠️  WARNING: No OpenAI API key found. AI features will use mock data."
-  );
-  console.log("💡 To enable AI features, set OPENAI_API_KEY in your .env file");
-} else {
-  console.log("✅ OpenAI API key found - AI features enabled");
-}
-
-app.use(helmet());
-
-// CORS configuration - replace all hardcoded IPs with apiOrigin if available
+// Security middleware
 app.use(
-  cors({
-    origin: [
-      process.env.CLIENT_URL || "http://localhost:8081",
-      "http://localhost:19006",
-      "http://localhost:19000",
-      apiOrigin || "http://192.168.1.70:19006",
-      apiOrigin || "http://192.168.1.70:8081",
-      // You can add more allowed origins if needed
-      "*", // (for development, remove this in production)
-    ],
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
+  helmet({
+    contentSecurityPolicy: config.isDevelopment ? false : undefined,
+    crossOriginEmbedderPolicy: false,
   })
 );
 
-// Cookie parser middleware - MUST be before routes
-app.use(cookieParser());
+// Compression middleware
+app.use(compression());
 
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: config.isDevelopment ? 1000 : 100, // requests per window
+  message: "Too many requests from this IP, please try again later.",
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(limiter);
+
+// CORS configuration
+const corsOptions = {
+  origin: [
+    config.clientUrl,
+    "http://localhost:19006",
+    "http://localhost:19000",
+    apiOrigin || `http://${config.serverIp}:19006`,
+    apiOrigin || `http://${config.serverIp}:8081`,
+    ...(config.isDevelopment ? ["*"] : []),
+  ].filter(Boolean) as string[],
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
+};
+
+app.use(cors(corsOptions));
+// Body parsing middleware
+app.use(cookieParser());
+app.use(
+  express.json({
+    limit: "10mb",
+    type: ["application/json", "text/plain"],
+  })
+);
+app.use(
+  express.urlencoded({
+    extended: true,
+    limit: "10mb",
+  })
+);
 
 // Health check endpoint
 app.get("/health", (req, res) => {
@@ -70,52 +106,106 @@ app.get("/health", (req, res) => {
     status: "healthy",
     timestamp: new Date().toISOString(),
     database: "supabase-postgresql",
-    environment: process.env.NODE_ENV || "development",
-    ip: req.ip,
-    openai_enabled: !!process.env.OPENAI_API_KEY,
+    environment: config.nodeEnv,
+    version: process.env.npm_package_version || "unknown",
+    uptime: process.uptime(),
+    openai_enabled: !!config.openaiApiKey,
   });
 });
 
-// Test endpoint for connectivity
+// Test endpoint
 app.get("/test", (req, res) => {
-  console.log("🧪 Test endpoint hit from:", req.ip);
+  log.info("Test endpoint accessed from:", req.ip);
   res.json({
     message: "Server is reachable!",
     timestamp: new Date().toISOString(),
     ip: req.ip,
     userAgent: req.headers["user-agent"],
     origin: req.headers.origin,
-    openai_enabled: !!process.env.OPENAI_API_KEY,
+    openai_enabled: !!config.openaiApiKey,
   });
 });
 
-// API routes
-app.use("/api/auth", authRoutes);
-app.use("/api/nutrition", nutritionRoutes);
-app.use("/api/user", userRoutes);
-app.use("/api/devices", deviceRoutes);
-app.use("/api/calendar", calendarRoutes);
-app.use("/api/meal-plans", mealPlanRoutes);
-app.use("/api", statisticsRoutes);
+// API routes with prefix
+const apiRouter = express.Router();
+apiRouter.use("/auth", authRoutes);
+apiRouter.use("/nutrition", nutritionRoutes);
+apiRouter.use("/user", userRoutes);
+apiRouter.use("/devices", deviceRoutes);
+apiRouter.use("/calendar", calendarRoutes);
+apiRouter.use("/meal-plans", mealPlanRoutes);
+apiRouter.use("/", statisticsRoutes);
 
-// Error handler
+app.use("/api", apiRouter);
+
+// 404 handler for undefined routes
+app.use("*", (req, res) => {
+  res.status(404).json({
+    error: "Route not found",
+    path: req.originalUrl,
+    method: req.method,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Error handler (must be last)
 app.use(errorHandler);
 
-// Start server - binding to 0.0.0.0 allows external connections
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📊 Database: Supabase PostgreSQL`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
-  console.log(`📱 Access from phone: http://192.168.1.70:${PORT}`);
-  console.log(`🍪 Cookie-based authentication enabled`);
-  console.log(`🧪 Test endpoint: http://192.168.1.70:${PORT}/test`);
-  console.log(`💚 Health check: http://192.168.1.70:${PORT}/health`);
+// Startup logging
+const logStartup = () => {
+  log.rocket("Starting server...");
+  log.info(`Environment: ${config.nodeEnv}`);
+  log.info(`Port: ${config.port}`);
+  log.info(`API Base URL: ${config.apiBaseUrl || "Not set"}`);
 
-  if (!process.env.OPENAI_API_KEY) {
-    console.log(
-      "⚠️  Note: AI features are using mock data. Add OPENAI_API_KEY to enable real AI analysis."
+  if (config.openaiApiKey) {
+    log.success("OpenAI API key found - AI features enabled");
+  } else {
+    log.warn("No OpenAI API key found. AI features will use mock data.");
+    log.info("To enable AI features, set OPENAI_API_KEY in your .env file");
+  }
+};
+
+// Graceful shutdown
+const gracefulShutdown = (signal: string) => {
+  log.info(`Received ${signal}, shutting down gracefully...`);
+  server.close(() => {
+    log.info("Server closed successfully");
+    process.exit(0);
+  });
+};
+
+// Start server
+const server = app.listen(config.port, "0.0.0.0", () => {
+  logStartup();
+  log.rocket(`Server running on port ${config.port}`);
+  log.info(`Database: Supabase PostgreSQL`);
+  log.info(`Environment: ${config.nodeEnv}`);
+  log.info(`Access from phone: http://${config.serverIp}:${config.port}`);
+  log.success("Cookie-based authentication enabled");
+  log.info(`Test endpoint: http://${config.serverIp}:${config.port}/test`);
+  log.info(`Health check: http://${config.serverIp}:${config.port}/health`);
+
+  if (!config.openaiApiKey) {
+    log.warn(
+      "Note: AI features are using mock data. Add OPENAI_API_KEY to enable real AI analysis."
     );
   }
+});
+
+// Handle process termination
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+
+// Handle uncaught exceptions
+process.on("uncaughtException", (error) => {
+  log.error("Uncaught Exception:", error);
+  process.exit(1);
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  log.error("Unhandled Rejection at:", promise, "reason:", reason);
+  process.exit(1);
 });
 
 export default app;

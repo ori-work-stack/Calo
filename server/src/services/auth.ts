@@ -3,18 +3,39 @@ import jwt from "jsonwebtoken";
 import { prisma } from "../lib/database";
 import { SignUpInput, SignInInput } from "../types/auth";
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+const JWT_SECRET = process.env.JWT_SECRET!;
 const JWT_EXPIRES_IN = "7d";
+const SESSION_EXPIRES_DAYS = 7;
+
+const userSelectFields = {
+  user_id: true,
+  email: true,
+  name: true,
+  subscription_type: true,
+  age: true,
+  weight_kg: true,
+  height_cm: true,
+  aiRequestsCount: true,
+  aiRequestsResetAt: true,
+  createdAt: true,
+};
+
+function generateToken(payload: object) {
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+}
+
+function getSessionExpiryDate() {
+  const date = new Date();
+  date.setDate(date.getDate() + SESSION_EXPIRES_DAYS);
+  return date;
+}
 
 export class AuthService {
   static async signUp(data: SignUpInput) {
     const { email, name, password, age, weight, height } = data;
 
-    // Check if user already exists
     const existingUser = await prisma.user.findFirst({
-      where: {
-        OR: [{ email }],
-      },
+      where: { OR: [{ email }] },
     });
 
     if (existingUser) {
@@ -25,10 +46,8 @@ export class AuthService {
       );
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Create user
     const user = await prisma.user.create({
       data: {
         email,
@@ -41,57 +60,20 @@ export class AuthService {
         aiRequestsCount: 0,
         aiRequestsResetAt: new Date(),
       },
-      select: {
-        user_id: true,
-        email: true,
-        name: true,
-        subscription_type: true,
-        age: true,
-        weight_kg: true,
-        height_cm: true,
-        aiRequestsCount: true,
-        createdAt: true,
-      },
+      select: userSelectFields,
     });
 
-    console.log("Data being passed to Prisma:", {
-      email,
-      name,
-      password_hash: hashedPassword,
-      subscription_type: "FREE",
-      age: Number(age),
-      weight_kg: weight,
-      height_cm: height,
-      aiRequestsCount: 0,
-      aiRequestsResetAt: new Date(),
-    });
+    if (process.env.NODE_ENV !== "production") {
+      console.log("✅ Created user:", user);
+    }
 
-    console.log("Types:", {
-      email: typeof email,
-      name: typeof name,
-      age: typeof Number(age),
-      weight_kg: typeof weight,
-      height_cm: typeof height,
-    });
-
-    // Generate JWT token
-    const token = jwt.sign(
-      { user_id: user.user_id, email: user.email },
-      JWT_SECRET,
-      {
-        expiresIn: JWT_EXPIRES_IN,
-      }
-    );
-
-    // Store session
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
+    const token = generateToken({ user_id: user.user_id, email: user.email });
 
     await prisma.session.create({
       data: {
         user_id: user.user_id,
         token,
-        expiresAt,
+        expiresAt: getSessionExpiryDate(),
       },
     });
 
@@ -101,39 +83,19 @@ export class AuthService {
   static async signIn(data: SignInInput) {
     const { email, password } = data;
 
-    // Find user
-    const user = await prisma.user.findUnique({
-      where: { email },
-    });
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) throw new Error("Invalid email or password");
 
-    if (!user) {
-      throw new Error("Invalid email or password");
-    }
+    const isValid = await bcrypt.compare(password, user.password_hash);
+    if (!isValid) throw new Error("Invalid email or password");
 
-    // Verify password
-    const isValidPassword = await bcrypt.compare(password, user.password_hash);
-    if (!isValidPassword) {
-      throw new Error("Invalid email or password");
-    }
-
-    // Generate JWT token
-    const token = jwt.sign(
-      { user_id: user.user_id, email: user.email },
-      JWT_SECRET,
-      {
-        expiresIn: JWT_EXPIRES_IN,
-      }
-    );
-
-    // Store session
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
+    const token = generateToken({ user_id: user.user_id, email: user.email });
 
     await prisma.session.create({
       data: {
         user_id: user.user_id,
         token,
-        expiresAt,
+        expiresAt: getSessionExpiryDate(),
       },
     });
 
@@ -148,24 +110,19 @@ export class AuthService {
         email: string;
       };
 
-      // Check if session exists and is valid
+      if (
+        !decoded ||
+        typeof decoded !== "object" ||
+        !("user_id" in decoded) ||
+        !("email" in decoded)
+      ) {
+        throw new Error("Invalid token payload");
+      }
+
       const session = await prisma.session.findUnique({
         where: { token },
         include: {
-          user: {
-            select: {
-              user_id: true,
-              email: true,
-              name: true,
-              subscription_type: true,
-              age: true,
-              weight_kg: true,
-              height_cm: true,
-              aiRequestsCount: true,
-              aiRequestsResetAt: true,
-              createdAt: true,
-            },
-          },
+          user: { select: userSelectFields },
         },
       });
 
@@ -174,35 +131,32 @@ export class AuthService {
       }
 
       return session.user;
-    } catch (error) {
+    } catch {
       throw new Error("Invalid token");
     }
   }
 
   static async signOut(token: string) {
-    await prisma.session.deleteMany({
-      where: { token },
-    });
+    await prisma.session.deleteMany({ where: { token } });
   }
 
   static async getRolePermissions(role: string) {
     const permissions = {
-      FREE: { dailyRequests: 10 },  
+      FREE: { dailyRequests: 10 },
       PREMIUM: { dailyRequests: 50 },
-      GOLD: { dailyRequests: -1 }, // Unlimited
+      GOLD: { dailyRequests: -1 },
     };
 
-    return permissions[role as keyof typeof permissions] || permissions.FREE;
+    return permissions[role as keyof typeof permissions] ?? permissions.FREE;
   }
 
-  // Helper method to create secure cookie options
   static getCookieOptions() {
     return {
-      httpOnly: true, // Prevent XSS attacks
-      secure: process.env.NODE_ENV === "production", // HTTPS only in production
-      sameSite: "lax" as const, // CSRF protection
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
-      path: "/", // Available on all paths
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax" as const,
+      maxAge: SESSION_EXPIRES_DAYS * 24 * 60 * 60 * 1000,
+      path: "/",
     };
   }
 }

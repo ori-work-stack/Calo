@@ -12,10 +12,7 @@ import {
   RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useDispatch, useSelector } from "react-redux";
-import { RootState, AppDispatch } from "../../src/store";
-import axios from "axios";
-import { Platform } from "react-native";
+import { mealPlanAPI } from "@/src/services/api";
 
 interface MealTemplate {
   template_id: string;
@@ -55,21 +52,7 @@ interface MealPlanConfig {
   excluded_ingredients: string[];
 }
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
-
-// Get the correct API URL based on platform
-const getApiBaseUrl = () => {
-  if (Platform.OS === "web") {
-    return "http://localhost:5000/api";
-  } else {
-    return API_URL;
-  }
-};
-
 export default function RecommendedMenusScreen() {
-  const dispatch = useDispatch<AppDispatch>();
-  const { user } = useSelector((state: RootState) => state.auth);
-
   const [weeklyPlan, setWeeklyPlan] = useState<WeeklyMealPlan>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isCreatingPlan, setIsCreatingPlan] = useState(false);
@@ -80,6 +63,10 @@ export default function RecommendedMenusScreen() {
   const [selectedMeal, setSelectedMeal] = useState<MealTemplate | null>(null);
   const [currentDay, setCurrentDay] = useState("Monday");
   const [activePlanId, setActivePlanId] = useState<string | null>(null);
+  const [selectedMealDayTiming, setSelectedMealDayTiming] = useState<{
+    day: string;
+    timing: string;
+  } | null>(null);
   const [mealPlanConfig, setMealPlanConfig] = useState<MealPlanConfig>({
     name: "My AI Meal Plan",
     meals_per_day: 3,
@@ -108,178 +95,127 @@ export default function RecommendedMenusScreen() {
     "AFTERNOON_SNACK",
   ];
 
-  useEffect(() => {
-    loadMealPlan();
-  }, []);
-
-  const getAuthHeaders = async () => {
-    try {
-      if (Platform.OS === "web") {
-        return {}; // Cookies handled automatically
-      } else {
-        const { authAPI } = await import("../../src/services/api");
-        const token = await authAPI.getStoredToken();
-        return token ? { Authorization: `Bearer ${token}` } : {};
-      }
-    } catch (error) {
-      console.error("Error getting auth headers:", error);
-      return {};
-    }
-  };
-
-  const loadMealPlan = async () => {
-    try {
-      setIsLoading(true);
-
-      const headers = await getAuthHeaders();
-      const response = await axios.get(
-        `${getApiBaseUrl()}/meal-plans/current`,
-        {
-          headers,
-          withCredentials: Platform.OS === "web",
-        }
-      );
-
-      if (response.data.success) {
-        setWeeklyPlan(response.data.data);
-      }
-    } catch (error: any) {
-      console.error("💥 Error loading meal plan:", error);
-      if (
-        error.response?.status === 404 ||
-        error.response?.data?.error?.includes("No active meal plan")
-      ) {
-        // No meal plan exists yet - this is normal for new users
-        setWeeklyPlan({});
-      } else {
-        Alert.alert("Error", "Failed to load meal plan");
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const createAIMealPlan = async () => {
-    try {
-      setIsCreatingPlan(true);
-
-      const headers = await getAuthHeaders();
-      const response = await axios.post(
-        `${getApiBaseUrl()}/meal-plans/create`,
-        mealPlanConfig,
-        {
-          headers,
-          withCredentials: Platform.OS === "web",
-        }
-      );
-
-      if (response.data.success) {
-        setActivePlanId(response.data.data.plan_id);
-        Alert.alert(
-          "Success!",
-          "Your AI-powered meal plan has been created! 🎉",
-          [{ text: "OK", onPress: () => loadMealPlan() }]
-        );
-        setShowConfigModal(false);
-      }
-    } catch (error: any) {
-      console.error("💥 Error creating AI meal plan:", error);
-      const errorMessage =
-        error.response?.data?.error || "Failed to create meal plan";
-      Alert.alert("Error", errorMessage);
-    } finally {
-      setIsCreatingPlan(false);
-    }
-  };
-
   const onRefresh = async () => {
     setRefreshing(true);
     await loadMealPlan();
     setRefreshing(false);
   };
 
-  const handleMealPress = (meal: MealTemplate) => {
+  const handleMealPress = (meal: MealTemplate, day: string, timing: string) => {
     setSelectedMeal(meal);
+    setSelectedMealDayTiming({ day, timing });
     setShowMealModal(true);
   };
+  useEffect(() => {
+    loadMealPlan();
+  }, []);
 
+  const loadMealPlan = async () => {
+    try {
+      setIsLoading(true);
+      const result = await mealPlanAPI.loadMealPlan();
+
+      if (result.success) {
+        const planData = result.data;
+        setWeeklyPlan(planData.weeklyPlan || {});
+        setActivePlanId(planData.planId || null);
+      } else {
+        console.warn("❌ loadMealPlan failed:", result.error);
+        setWeeklyPlan({});
+        setActivePlanId(null);
+      }
+    } catch (error) {
+      console.error("💥 Unexpected error in loadMealPlan:", error);
+      Alert.alert("Error", "Failed to load meal plan");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Create a new AI meal plan
+  const createAIMealPlan = async () => {
+    try {
+      setIsCreatingPlan(true);
+      const result = await mealPlanAPI.createAIMealPlan(mealPlanConfig);
+
+      if (result.success) {
+        setActivePlanId(result.data.plan_id || result.data.planId);
+        Alert.alert("Success!", "Your AI-powered meal plan has been created!", [
+          { text: "OK", onPress: () => loadMealPlan() },
+        ]);
+        setShowConfigModal(false);
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error: any) {
+      console.error("💥 createAIMealPlan error:", error);
+      Alert.alert("Error", error.message || "Failed to create meal plan");
+    } finally {
+      setIsCreatingPlan(false);
+    }
+  };
+
+  // Replace selected meal
   const handleReplaceMeal = async () => {
-    if (!selectedMeal || !activePlanId) {
-      Alert.alert("Error", "Unable to replace meal at this time");
+    if (!selectedMeal || !activePlanId || !selectedMealDayTiming) {
+      Alert.alert("Error", "Missing selected meal data");
       return;
     }
 
     try {
       setIsReplacingMeal(true);
-
-      // Find the day and timing for this meal
-      const dayIndex = dayNames.indexOf(currentDay);
-
-      const headers = await getAuthHeaders();
-      const response = await axios.put(
-        `${getApiBaseUrl()}/meal-plans/${activePlanId}/replace`,
-        {
-          day_of_week: dayIndex,
-          meal_timing: selectedMeal.meal_timing,
-          meal_order: 1,
-          preferences: {
-            dietary_category: selectedMeal.dietary_category,
-            max_prep_time: 45,
-          },
+      const dayIndex = dayNames.indexOf(selectedMealDayTiming.day);
+      const payload = {
+        day_of_week: dayIndex,
+        meal_timing: selectedMeal.meal_timing,
+        meal_order: 1,
+        preferences: {
+          dietary_category: selectedMeal.dietary_category,
+          max_prep_time: selectedMeal.prep_time_minutes || 45,
         },
-        {
-          headers,
-          withCredentials: Platform.OS === "web",
-        }
-      );
+      };
 
-      if (response.data.success) {
-        Alert.alert(
-          "Success!",
-          "Meal replaced with AI-generated alternative! 🔄"
-        );
+      const result = await mealPlanAPI.replaceMeal(activePlanId, payload);
+
+      if (result.success) {
+        Alert.alert("Success!", "Meal replaced with AI suggestion!");
         setShowMealModal(false);
         await loadMealPlan();
+      } else {
+        throw new Error(result.error);
       }
     } catch (error: any) {
-      console.error("💥 Error replacing meal:", error);
-      Alert.alert("Error", "Failed to replace meal");
+      console.error("💥 handleReplaceMeal error:", error);
+      Alert.alert("Error", error.message || "Failed to replace meal");
     } finally {
       setIsReplacingMeal(false);
     }
   };
 
+  // Mark meal as favorite
   const handleMarkFavorite = async () => {
     if (!selectedMeal) return;
 
     try {
-      const headers = await getAuthHeaders();
-      await axios.post(
-        `${getApiBaseUrl()}/meal-plans/preferences`,
-        {
-          template_id: selectedMeal.template_id,
-          preference_type: "favorite",
-          rating: 5,
-        },
-        {
-          headers,
-          withCredentials: Platform.OS === "web",
-        }
+      const result = await mealPlanAPI.markMealAsFavorite(
+        selectedMeal.template_id
       );
 
-      Alert.alert(
-        "Success!",
-        "Meal marked as favorite! This will improve future AI recommendations. ❤️"
-      );
-    } catch (error) {
-      console.error("💥 Error marking favorite:", error);
-      Alert.alert("Error", "Failed to mark as favorite");
+      if (result.success) {
+        Alert.alert("Success", "Meal marked as favorite!");
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error: any) {
+      console.error("💥 handleMarkFavorite error:", error);
+      Alert.alert("Error", error.message || "Failed to mark as favorite");
     }
   };
 
+  // Generate shopping list
   const generateShoppingList = async () => {
     if (!activePlanId) {
-      Alert.alert("Error", "No active meal plan found");
+      Alert.alert("Error", "No active meal plan");
       return;
     }
 
@@ -290,29 +226,27 @@ export default function RecommendedMenusScreen() {
       );
       const weekStartDate = startOfWeek.toISOString().split("T")[0];
 
-      const headers = await getAuthHeaders();
-      const response = await axios.post(
-        `${getApiBaseUrl()}/meal-plans/${activePlanId}/shopping-list`,
-        { week_start_date: weekStartDate },
-        {
-          headers,
-          withCredentials: Platform.OS === "web",
-        }
+      const result = await mealPlanAPI.generateShoppingList(
+        activePlanId,
+        weekStartDate
       );
 
-      if (response.data.success) {
+      if (result.success) {
+        const itemCount = result.data.items_json
+          ? Object.keys(result.data.items_json).length
+          : 0;
+        const totalCost = result.data.total_estimated_cost || 0;
+
         Alert.alert(
-          "Shopping List Generated! 🛒",
-          `Your shopping list has been created with ${
-            Object.keys(response.data.data.items_json).length
-          } categories. Estimated cost: $${
-            response.data.data.total_estimated_cost?.toFixed(2) || "0.00"
-          }`
+          "Shopping List Ready!",
+          `Items: ${itemCount}, Estimated Cost: $${totalCost.toFixed(2)}`
         );
+      } else {
+        throw new Error(result.error);
       }
-    } catch (error) {
-      console.error("💥 Error generating shopping list:", error);
-      Alert.alert("Error", "Failed to generate shopping list");
+    } catch (error: any) {
+      console.error("💥 generateShoppingList error:", error);
+      Alert.alert("Error", error.message || "Failed to generate shopping list");
     }
   };
 
@@ -360,32 +294,40 @@ export default function RecommendedMenusScreen() {
           styles.mealCard,
           { borderLeftColor: getCategoryColor(meal.dietary_category) },
         ]}
-        onPress={() => handleMealPress(meal)}
+        onPress={() => handleMealPress(meal, day, timing)}
       >
         {meal.image_url && (
-          <Image source={{ uri: meal.image_url }} style={styles.mealImage} />
+          <Image
+            source={{ uri: meal.image_url }}
+            style={styles.mealImage}
+            onError={(error) => console.log("Image load error:", error)}
+          />
         )}
 
         <View style={styles.mealContent}>
           <View style={styles.mealHeader}>
             <Text style={styles.mealName}>{meal.name}</Text>
             <View style={styles.mealBadges}>
-              <View
-                style={[
-                  styles.difficultyBadge,
-                  {
-                    backgroundColor: getDifficultyColor(meal.difficulty_level),
-                  },
-                ]}
-              >
-                <Text style={styles.badgeText}>
-                  {meal.difficulty_level === 1
-                    ? "Easy"
-                    : meal.difficulty_level === 2
-                    ? "Medium"
-                    : "Hard"}
-                </Text>
-              </View>
+              {meal.difficulty_level && (
+                <View
+                  style={[
+                    styles.difficultyBadge,
+                    {
+                      backgroundColor: getDifficultyColor(
+                        meal.difficulty_level
+                      ),
+                    },
+                  ]}
+                >
+                  <Text style={styles.badgeText}>
+                    {meal.difficulty_level === 1
+                      ? "Easy"
+                      : meal.difficulty_level === 2
+                      ? "Medium"
+                      : "Hard"}
+                  </Text>
+                </View>
+              )}
               <View
                 style={[
                   styles.categoryBadge,
@@ -399,31 +341,47 @@ export default function RecommendedMenusScreen() {
             </View>
           </View>
 
-          <Text style={styles.mealDescription}>{meal.description}</Text>
+          {meal.description && (
+            <Text style={styles.mealDescription} numberOfLines={2}>
+              {meal.description}
+            </Text>
+          )}
 
           <View style={styles.mealInfo}>
-            <View style={styles.infoItem}>
-              <Ionicons name="time-outline" size={16} color="#666" />
-              <Text style={styles.infoText}>{meal.prep_time_minutes} min</Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Ionicons name="flame-outline" size={16} color="#666" />
-              <Text style={styles.infoText}>
-                {Math.round(meal.calories || 0)} cal
-              </Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Ionicons name="fitness-outline" size={16} color="#666" />
-              <Text style={styles.infoText}>
-                {Math.round(meal.protein_g || 0)}g protein
-              </Text>
-            </View>
+            {meal.prep_time_minutes && (
+              <View style={styles.infoItem}>
+                <Ionicons name="time-outline" size={16} color="#666" />
+                <Text style={styles.infoText}>
+                  {meal.prep_time_minutes} min
+                </Text>
+              </View>
+            )}
+            {meal.calories && (
+              <View style={styles.infoItem}>
+                <Ionicons name="flame-outline" size={16} color="#666" />
+                <Text style={styles.infoText}>
+                  {Math.round(meal.calories)} cal
+                </Text>
+              </View>
+            )}
+            {meal.protein_g && (
+              <View style={styles.infoItem}>
+                <Ionicons name="fitness-outline" size={16} color="#666" />
+                <Text style={styles.infoText}>
+                  {Math.round(meal.protein_g)}g protein
+                </Text>
+              </View>
+            )}
           </View>
 
           <View style={styles.mealActions}>
             <TouchableOpacity
               style={styles.actionButton}
-              onPress={handleReplaceMeal}
+              onPress={() => {
+                setSelectedMeal(meal);
+                setSelectedMealDayTiming({ day, timing });
+                handleReplaceMeal();
+              }}
               disabled={isReplacingMeal}
             >
               {isReplacingMeal ? (
@@ -436,7 +394,10 @@ export default function RecommendedMenusScreen() {
 
             <TouchableOpacity
               style={styles.actionButton}
-              onPress={handleMarkFavorite}
+              onPress={() => {
+                setSelectedMeal(meal);
+                handleMarkFavorite();
+              }}
             >
               <Ionicons name="heart-outline" size={18} color="#FF6B6B" />
               <Text style={styles.actionText}>Favorite</Text>
@@ -501,43 +462,47 @@ export default function RecommendedMenusScreen() {
           >
             <Ionicons name="settings-outline" size={24} color="#007AFF" />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headerButton}
-            onPress={generateShoppingList}
-          >
-            <Ionicons name="list-outline" size={24} color="#007AFF" />
-          </TouchableOpacity>
+          {activePlanId && (
+            <TouchableOpacity
+              style={styles.headerButton}
+              onPress={generateShoppingList}
+            >
+              <Ionicons name="list-outline" size={24} color="#007AFF" />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
       {/* Compact Day Selector */}
-      <View style={styles.daySelector}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.daySelectorContent}
-        >
-          {dayNames.map((day) => (
-            <TouchableOpacity
-              key={day}
-              style={[
-                styles.dayButton,
-                currentDay === day && styles.dayButtonActive,
-              ]}
-              onPress={() => setCurrentDay(day)}
-            >
-              <Text
+      {Object.keys(weeklyPlan).length > 0 && (
+        <View style={styles.daySelector}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.daySelectorContent}
+          >
+            {dayNames.map((day) => (
+              <TouchableOpacity
+                key={day}
                 style={[
-                  styles.dayButtonText,
-                  currentDay === day && styles.dayButtonTextActive,
+                  styles.dayButton,
+                  currentDay === day && styles.dayButtonActive,
                 ]}
+                onPress={() => setCurrentDay(day)}
               >
-                {day.substring(0, 3)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
+                <Text
+                  style={[
+                    styles.dayButtonText,
+                    currentDay === day && styles.dayButtonTextActive,
+                  ]}
+                >
+                  {day.substring(0, 3)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
 
       {/* Meal Plan Content */}
       <ScrollView
@@ -589,12 +554,17 @@ export default function RecommendedMenusScreen() {
                     <Image
                       source={{ uri: selectedMeal.image_url }}
                       style={styles.modalImage}
+                      onError={(error) =>
+                        console.log("Modal image load error:", error)
+                      }
                     />
                   )}
 
-                  <Text style={styles.modalDescription}>
-                    {selectedMeal.description}
-                  </Text>
+                  {selectedMeal.description && (
+                    <Text style={styles.modalDescription}>
+                      {selectedMeal.description}
+                    </Text>
+                  )}
 
                   {/* Nutrition Info */}
                   <View style={styles.nutritionGrid}>
@@ -625,39 +595,50 @@ export default function RecommendedMenusScreen() {
                   </View>
 
                   {/* Ingredients */}
-                  <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Ingredients</Text>
-                    {selectedMeal.ingredients.map((ingredient, index) => (
-                      <Text key={index} style={styles.ingredientText}>
-                        • {ingredient.quantity} {ingredient.unit}{" "}
-                        {ingredient.name}
-                      </Text>
-                    ))}
-                  </View>
-
-                  {/* Instructions */}
-                  <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Instructions</Text>
-                    {selectedMeal.instructions.map((instruction, index) => (
-                      <Text key={index} style={styles.instructionText}>
-                        {instruction.step}. {instruction.text}
-                      </Text>
-                    ))}
-                  </View>
-
-                  {/* Allergens */}
-                  {selectedMeal.allergens.length > 0 && (
-                    <View style={styles.section}>
-                      <Text style={styles.sectionTitle}>Allergens</Text>
-                      <View style={styles.allergenContainer}>
-                        {selectedMeal.allergens.map((allergen, index) => (
-                          <View key={index} style={styles.allergenBadge}>
-                            <Text style={styles.allergenText}>{allergen}</Text>
-                          </View>
+                  {selectedMeal.ingredients &&
+                    selectedMeal.ingredients.length > 0 && (
+                      <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Ingredients</Text>
+                        {selectedMeal.ingredients.map((ingredient, index) => (
+                          <Text key={index} style={styles.ingredientText}>
+                            • {ingredient.quantity || ""}{" "}
+                            {ingredient.unit || ""}{" "}
+                            {ingredient.name || ingredient}
+                          </Text>
                         ))}
                       </View>
-                    </View>
-                  )}
+                    )}
+
+                  {/* Instructions */}
+                  {selectedMeal.instructions &&
+                    selectedMeal.instructions.length > 0 && (
+                      <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Instructions</Text>
+                        {selectedMeal.instructions.map((instruction, index) => (
+                          <Text key={index} style={styles.instructionText}>
+                            {instruction.step || index + 1}.{" "}
+                            {instruction.text || instruction}
+                          </Text>
+                        ))}
+                      </View>
+                    )}
+
+                  {/* Allergens */}
+                  {selectedMeal.allergens &&
+                    selectedMeal.allergens.length > 0 && (
+                      <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Allergens</Text>
+                        <View style={styles.allergenContainer}>
+                          {selectedMeal.allergens.map((allergen, index) => (
+                            <View key={index} style={styles.allergenBadge}>
+                              <Text style={styles.allergenText}>
+                                {allergen}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    )}
                 </ScrollView>
 
                 <View style={styles.modalActions}>
