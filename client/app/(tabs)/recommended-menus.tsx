@@ -137,22 +137,34 @@ export default function RecommendedMenusScreen() {
         {
           headers,
           withCredentials: Platform.OS === "web",
+          timeout: 10000, // 10 second timeout
         }
       );
 
       if (response.data.success) {
         setWeeklyPlan(response.data.data);
+        // Store the active plan ID for future operations
+        if (response.data.data && Object.keys(response.data.data).length > 0) {
+          // Extract plan ID if available in response
+          setActivePlanId(response.data.plan_id);
+        }
       }
     } catch (error: any) {
       console.error("💥 Error loading meal plan:", error);
       if (
         error.response?.status === 404 ||
-        error.response?.data?.error?.includes("No active meal plan")
+        error.response?.data?.error?.includes("No active meal plan") ||
+        error.code === 'ECONNREFUSED'
       ) {
         // No meal plan exists yet - this is normal for new users
         setWeeklyPlan({});
+        setActivePlanId(null);
+      } else if (error.code === 'ECONNABORTED') {
+        Alert.alert("Timeout", "Request timed out. Please check your connection and try again.");
+      } else if (error.response?.status === 401) {
+        Alert.alert("Authentication Error", "Please login again to access your meal plans.");
       } else {
-        Alert.alert("Error", "Failed to load meal plan");
+        Alert.alert("Error", "Failed to load meal plan. Please try again.");
       }
     } finally {
       setIsLoading(false);
@@ -204,9 +216,26 @@ export default function RecommendedMenusScreen() {
   };
 
   const handleReplaceMeal = async () => {
-    if (!selectedMeal || !activePlanId) {
-      Alert.alert("Error", "Unable to replace meal at this time");
+    if (!selectedMeal) {
+      Alert.alert("Error", "No meal selected for replacement");
       return;
+    }
+
+    // If we don't have an active plan ID, try to load the current plan first
+    if (!activePlanId) {
+      try {
+        setIsReplacingMeal(true);
+        await loadMealPlan();
+        if (!activePlanId) {
+          Alert.alert("Error", "No active meal plan found. Please create a meal plan first.");
+          return;
+        }
+      } catch (error) {
+        Alert.alert("Error", "Unable to access meal plan for replacement");
+        return;
+      } finally {
+        setIsReplacingMeal(false);
+      }
     }
 
     try {
@@ -214,6 +243,10 @@ export default function RecommendedMenusScreen() {
 
       // Find the day and timing for this meal
       const dayIndex = dayNames.indexOf(currentDay);
+      if (dayIndex === -1) {
+        Alert.alert("Error", "Invalid day selected");
+        return;
+      }
 
       const headers = await getAuthHeaders();
       const response = await axios.put(
@@ -230,6 +263,7 @@ export default function RecommendedMenusScreen() {
         {
           headers,
           withCredentials: Platform.OS === "web",
+          timeout: 30000, // 30 second timeout for AI operations
         }
       );
 
@@ -243,7 +277,13 @@ export default function RecommendedMenusScreen() {
       }
     } catch (error: any) {
       console.error("💥 Error replacing meal:", error);
-      Alert.alert("Error", "Failed to replace meal");
+      if (error.code === 'ECONNABORTED') {
+        Alert.alert("Timeout", "AI meal generation timed out. Please try again.");
+      } else if (error.response?.status === 429) {
+        Alert.alert("Limit Reached", "You've reached your daily AI meal plan limit. Upgrade for more!");
+      } else {
+        Alert.alert("Error", "Failed to replace meal. Please try again.");
+      }
     } finally {
       setIsReplacingMeal(false);
     }

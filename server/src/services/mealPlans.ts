@@ -386,6 +386,7 @@ export class MealPlanService {
               ...baseMeal,
               name: `${baseMeal.name} - ${day}`,
               meal_timing: timing,
+              image_url: baseMeal.image_url || undefined,
             };
           }),
       })),
