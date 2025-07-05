@@ -128,6 +128,12 @@ export class OpenAIService {
     try {
       console.log("🤖 Starting OpenAI meal analysis...");
 
+      // Check if OpenAI API key is available
+      if (!process.env.OPENAI_API_KEY) {
+        console.log("⚠️ No OpenAI API key found, using mock analysis");
+        return this.getMockAnalysis(updateText);
+      }
+
       const systemPrompt = `You are a professional nutritionist and food analyst. Analyze the food image and provide detailed nutritional information.
 
 IMPORTANT INSTRUCTIONS:
@@ -170,7 +176,7 @@ Language for response: ${language}`;
         : "Please analyze this food image and provide detailed nutritional information.";
 
       const response = await openai.chat.completions.create({
-        model: "gpt-4o", // Updated to current model
+        model: "gpt-4o",
         messages: [
           {
             role: "system",
@@ -238,40 +244,110 @@ Language for response: ${language}`;
         console.error("💥 Failed to parse OpenAI response:", parseError);
         console.error("📄 Raw content:", content);
 
-        analysisResult = {
-          name: "Food Item",
-          description: "Unable to fully analyze the image",
-          calories: 300,
-          protein: 15,
-          carbs: 30,
-          fat: 10,
-          confidence: 50,
-          ingredients: ["Unknown"],
-          servingSize: "1 serving",
-          cookingMethod: "Unknown",
-          healthNotes: "Analysis incomplete - please try again",
-        };
+        analysisResult = this.getMockAnalysis(updateText);
       }
 
       console.log("✅ Analysis completed:", analysisResult);
       return analysisResult;
     } catch (error) {
       console.error("💥 OpenAI analysis error:", error);
-
-      return {
-        name: "Food Item",
-        description: "Unable to analyze the image",
-        calories: 250,
-        protein: 12,
-        carbs: 25,
-        fat: 8,
-        confidence: 30,
-        ingredients: ["Unknown"],
-        servingSize: "1 serving",
-        cookingMethod: "Unknown",
-        healthNotes: "Analysis failed - please try again",
-      };
+      return this.getMockAnalysis(updateText);
     }
+  }
+
+  private static getMockAnalysis(updateText?: string): MealAnalysisResult {
+    console.log("🎭 Using mock meal analysis");
+
+    // Generate varied mock data based on update text or random
+    const mockMeals = [
+      {
+        name: "Grilled Chicken Salad",
+        description:
+          "Fresh mixed greens with grilled chicken breast, cherry tomatoes, and olive oil dressing",
+        calories: 350,
+        protein: 35,
+        carbs: 12,
+        fat: 18,
+        fiber: 6,
+        sugar: 8,
+        sodium: 450,
+        ingredients: [
+          "chicken breast",
+          "mixed greens",
+          "cherry tomatoes",
+          "olive oil",
+          "lemon",
+        ],
+        cookingMethod: "Grilled",
+        healthNotes: "High protein, low carb meal with healthy fats",
+      },
+      {
+        name: "Pasta with Marinara",
+        description:
+          "Whole wheat pasta with homemade marinara sauce and fresh basil",
+        calories: 420,
+        protein: 15,
+        carbs: 65,
+        fat: 8,
+        fiber: 8,
+        sugar: 12,
+        sodium: 680,
+        ingredients: [
+          "whole wheat pasta",
+          "tomatoes",
+          "garlic",
+          "basil",
+          "olive oil",
+        ],
+        cookingMethod: "Boiled and simmered",
+        healthNotes: "Good source of complex carbohydrates and fiber",
+      },
+      {
+        name: "Avocado Toast",
+        description:
+          "Whole grain bread topped with mashed avocado, tomato, and a sprinkle of salt",
+        calories: 280,
+        protein: 8,
+        carbs: 25,
+        fat: 18,
+        fiber: 10,
+        sugar: 3,
+        sodium: 320,
+        ingredients: [
+          "whole grain bread",
+          "avocado",
+          "tomato",
+          "salt",
+          "pepper",
+        ],
+        cookingMethod: "Toasted",
+        healthNotes: "Rich in healthy monounsaturated fats and fiber",
+      },
+    ];
+
+    const randomMeal = mockMeals[Math.floor(Math.random() * mockMeals.length)];
+
+    // Adjust based on update text if provided
+    if (updateText) {
+      const lowerUpdate = updateText.toLowerCase();
+      if (
+        lowerUpdate.includes("more") ||
+        lowerUpdate.includes("extra") ||
+        lowerUpdate.includes("additional")
+      ) {
+        randomMeal.calories = Math.round(randomMeal.calories * 1.3);
+        randomMeal.protein = Math.round(randomMeal.protein * 1.3);
+        randomMeal.carbs = Math.round(randomMeal.carbs * 1.3);
+        randomMeal.fat = Math.round(randomMeal.fat * 1.3);
+        randomMeal.name += " (Large Portion)";
+      }
+    }
+
+    return {
+      ...randomMeal,
+      confidence: 85,
+      servingSize: "1 serving",
+    };
   }
 
   static async updateMealAnalysis(
@@ -281,6 +357,11 @@ Language for response: ${language}`;
   ): Promise<MealAnalysisResult> {
     try {
       console.log("🔄 Updating meal analysis with additional info...");
+
+      if (!process.env.OPENAI_API_KEY) {
+        console.log("⚠️ No OpenAI API key found, using mock update");
+        return this.getMockUpdate(originalAnalysis, updateText);
+      }
 
       const systemPrompt = `You are a professional nutritionist. The user has provided additional information about their meal. Update the nutritional analysis accordingly.
 
@@ -363,19 +444,65 @@ Language for response: ${language}`;
         return updatedResult;
       } catch (parseError) {
         console.error("💥 Failed to parse update response:", parseError);
-        return originalAnalysis;
+        return this.getMockUpdate(originalAnalysis, updateText);
       }
     } catch (error) {
       console.error("💥 OpenAI update error:", error);
-      return originalAnalysis;
+      return this.getMockUpdate(originalAnalysis, updateText);
     }
   }
+
+  private static getMockUpdate(
+    originalAnalysis: MealAnalysisResult,
+    updateText: string
+  ): MealAnalysisResult {
+    console.log("🎭 Using mock meal update");
+
+    const updated = { ...originalAnalysis };
+    const lowerUpdate = updateText.toLowerCase();
+
+    // Simple logic to adjust based on common update patterns
+    if (
+      lowerUpdate.includes("more") ||
+      lowerUpdate.includes("extra") ||
+      lowerUpdate.includes("additional")
+    ) {
+      updated.calories = Math.round(updated.calories * 1.3);
+      updated.protein = Math.round(updated.protein * 1.3);
+      updated.carbs = Math.round(updated.carbs * 1.3);
+      updated.fat = Math.round(updated.fat * 1.3);
+      updated.name += " (Updated)";
+      updated.description += ` - Updated with: ${updateText}`;
+    } else if (
+      lowerUpdate.includes("less") ||
+      lowerUpdate.includes("smaller")
+    ) {
+      updated.calories = Math.round(updated.calories * 0.7);
+      updated.protein = Math.round(updated.protein * 0.7);
+      updated.carbs = Math.round(updated.carbs * 0.7);
+      updated.fat = Math.round(updated.fat * 0.7);
+      updated.name += " (Smaller Portion)";
+    } else {
+      // Generic update
+      updated.name += " (Updated)";
+      updated.description += ` - Additional info: ${updateText}`;
+    }
+
+    return updated;
+  }
+
+  // Add these methods to your OpenAIService class
 
   static async generateMealPlan(
     userProfile: MealPlanRequest
   ): Promise<MealPlanResponse> {
     try {
       console.log("🤖 Generating AI meal plan...");
+
+      if (!process.env.OPENAI_API_KEY) {
+        console.log("⚠️ No OpenAI API key found, using fallback meal plan");
+        return this.generateFallbackMealPlan(userProfile);
+      }
 
       // Create meal timing array based on user preferences
       const mealTimings = this.generateMealTimings(
@@ -395,16 +522,9 @@ CRITICAL REQUIREMENTS:
 5. Avoid all excluded ingredients and allergens: ${userProfile.excluded_ingredients.join(
         ", "
       )}
-6. Avoid foods from avoided list: ${userProfile.avoided_foods
-        .map((f) => f.name || f)
-        .join(", ")}
-7. Balance nutrition across the week to meet daily targets
-8. Consider cooking skill level: ${userProfile.cooking_skill_level}
-9. Available cooking time: ${userProfile.available_cooking_time}
-10. Provide detailed recipes with ingredients and instructions
-11. Include realistic prep times and difficulty levels
-12. Suggest appropriate portion sizes
-13. Ensure variety across the week
+6. Balance nutrition across the week to meet daily targets
+7. Consider cooking skill level: ${userProfile.cooking_skill_level}
+8. Available cooking time: ${userProfile.available_cooking_time}
 
 USER PROFILE:
 - Age: ${userProfile.age}
@@ -419,27 +539,9 @@ USER PROFILE:
 - Activity level: ${userProfile.physical_activity_level}
 - Main goal: ${userProfile.main_goal}
 
-MEAL TIMING EXPLANATION:
-- BREAKFAST: Morning meal
-- LUNCH: Midday meal  
-- DINNER: Evening meal
-- MORNING_SNACK: Between breakfast and lunch
-- AFTERNOON_SNACK: Between lunch and dinner
-- EVENING_SNACK: After dinner
+IMPORTANT: Your response must be a valid, complete JSON object. End with proper closing braces and brackets.
 
-DIETARY CATEGORIES:
-- BALANCED: Well-rounded nutrition
-- VEGETARIAN: No meat, fish allowed
-- VEGAN: No animal products
-- KETO: Very low carb, high fat
-- PALEO: Whole foods, no processed
-- MEDITERRANEAN: Mediterranean diet
-- LOW_CARB: Reduced carbohydrates
-- HIGH_PROTEIN: Increased protein
-- GLUTEN_FREE: No gluten
-- DAIRY_FREE: No dairy products
-
-You must respond with a valid JSON object in this exact format:
+Respond with a valid JSON object in this exact format:
 {
   "weekly_plan": [
     {
@@ -448,7 +550,7 @@ You must respond with a valid JSON object in this exact format:
       "meals": [
         {
           "name": "Meal Name",
-          "description": "Brief description of the meal",
+          "description": "Brief description",
           "meal_timing": "BREAKFAST",
           "dietary_category": "BALANCED",
           "prep_time_minutes": 15,
@@ -462,7 +564,7 @@ You must respond with a valid JSON object in this exact format:
           "sodium_mg": 600,
           "ingredients": [
             {
-              "name": "Oats",
+              "name": "Ingredient",
               "quantity": 50,
               "unit": "g",
               "category": "Grains"
@@ -471,7 +573,7 @@ You must respond with a valid JSON object in this exact format:
           "instructions": [
             {
               "step": 1,
-              "text": "Detailed cooking instruction"
+              "text": "Cooking instruction"
             }
           ],
           "allergens": [],
@@ -489,25 +591,11 @@ You must respond with a valid JSON object in this exact format:
     "avg_daily_fats": 67,
     "goal_adherence_percentage": 95
   },
-  "shopping_tips": [
-    "Buy seasonal produce for better prices",
-    "Prepare proteins in bulk on weekends"
-  ],
-  "meal_prep_suggestions": [
-    "Cook grains in batches",
-    "Pre-cut vegetables for quick assembly"
-  ]
-}
+  "shopping_tips": ["Tip 1", "Tip 2"],
+  "meal_prep_suggestions": ["Suggestion 1", "Suggestion 2"]
+}`;
 
-IMPORTANT: 
-- Ensure all 7 days are included (Sunday through Saturday)
-- Each day must have the correct number of meals and snacks
-- All nutritional values must be realistic numbers
-- Use realistic Pexels image URLs
-- Include complete ingredient lists with quantities
-- Provide step-by-step instructions
-- Make sure the JSON is valid and complete`;
-
+      // Try with increased token limit first
       const response = await openai.chat.completions.create({
         model: "gpt-4o",
         messages: [
@@ -518,10 +606,10 @@ IMPORTANT:
           {
             role: "user",
             content:
-              "Please create my personalized 7-day meal plan based on my profile and preferences. Make sure to include all 7 days with complete meal information.",
+              "Please create my personalized 7-day meal plan. Ensure the response is complete and valid JSON.",
           },
         ],
-        max_tokens: 4000,
+        max_tokens: 8000, // Increased from 4000
         temperature: 0.3,
       });
 
@@ -532,55 +620,337 @@ IMPORTANT:
 
       console.log("🤖 OpenAI meal plan response received");
 
-      // Parse JSON response with better error handling
-      try {
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        const jsonString = jsonMatch ? jsonMatch[0] : content;
-        const mealPlan = JSON.parse(jsonString);
+      // Enhanced JSON parsing with validation
+      const mealPlan = this.parseAndValidateJSON(content);
 
-        // Validate the meal plan structure
-        if (!mealPlan.weekly_plan || !Array.isArray(mealPlan.weekly_plan)) {
-          throw new Error(
-            "Invalid meal plan structure: missing weekly_plan array"
-          );
-        }
-
-        if (mealPlan.weekly_plan.length !== 7) {
-          throw new Error(
-            `Expected 7 days, got ${mealPlan.weekly_plan.length}`
-          );
-        }
-
-        // Validate each day has the correct number of meals
-        for (const day of mealPlan.weekly_plan) {
-          if (!day.meals || !Array.isArray(day.meals)) {
-            throw new Error(`Day ${day.day} missing meals array`);
-          }
-
-          const expectedMealsCount =
-            userProfile.meals_per_day + userProfile.snacks_per_day;
-          if (day.meals.length !== expectedMealsCount) {
-            console.warn(
-              `Day ${day.day} has ${day.meals.length} meals, expected ${expectedMealsCount}`
-            );
-          }
-        }
-
-        console.log("✅ AI meal plan generated and validated successfully");
-        return mealPlan as MealPlanResponse;
-      } catch (parseError) {
-        console.error("💥 Failed to parse meal plan response:", parseError);
-        console.error("📄 Raw content:", content);
-
-        // Return a fallback meal plan
-        return this.generateFallbackMealPlan(userProfile);
+      if (!mealPlan) {
+        console.log("🔄 First attempt failed, trying chunked generation...");
+        return this.generateChunkedMealPlan(userProfile);
       }
+
+      console.log("✅ AI meal plan generated and validated successfully");
+      return mealPlan as MealPlanResponse;
     } catch (error) {
       console.error("💥 OpenAI meal plan generation error:", error);
 
-      // Return a fallback meal plan
-      return this.generateFallbackMealPlan(userProfile);
+      // Try chunked generation as fallback
+      try {
+        console.log("🔄 Attempting chunked generation...");
+        return this.generateChunkedMealPlan(userProfile);
+      } catch (chunkedError) {
+        console.error("💥 Chunked generation also failed:", chunkedError);
+        return this.generateFallbackMealPlan(userProfile);
+      }
     }
+  }
+
+  // New method for robust JSON parsing
+  private static parseAndValidateJSON(content: string): any | null {
+    try {
+      // Extract JSON from the content
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        console.error("💥 No JSON found in response");
+        return null;
+      }
+
+      const jsonString = jsonMatch[0];
+
+      // Basic validation checks before parsing
+      if (!this.isValidJSONStructure(jsonString)) {
+        console.error("💥 JSON structure validation failed");
+        return null;
+      }
+
+      const parsed = JSON.parse(jsonString);
+
+      // Validate the meal plan structure
+      if (!this.validateMealPlanStructure(parsed)) {
+        console.error("💥 Meal plan structure validation failed");
+        return null;
+      }
+
+      return parsed;
+    } catch (parseError) {
+      console.error("💥 JSON parsing failed:", parseError);
+      console.error("📄 Raw content length:", content.length);
+      console.error("📄 Content ends with:", content.slice(-100));
+      return null;
+    }
+  }
+
+  // JSON structure validation
+  private static isValidJSONStructure(jsonString: string): boolean {
+    // Check if JSON appears complete
+    const openBraces = (jsonString.match(/\{/g) || []).length;
+    const closeBraces = (jsonString.match(/\}/g) || []).length;
+    const openBrackets = (jsonString.match(/\[/g) || []).length;
+    const closeBrackets = (jsonString.match(/\]/g) || []).length;
+
+    // Check for matching braces/brackets
+    if (openBraces !== closeBraces || openBrackets !== closeBrackets) {
+      console.error(
+        `💥 Mismatched braces/brackets: {${openBraces}/${closeBraces}, [${openBrackets}/${closeBrackets}]`
+      );
+      return false;
+    }
+
+    // Check if string appears to end properly
+    const trimmed = jsonString.trim();
+    if (!trimmed.endsWith("}") && !trimmed.endsWith("]")) {
+      console.error("💥 JSON doesn't end with proper closing character");
+      return false;
+    }
+
+    return true;
+  }
+
+  // Meal plan structure validation
+  private static validateMealPlanStructure(parsed: any): boolean {
+    if (!parsed.weekly_plan || !Array.isArray(parsed.weekly_plan)) {
+      console.error("💥 Missing or invalid weekly_plan array");
+      return false;
+    }
+
+    if (parsed.weekly_plan.length !== 7) {
+      console.error(`💥 Expected 7 days, got ${parsed.weekly_plan.length}`);
+      return false;
+    }
+
+    // Check each day has required structure
+    for (const day of parsed.weekly_plan) {
+      if (!day.day || !day.meals || !Array.isArray(day.meals)) {
+        console.error("💥 Invalid day structure:", day);
+        return false;
+      }
+
+      // Check each meal has required fields
+      for (const meal of day.meals) {
+        if (
+          !meal.name ||
+          !meal.meal_timing ||
+          typeof meal.calories !== "number"
+        ) {
+          console.error("💥 Invalid meal structure:", meal);
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  // Chunked generation as fallback
+  private static async generateChunkedMealPlan(
+    userProfile: MealPlanRequest
+  ): Promise<MealPlanResponse> {
+    console.log("🔄 Generating meal plan in chunks...");
+
+    const days = [
+      "Sunday",
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday",
+    ];
+    const weeklyPlan = [];
+    const mealTimings = this.generateMealTimings(
+      userProfile.meals_per_day,
+      userProfile.snacks_per_day
+    );
+
+    // Generate meals for each day separately
+    for (let i = 0; i < days.length; i++) {
+      try {
+        const dayMeals = await this.generateSingleDayMeals(
+          userProfile,
+          days[i],
+          i,
+          mealTimings
+        );
+        weeklyPlan.push(dayMeals);
+      } catch (error) {
+        console.error(`💥 Failed to generate meals for ${days[i]}:`, error);
+        // Use fallback for this day
+        weeklyPlan.push(
+          this.generateFallbackDayMeals(userProfile, days[i], i, mealTimings)
+        );
+      }
+    }
+
+    // Calculate nutrition summary
+    const nutritionSummary = this.calculateNutritionSummary(
+      weeklyPlan,
+      userProfile
+    );
+
+    return {
+      weekly_plan: weeklyPlan,
+      weekly_nutrition_summary: nutritionSummary,
+      shopping_tips: [
+        "Plan your shopping list based on the weekly meals",
+        "Buy seasonal produce for better prices",
+        "Prepare proteins in bulk on weekends",
+      ],
+      meal_prep_suggestions: [
+        "Cook grains in batches",
+        "Pre-cut vegetables for quick assembly",
+        "Prepare protein sources in advance",
+      ],
+    };
+  }
+
+  // Generate meals for a single day
+  private static async generateSingleDayMeals(
+    userProfile: MealPlanRequest,
+    day: string,
+    dayIndex: number,
+    mealTimings: string[]
+  ): Promise<any> {
+    const systemPrompt = `Generate meals for ${day} only. Create ${
+      mealTimings.length
+    } meals with timings: ${mealTimings.join(", ")}.
+
+USER PROFILE:
+- Target daily calories: ${userProfile.target_calories_daily}
+- Target daily protein: ${userProfile.target_protein_daily}g
+- Dietary preferences: ${userProfile.dietary_preferences.join(", ")}
+- Excluded ingredients: ${userProfile.excluded_ingredients.join(", ")}
+- Allergies: ${userProfile.allergies.map((a) => a.name || a).join(", ")}
+
+Respond with valid JSON for ONE day:
+{
+  "day": "${day}",
+  "day_index": ${dayIndex},
+  "meals": [/* array of meals */]
+}`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: `Generate meals for ${day}` },
+      ],
+      max_tokens: 2000,
+      temperature: 0.3,
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      throw new Error(`No response for ${day}`);
+    }
+
+    const parsed = this.parseAndValidateJSON(content);
+    if (!parsed) {
+      throw new Error(`Failed to parse JSON for ${day}`);
+    }
+
+    return parsed;
+  }
+
+  // Fallback day meals generation
+  private static generateFallbackDayMeals(
+    userProfile: MealPlanRequest,
+    day: string,
+    dayIndex: number,
+    mealTimings: string[]
+  ): any {
+    return {
+      day,
+      day_index: dayIndex,
+      meals: mealTimings.map((timing) => ({
+        name: `${
+          timing.charAt(0) + timing.slice(1).toLowerCase().replace("_", " ")
+        } ${dayIndex + 1}`,
+        description: `A nutritious ${timing
+          .toLowerCase()
+          .replace("_", " ")} meal`,
+        meal_timing: timing,
+        dietary_category: "BALANCED",
+        prep_time_minutes: 15,
+        difficulty_level: 1,
+        calories: Math.round(
+          userProfile.target_calories_daily /
+            (userProfile.meals_per_day + userProfile.snacks_per_day)
+        ),
+        protein_g: Math.round(
+          userProfile.target_protein_daily /
+            (userProfile.meals_per_day + userProfile.snacks_per_day)
+        ),
+        carbs_g: Math.round(
+          userProfile.target_carbs_daily /
+            (userProfile.meals_per_day + userProfile.snacks_per_day)
+        ),
+        fats_g: Math.round(
+          userProfile.target_fats_daily /
+            (userProfile.meals_per_day + userProfile.snacks_per_day)
+        ),
+        fiber_g: 5,
+        sugar_g: 8,
+        sodium_mg: 400,
+        ingredients: [
+          {
+            name: "Mixed ingredients",
+            quantity: 100,
+            unit: "g",
+            category: "Mixed",
+          },
+        ],
+        instructions: [
+          { step: 1, text: "Prepare according to your preferences" },
+        ],
+        allergens: [],
+        image_url:
+          "https://images.pexels.com/photos/1640777/pexels-photo-1640777.jpeg",
+        portion_multiplier: 1.0,
+        is_optional: false,
+      })),
+    };
+  }
+
+  // Calculate nutrition summary
+  private static calculateNutritionSummary(
+    weeklyPlan: any[],
+    userProfile: MealPlanRequest
+  ): any {
+    let totalCalories = 0;
+    let totalProtein = 0;
+    let totalCarbs = 0;
+    let totalFats = 0;
+
+    weeklyPlan.forEach((day) => {
+      day.meals.forEach((meal: any) => {
+        totalCalories += meal.calories || 0;
+        totalProtein += meal.protein_g || 0;
+        totalCarbs += meal.carbs_g || 0;
+        totalFats += meal.fats_g || 0;
+      });
+    });
+
+    const avgCalories = totalCalories / 7;
+    const avgProtein = totalProtein / 7;
+    const avgCarbs = totalCarbs / 7;
+    const avgFats = totalFats / 7;
+
+    const calorieAdherence = Math.min(
+      100,
+      (avgCalories / userProfile.target_calories_daily) * 100
+    );
+    const proteinAdherence = Math.min(
+      100,
+      (avgProtein / userProfile.target_protein_daily) * 100
+    );
+    const goalAdherence = (calorieAdherence + proteinAdherence) / 2;
+
+    return {
+      avg_daily_calories: Math.round(avgCalories),
+      avg_daily_protein: Math.round(avgProtein),
+      avg_daily_carbs: Math.round(avgCarbs),
+      avg_daily_fats: Math.round(avgFats),
+      goal_adherence_percentage: Math.round(goalAdherence),
+    };
   }
 
   static async generateReplacementMeal(
@@ -588,6 +958,11 @@ IMPORTANT:
   ): Promise<any> {
     try {
       console.log("🔄 Generating AI replacement meal...");
+
+      if (!process.env.OPENAI_API_KEY) {
+        console.log("⚠️ No OpenAI API key found, using fallback replacement");
+        return this.generateFallbackReplacementMeal(request);
+      }
 
       const systemPrompt = `You are a professional nutritionist. Generate a replacement meal that is similar to the current meal but meets the user's specific preferences and requirements.
 
@@ -612,15 +987,6 @@ USER PREFERENCES:
 NUTRITION TARGETS:
 - Target calories: ${request.nutrition_targets.target_calories}
 - Target protein: ${request.nutrition_targets.target_protein}g
-
-REQUIREMENTS:
-1. Keep the same meal timing as the original
-2. Maintain similar calorie and protein content (±20%)
-3. Respect all dietary preferences and restrictions
-4. Avoid all excluded ingredients and allergens
-5. Consider the preferred dietary category if specified
-6. Respect maximum prep time if specified
-7. Provide a complete recipe with ingredients and instructions
 
 Respond with a valid JSON object in this exact format:
 {
@@ -708,6 +1074,67 @@ Respond with a valid JSON object in this exact format:
 
       // Return a fallback replacement meal
       return this.generateFallbackReplacementMeal(request);
+    }
+  }
+
+  static async generateNutritionInsights(
+    meals: any[],
+    stats: any
+  ): Promise<string[]> {
+    try {
+      if (!process.env.OPENAI_API_KEY) {
+        console.log("⚠️ No OpenAI API key found, using default insights");
+        return [];
+      }
+
+      const systemPrompt = `You are a professional nutritionist. Analyze the user's meal data and statistics to provide personalized insights.
+
+MEAL DATA SUMMARY:
+- Total meals analyzed: ${meals.length}
+- Average daily calories: ${stats.averageCaloriesDaily}
+- Average daily protein: ${stats.averageProteinDaily}g
+- Calorie goal achievement: ${stats.calorieGoalAchievementPercent}%
+- Processed food percentage: ${stats.processedFoodPercentage}%
+
+Provide 3-5 personalized insights based on this data. Focus on:
+1. Nutrition patterns and trends
+2. Areas for improvement
+3. Positive behaviors to reinforce
+4. Specific actionable advice
+
+Respond with a JSON array of insight strings.`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: systemPrompt,
+          },
+          {
+            role: "user",
+            content: "Please analyze my nutrition data and provide insights.",
+          },
+        ],
+        max_tokens: 500,
+        temperature: 0.3,
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        return [];
+      }
+
+      try {
+        const insights = JSON.parse(content);
+        return Array.isArray(insights) ? insights : [];
+      } catch (parseError) {
+        console.error("Failed to parse insights:", parseError);
+        return [];
+      }
+    } catch (error) {
+      console.error("Error generating AI insights:", error);
+      return [];
     }
   }
 

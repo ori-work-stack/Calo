@@ -28,6 +28,16 @@ console.log("🚀 Starting server...");
 console.log("📊 Environment:", process.env.NODE_ENV || "development");
 console.log("🔌 Port:", PORT);
 
+// Check for OpenAI API key
+if (!process.env.OPENAI_API_KEY) {
+  console.log(
+    "⚠️  WARNING: No OpenAI API key found. AI features will use mock data."
+  );
+  console.log("💡 To enable AI features, set OPENAI_API_KEY in your .env file");
+} else {
+  console.log("✅ OpenAI API key found - AI features enabled");
+}
+
 app.use(helmet());
 
 // CORS configuration - replace all hardcoded IPs with apiOrigin if available
@@ -62,7 +72,7 @@ app.get("/health", (req, res) => {
     database: "supabase-postgresql",
     environment: process.env.NODE_ENV || "development",
     ip: req.ip,
-    headers: req.headers,
+    openai_enabled: !!process.env.OPENAI_API_KEY,
   });
 });
 
@@ -75,6 +85,7 @@ app.get("/test", (req, res) => {
     ip: req.ip,
     userAgent: req.headers["user-agent"],
     origin: req.headers.origin,
+    openai_enabled: !!process.env.OPENAI_API_KEY,
   });
 });
 
@@ -99,6 +110,12 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`🍪 Cookie-based authentication enabled`);
   console.log(`🧪 Test endpoint: http://192.168.1.70:${PORT}/test`);
   console.log(`💚 Health check: http://192.168.1.70:${PORT}/health`);
+
+  if (!process.env.OPENAI_API_KEY) {
+    console.log(
+      "⚠️  Note: AI features are using mock data. Add OPENAI_API_KEY to enable real AI analysis."
+    );
+  }
 });
 
 export default app;
