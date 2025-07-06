@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../lib/database";
-import { updateProfileSchema, updateSubscriptionSchema } from "../types/auth";
+import { updateProfileSchema } from "../types/auth";
 import { authenticateToken, AuthRequest } from "../middleware/auth";
 import { StatisticsService } from "../services/statistics";
 
@@ -25,51 +25,6 @@ router.put(
           weight_kg: true,
           height_cm: true,
           ai_requests_count: true,
-          is_questionnaire_completed: true,
-          created_at: true,
-        },
-      });
-
-      res.json({
-        success: true,
-        user: updatedUser,
-      });
-    } catch (error) {
-      if (error instanceof Error) {
-        res.status(400).json({
-          success: false,
-          error: error.message,
-        });
-      } else {
-        next(error);
-      }
-    }
-  }
-);
-
-router.put(
-  "/subscription",
-  authenticateToken,
-  async (req: AuthRequest, res, next) => {
-    try {
-      const validatedData = updateSubscriptionSchema.parse(req.body);
-
-      const updatedUser = await prisma.user.update({
-        where: { user_id: req.user.user_id },
-        data: {
-          subscription_type: validatedData.subscription_type,
-          subscription_start: new Date(),
-        },
-        select: {
-          user_id: true,
-          email: true,
-          name: true,
-          subscription_type: true,
-          age: true,
-          weight_kg: true,
-          height_cm: true,
-          ai_requests_count: true,
-          is_questionnaire_completed: true,
           created_at: true,
         },
       });
@@ -148,6 +103,209 @@ router.get(
         success: false,
         error: message,
       });
+    }
+  }
+);
+
+// Add these endpoints to your existing userRoutes file
+
+// EDIT USER ENDPOINT
+router.patch(
+  "/edit",
+  authenticateToken,
+  async (req: AuthRequest, res, next) => {
+    try {
+      // Only allow updating specific fields
+      const allowedFields = ["name", "age", "weight_kg", "height_cm"];
+      const updateData: any = {};
+
+      // Filter only allowed fields from request body
+      Object.keys(req.body).forEach((key) => {
+        if (allowedFields.includes(key) && req.body[key] !== undefined) {
+          updateData[key] = req.body[key];
+        }
+      });
+
+      // Check if there's anything to update
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: "No valid fields provided for update",
+        });
+      }
+
+      const updatedUser = await prisma.user.update({
+        where: { user_id: req.user.user_id },
+        data: updateData,
+        select: {
+          user_id: true,
+          email: true,
+          name: true,
+          subscription_type: true,
+          age: true,
+          weight_kg: true,
+          height_cm: true,
+          ai_requests_count: true,
+          created_at: true,
+        },
+      });
+
+      res.json({
+        success: true,
+        message: "User updated successfully",
+        user: updatedUser,
+      });
+    } catch (error) {
+      console.error("💥 Edit user error:", error);
+      if (error instanceof Error) {
+        res.status(400).json({
+          success: false,
+          error: error.message,
+        });
+      } else {
+        next(error);
+      }
+    }
+  }
+);
+
+// DELETE USER ENDPOINT (Permanent deletion with related data cleanup)
+router.delete(
+  "/delete",
+  authenticateToken,
+  async (req: AuthRequest, res, next) => {
+    try {
+      console.log(
+        "🗑️ Permanent delete user request for user:",
+        req.user.user_id
+      );
+
+      // Use a transaction to ensure all deletions succeed or fail together
+      await prisma.$transaction(async (tx) => {
+        // Delete all related data first (based on common nutrition app tables)
+
+        // Delete nutrition logs/entries
+        await tx.connectedDevice.deleteMany({
+          where: { user_id: req.user.user_id },
+        });
+
+        // Delete meal plans
+        await tx.userMealPlan.deleteMany({
+          where: { user_id: req.user.user_id },
+        });
+
+        // Delete user goals/targets
+        await tx.dailyActivitySummary.deleteMany({
+          where: { user_id: req.user.user_id },
+        });
+
+        // Delete user preferences/settings
+        await tx.userMealPreference.deleteMany({
+          where: { user_id: req.user.user_id },
+        });
+
+        // Delete user recipes
+        await tx.meal.deleteMany({
+          where: { user_id: req.user.user_id },
+        });
+
+        // Delete user workouts (if applicable)
+        // await tx.mealPlanSchedule.deleteMany({
+        //   where: { user_id: req.user.user_id },
+        // });
+
+        // Delete user progress tracking
+        await tx.userQuestionnaire.deleteMany({
+          where: { user_id: req.user.user_id },
+        });
+
+        // Delete user notifications
+        await tx.subscriptionPayment.deleteMany({
+          where: { user_id: req.user.user_id },
+        });
+
+        // Delete user sessions/tokens
+        await tx.shoppingList.deleteMany({
+          where: { user_id: req.user.user_id },
+        });
+
+        // Delete user subscriptions/payments (if applicable)
+        await tx.nutritionPlan.deleteMany({
+          where: { user_id: req.user.user_id },
+        });
+
+        // Finally, delete the user
+        await tx.user.delete({
+          where: { user_id: req.user.user_id },
+        });
+
+        console.log(
+          "✅ Successfully deleted user and all related data:",
+          req.user.user_id
+        );
+      });
+
+      res.json({
+        success: true,
+        message: "User account and all related data permanently deleted",
+      });
+    } catch (error) {
+      console.error("💥 Delete user error:", error);
+      if (error instanceof Error) {
+        res.status(500).json({
+          success: false,
+          error: error.message,
+        });
+      } else {
+        next(error);
+      }
+    }
+  }
+);
+
+// GET USER PROFILE ENDPOINT
+router.get(
+  "/profile",
+  authenticateToken,
+  async (req: AuthRequest, res, next) => {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { user_id: req.user.user_id },
+        select: {
+          user_id: true,
+          email: true,
+          name: true,
+          subscription_type: true,
+          age: true,
+          weight_kg: true,
+          height_cm: true,
+          ai_requests_count: true,
+          ai_requests_reset_at: true,
+          created_at: true,
+        },
+      });
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          error: "User not found",
+        });
+      }
+
+      res.json({
+        success: true,
+        user: user,
+      });
+    } catch (error) {
+      console.error("💥 Get user profile error:", error);
+      if (error instanceof Error) {
+        res.status(400).json({
+          success: false,
+          error: error.message,
+        });
+      } else {
+        next(error);
+      }
     }
   }
 );

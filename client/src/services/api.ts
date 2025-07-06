@@ -799,6 +799,11 @@ export const userAPI = {
     return response.data;
   },
 
+  deleteProfile: async () => {
+    const response = await api.delete("/user/delete");
+    return response.data;
+  },
+
   updateSubscription: async (subscription_type: string) => {
     const response = await api.put("/user/subscription", { subscription_type });
     return response.data;

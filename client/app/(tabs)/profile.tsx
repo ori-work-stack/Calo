@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -16,6 +17,7 @@ import { router } from "expo-router";
 import { RootState, AppDispatch } from "@/src/store";
 import { signOut, forceSignOut } from "@/src/store/authSlice";
 import { Ionicons } from "@expo/vector-icons";
+import { authAPI, userAPI } from "@/src/services/api";
 
 interface ProfileFormData {
   name: string;
@@ -35,10 +37,10 @@ export default function ProfileScreen() {
   const [formData, setFormData] = useState<ProfileFormData>({
     name: user?.name || "",
     age: user?.age?.toString() || "",
-    gender: "",
+    gender: user?.gender || "",
     weight_kg: user?.weight_kg?.toString() || "",
     height_cm: user?.height_cm?.toString() || "",
-    health_goal: "",
+    health_goal: user?.health_goal || "",
   });
 
   // Notification settings
@@ -61,16 +63,36 @@ export default function ProfileScreen() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-
+  const [isSaving, setIsSaving] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
+  // Update form data when user changes
   useEffect(() => {
-    // Check if form data has changed
+    if (user) {
+      setFormData({
+        name: user.name || "",
+        age: user.age?.toString() || "",
+        gender: user.gender || "",
+        weight_kg: user.weight_kg?.toString() || "",
+        height_cm: user.height_cm?.toString() || "",
+        health_goal: user.health_goal || "",
+      });
+    }
+  }, [user]);
+
+  // Check for changes in form data
+  useEffect(() => {
+    if (!user) return;
+
     const originalData = {
-      name: user?.name || "",
-      age: user?.age?.toString() || "",
-      weight_kg: user?.weight_kg?.toString() || "",
-      height_cm: user?.height_cm?.toString() || "",
+      name: user.name || "",
+      age: user.age?.toString() || "",
+      gender: user.gender || "",
+      weight_kg: user.weight_kg?.toString() || "",
+      height_cm: user.height_cm?.toString() || "",
+      health_goal: user.health_goal || "",
     };
 
     const isChanged = Object.keys(originalData).some(
@@ -82,10 +104,44 @@ export default function ProfileScreen() {
     setHasChanges(isChanged);
   }, [formData, user]);
 
+  // Handle account deletion
+  const handleDeleteAccount = async () => {
+    try {
+      setIsDeleting(true);
+
+      // Call your API service
+      const response = await userAPI.deleteProfile();
+
+      if (response.success) {
+        // Show success message
+        Alert.alert("חשבון נמחק בהצלחה", "החשבון שלך נמחק לצמיתות מהמערכת", [
+          {
+            text: "אישור",
+            onPress: () => {
+              // Clear any stored tokens/data and sign out
+              dispatch(forceSignOut());
+              router.replace("/(auth)/signin");
+            },
+          },
+        ]);
+      } else {
+        throw new Error(response.error || "Failed to delete account");
+      }
+    } catch (error: any) {
+      console.error("Error deleting account:", error);
+      Alert.alert("שגיאה", error.message || "אירעה שגיאה במחיקת החשבון. נסה שנית.", [
+        { text: "אישור" },
+      ]);
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteModal(false);
+    }
+  };
+
   const handleSignOut = async () => {
     try {
       console.log("Starting signout process...");
-      const result = await dispatch(signOut());
+      const result = await dispatch(signOut()).unwrap();
       console.log("SignOut result:", result);
       router.replace("/(auth)/signin");
     } catch (error) {
@@ -97,37 +153,81 @@ export default function ProfileScreen() {
 
   const handleSaveChanges = async () => {
     try {
+      setIsSaving(true);
+
       // Validate required fields
       if (!formData.name || !formData.age) {
         Alert.alert("שגיאה", "אנא מלא את כל השדות הנדרשים");
         return;
       }
 
-      const updateData = {
-        name: formData.name,
-        age: parseInt(formData.age),
-        weight_kg: formData.weight_kg
-          ? parseFloat(formData.weight_kg)
-          : undefined,
-        height_cm: formData.height_cm
-          ? parseFloat(formData.height_cm)
-          : undefined,
+      // Validate age
+      const age = parseInt(formData.age);
+      if (isNaN(age) || age <= 0 || age > 120) {
+        Alert.alert("שגיאה", "אנא הכנס גיל תקין");
+        return;
+      }
+
+      // Validate weight if provided
+      if (formData.weight_kg && (isNaN(parseFloat(formData.weight_kg)) || parseFloat(formData.weight_kg) <= 0)) {
+        Alert.alert("שגיאה", "אנא הכנס משקל תקין");
+        return;
+      }
+
+      // Validate height if provided
+      if (formData.height_cm && (isNaN(parseFloat(formData.height_cm)) || parseFloat(formData.height_cm) <= 0)) {
+        Alert.alert("שגיאה", "אנא הכנס גובה תקין");
+        return;
+      }
+
+      const updateData: any = {
+        name: formData.name.trim(),
+        age: age,
       };
 
-      // Here you would call the API to update user profile
-      // await dispatch(updateProfile(updateData));
+      // Add optional fields only if they have values
+      if (formData.gender) {
+        updateData.gender = formData.gender;
+      }
+      if (formData.weight_kg) {
+        updateData.weight_kg = parseFloat(formData.weight_kg);
+      }
+      if (formData.height_cm) {
+        updateData.height_cm = parseFloat(formData.height_cm);
+      }
+      if (formData.health_goal) {
+        updateData.health_goal = formData.health_goal;
+      }
 
-      Alert.alert("הצלחה", "הפרטים עודכנו בהצלחה");
-      setIsEditing(false);
-      setHasChanges(false);
-    } catch (error) {
-      Alert.alert("שגיאה", "אירעה שגיאה בעדכון הפרטים");
+      // Call the API
+      const response = await userAPI.updateProfile(updateData);
+
+      if (response.success) {
+        Alert.alert("הצלחה", "הפרטים עודכנו בהצלחה");
+        setIsEditing(false);
+        setHasChanges(false);
+        // You might want to update the user in your Redux store here
+        // dispatch(updateUser(response.user));
+      } else {
+        throw new Error(response.error || "Failed to update profile");
+      }
+    } catch (error: any) {
+      console.error("Error updating profile:", error);
+      Alert.alert("שגיאה", error.message || "אירעה שגיאה בעדכון הפרטים");
+    } finally {
+      setIsSaving(false);
     }
   };
 
+  // Handle password change
   const handleChangePassword = async () => {
-    if (newPassword !== confirmPassword) {
-      Alert.alert("שגיאה", "הסיסמאות אינן תואמות");
+    if (!currentPassword.trim()) {
+      Alert.alert("שגיאה", "אנא הכנס את הסיסמה הנוכחית");
+      return;
+    }
+
+    if (!newPassword.trim()) {
+      Alert.alert("שגיאה", "אנא הכנס סיסמה חדשה");
       return;
     }
 
@@ -136,15 +236,34 @@ export default function ProfileScreen() {
       return;
     }
 
+    if (newPassword !== confirmPassword) {
+      Alert.alert("שגיאה", "הסיסמאות אינן תואמות");
+      return;
+    }
+
     try {
-      // Here you would call the API to change password
-      Alert.alert("הצלחה", "הסיסמה שונתה בהצלחה");
-      setShowPasswordModal(false);
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-    } catch (error) {
-      Alert.alert("שגיאה", "אירעה שגיאה בשינוי הסיסמה");
+      setIsChangingPassword(true);
+
+      // You'll need to add this method to your userAPI
+      const response = await userAPI.changePassword?.({
+        currentPassword,
+        newPassword,
+      });
+
+      if (response?.success) {
+        Alert.alert("הצלחה", "הסיסמה שונתה בהצלחה");
+        setShowPasswordModal(false);
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+      } else {
+        throw new Error(response?.error || "Failed to change password");
+      }
+    } catch (error: any) {
+      console.error("Error changing password:", error);
+      Alert.alert("שגיאה", error.message || "אירעה שגיאה בשינוי הסיסמה");
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
@@ -153,7 +272,7 @@ export default function ProfileScreen() {
       <Text style={styles.sectionTitle}>פרטי חשבון אישיים</Text>
 
       <View style={styles.infoRow}>
-        <Text style={styles.infoLabel}>שם מלא</Text>
+        <Text style={styles.infoLabel}>שם מלא *</Text>
         {isEditing ? (
           <TextInput
             style={styles.editInput}
@@ -167,7 +286,7 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.infoRow}>
-        <Text style={styles.infoLabel}>גיל</Text>
+        <Text style={styles.infoLabel}>גיל *</Text>
         {isEditing ? (
           <TextInput
             style={styles.editInput}
@@ -178,6 +297,50 @@ export default function ProfileScreen() {
           />
         ) : (
           <Text style={styles.infoValue}>{formData.age || "לא הוגדר"}</Text>
+        )}
+      </View>
+
+      <View style={styles.infoRow}>
+        <Text style={styles.infoLabel}>מין</Text>
+        {isEditing ? (
+          <View style={styles.segmentedControl}>
+            <TouchableOpacity
+              style={[
+                styles.segmentButton,
+                formData.gender === "male" && styles.segmentButtonActive,
+              ]}
+              onPress={() => setFormData({ ...formData, gender: "male" })}
+            >
+              <Text
+                style={[
+                  styles.segmentText,
+                  formData.gender === "male" && styles.segmentTextActive,
+                ]}
+              >
+                זכר
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.segmentButton,
+                formData.gender === "female" && styles.segmentButtonActive,
+              ]}
+              onPress={() => setFormData({ ...formData, gender: "female" })}
+            >
+              <Text
+                style={[
+                  styles.segmentText,
+                  formData.gender === "female" && styles.segmentTextActive,
+                ]}
+              >
+                נקבה
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <Text style={styles.infoValue}>
+            {formData.gender === "male" ? "זכר" : formData.gender === "female" ? "נקבה" : "לא הוגדר"}
+          </Text>
         )}
       </View>
 
@@ -221,15 +384,55 @@ export default function ProfileScreen() {
 
       <View style={styles.infoRow}>
         <Text style={styles.infoLabel}>יעד בריאותי כללי</Text>
-        <Text style={styles.infoValue}>
-          {formData.health_goal || "לא הוגדר"}
-        </Text>
+        {isEditing ? (
+          <TextInput
+            style={styles.editInput}
+            value={formData.health_goal}
+            onChangeText={(text) =>
+              setFormData({ ...formData, health_goal: text })
+            }
+            placeholder="הכנס יעד בריאותי"
+            multiline
+          />
+        ) : (
+          <Text style={styles.infoValue}>
+            {formData.health_goal || "לא הוגדר"}
+          </Text>
+        )}
       </View>
 
-      {(isEditing || hasChanges) && (
-        <TouchableOpacity style={styles.saveButton} onPress={handleSaveChanges}>
-          <Text style={styles.saveButtonText}>שמור שינויים</Text>
-        </TouchableOpacity>
+      {isEditing && (
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={[styles.saveButton, isSaving && styles.disabledButton]}
+            onPress={handleSaveChanges}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.saveButtonText}>שמור שינויים</Text>
+            )}
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={() => {
+              setIsEditing(false);
+              // Reset form data to original values
+              setFormData({
+                name: user?.name || "",
+                age: user?.age?.toString() || "",
+                gender: user?.gender || "",
+                weight_kg: user?.weight_kg?.toString() || "",
+                height_cm: user?.height_cm?.toString() || "",
+                health_goal: user?.health_goal || "",
+              });
+            }}
+          >
+            <Text style={styles.cancelButtonText}>ביטול</Text>
+          </TouchableOpacity>
+        </View>
       )}
     </View>
   );
@@ -282,6 +485,7 @@ export default function ProfileScreen() {
           value={mealReminders}
           onValueChange={setMealReminders}
           trackColor={{ false: "#767577", true: "#007AFF" }}
+          thumbColor={mealReminders ? "#fff" : "#f4f3f4"}
         />
       </View>
 
@@ -291,6 +495,7 @@ export default function ProfileScreen() {
           value={waterReminders}
           onValueChange={setWaterReminders}
           trackColor={{ false: "#767577", true: "#007AFF" }}
+          thumbColor={waterReminders ? "#fff" : "#f4f3f4"}
         />
       </View>
 
@@ -300,6 +505,7 @@ export default function ProfileScreen() {
           value={goalAlerts}
           onValueChange={setGoalAlerts}
           trackColor={{ false: "#767577", true: "#007AFF" }}
+          thumbColor={goalAlerts ? "#fff" : "#f4f3f4"}
         />
       </View>
     </View>
@@ -415,7 +621,7 @@ export default function ProfileScreen() {
       >
         <Ionicons name="trash-outline" size={20} color="#dc3545" />
         <Text style={[styles.actionButtonText, { color: "#dc3545" }]}>
-          ניהול חשבון
+          מחק חשבון
         </Text>
         <Ionicons name="chevron-forward" size={20} color="#999" />
       </TouchableOpacity>
@@ -451,12 +657,12 @@ export default function ProfileScreen() {
           onPress={() => setIsEditing(!isEditing)}
         >
           <Ionicons
-            name={isEditing ? "checkmark" : "create-outline"}
+            name={isEditing ? "close" : "create-outline"}
             size={20}
             color="#007AFF"
           />
           <Text style={styles.editButtonText}>
-            {isEditing ? "סיים עריכה" : "ערוך פרופיל"}
+            {isEditing ? "ביטול עריכה" : "ערוך פרופיל"}
           </Text>
         </TouchableOpacity>
       </View>
@@ -488,7 +694,7 @@ export default function ProfileScreen() {
 
             <TextInput
               style={styles.modalInput}
-              placeholder="סיסמה חדשה"
+              placeholder="סיסמה חדשה (לפחות 8 תווים)"
               value={newPassword}
               onChangeText={setNewPassword}
               secureTextEntry
@@ -505,15 +711,94 @@ export default function ProfileScreen() {
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setShowPasswordModal(false)}
+                onPress={() => {
+                  setShowPasswordModal(false);
+                  setCurrentPassword("");
+                  setNewPassword("");
+                  setConfirmPassword("");
+                }}
+                disabled={isChangingPassword}
               >
                 <Text style={styles.cancelButtonText}>ביטול</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalButton, styles.submitButton]}
+                style={[
+                  styles.modalButton,
+                  styles.submitButton,
+                  isChangingPassword && styles.disabledButton,
+                ]}
                 onPress={handleChangePassword}
+                disabled={isChangingPassword}
               >
-                <Text style={styles.submitButtonText}>שמור</Text>
+                {isChangingPassword ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.submitButtonText}>שמור</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Delete Account Modal */}
+      <Modal
+        visible={showDeleteModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowDeleteModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.deleteWarningIcon}>
+              <Ionicons name="warning" size={48} color="#dc3545" />
+            </View>
+
+            <Text style={styles.modalTitle}>מחיקת חשבון</Text>
+
+            <Text style={styles.deleteWarningText}>
+              בטוחים שאתם רוצים למחוק את החשבון?
+            </Text>
+
+            <Text style={styles.deleteWarningSubtext}>
+              פעולה זו לא ניתנת לביטול ותמחק את כל הנתונים שלך:
+            </Text>
+
+            <View style={styles.deleteWarningList}>
+              <Text style={styles.deleteWarningItem}>• כל המידע האישי</Text>
+              <Text style={styles.deleteWarningItem}>
+                • היסטוריית הארוחות
+              </Text>
+              <Text style={styles.deleteWarningItem}>• תוכניות התזונה</Text>
+              <Text style={styles.deleteWarningItem}>• רשימות הקניות</Text>
+              <Text style={styles.deleteWarningItem}>
+                • כל הנתונים האחרים
+              </Text>
+            </View>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setShowDeleteModal(false)}
+                disabled={isDeleting}
+              >
+                <Text style={styles.cancelButtonText}>ביטול</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.modalButton,
+                  styles.deleteButton,
+                  isDeleting && styles.disabledButton,
+                ]}
+                onPress={handleDeleteAccount}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.deleteButtonText}>מחק חשבון</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -524,7 +809,6 @@ export default function ProfileScreen() {
     </ScrollView>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -789,5 +1073,46 @@ const styles = StyleSheet.create({
   },
   bottomSpace: {
     height: 40,
+  },
+  deleteWarningIcon: {
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  deleteWarningText: {
+    fontSize: 18,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: 12,
+    color: "#333",
+  },
+  deleteWarningSubtext: {
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: 16,
+    color: "#666",
+    lineHeight: 20,
+  },
+  deleteWarningList: {
+    backgroundColor: "#f8f9fa",
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 24,
+  },
+  deleteWarningItem: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 4,
+    textAlign: "right",
+  },
+  deleteButton: {
+    backgroundColor: "#dc3545",
+    flex: 1,
+    marginLeft: 8,
+  },
+  deleteButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+    textAlign: "center",
   },
 });
