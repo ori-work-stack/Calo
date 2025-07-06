@@ -49,7 +49,7 @@ export interface User {
   subscription_type: string;
   aiRequestsCount: number;
   aiRequestsResetAt: string;
-  createdAt: string;
+  created_at: string;
 }
 
 // Updated Meal interface to match Prisma schema exactly
@@ -90,7 +90,7 @@ export interface Meal {
   cooking_method?: string | null;
   additives_json?: any;
   health_risk_notes?: string | null;
-  createdAt: string;
+  created_at: string;
 
   // Computed fields for compatibility
   name: string;

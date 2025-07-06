@@ -2,55 +2,68 @@ import { configureStore } from "@reduxjs/toolkit";
 import { persistStore, persistReducer } from "redux-persist";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
+import { Platform } from "react-native";
+
 import authReducer from "./authSlice";
 import mealReducer from "./mealSlice";
 import calendarReducer from "./calendarSlice";
 
-// Create secure storage adapter for redux-persist
-const createSecureStorage = () => {
-  // Helper function to sanitize keys for SecureStore
-  const sanitizeKey = (key: string): string => {
-    return key.replace(/[^a-zA-Z0-9._-]/g, "_");
-  };
+// Cross-platform storage adapter for redux-persist
+const createCrossPlatformStorage = () => {
+  if (Platform.OS === "web") {
+    return {
+      setItem: async (key: string, value: string) => {
+        localStorage.setItem(key, value);
+      },
+      getItem: async (key: string) => {
+        return localStorage.getItem(key);
+      },
+      removeItem: async (key: string) => {
+        localStorage.removeItem(key);
+      },
+    };
+  } else {
+    // For mobile, sanitize keys because SecureStore doesn't allow all chars
+    const sanitizeKey = (key: string): string =>
+      key.replace(/[^a-zA-Z0-9._-]/g, "_");
 
-  return {
-    setItem: async (key: string, value: string) => {
-      const sanitizedKey = sanitizeKey(key);
-      await SecureStore.setItemAsync(sanitizedKey, value);
-    },
-    getItem: async (key: string) => {
-      const sanitizedKey = sanitizeKey(key);
-      const result = await SecureStore.getItemAsync(sanitizedKey);
-      return result;
-    },
-    removeItem: async (key: string) => {
-      const sanitizedKey = sanitizeKey(key);
-      await SecureStore.deleteItemAsync(sanitizedKey);
-    },
-  };
+    return {
+      setItem: async (key: string, value: string) => {
+        const sanitizedKey = sanitizeKey(key);
+        await SecureStore.setItemAsync(sanitizedKey, value);
+      },
+      getItem: async (key: string) => {
+        const sanitizedKey = sanitizeKey(key);
+        return await SecureStore.getItemAsync(sanitizedKey);
+      },
+      removeItem: async (key: string) => {
+        const sanitizedKey = sanitizeKey(key);
+        await SecureStore.deleteItemAsync(sanitizedKey);
+      },
+    };
+  }
 };
 
-const secureStorage = createSecureStorage();
+const crossPlatformStorage = createCrossPlatformStorage();
 
-// Auth config using SecureStore for sensitive data
+// Auth config uses cross-platform storage (SecureStore on mobile, localStorage on web)
 const authPersistConfig = {
   key: "auth",
-  storage: secureStorage,
+  storage: crossPlatformStorage,
   whitelist: ["user", "token", "isAuthenticated"],
 };
 
-// Meal config using regular AsyncStorage (not sensitive data)
+// Meal and Calendar configs use AsyncStorage (no sensitive data)
 const mealPersistConfig = {
   key: "meal",
   storage: AsyncStorage,
   whitelist: ["meals"],
 };
 
-// Calendar config using regular AsyncStorage (not sensitive data)
 const calendarPersistConfig = {
   key: "calendar",
   storage: AsyncStorage,
-  whitelist: ["calendarData"], // Only persist calendar data, not loading states
+  whitelist: ["calendarData"],
 };
 
 const persistedAuthReducer = persistReducer(authPersistConfig, authReducer);

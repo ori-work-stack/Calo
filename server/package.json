@@ -13,7 +13,6 @@
     "db:seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@prisma/client": "^6.11.0",
     "bcryptjs": "^2.4.3",
     "compression": "^1.8.0",
     "cookie-parser": "^1.4.7",
@@ -28,6 +27,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@prisma/client": "^6.11.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/compression": "^1.8.1",
     "@types/cookie-parser": "^1.4.9",
@@ -36,7 +36,9 @@
     "@types/jsonwebtoken": "^9.0.6",
     "@types/node": "^20.10.0",
     "@types/node-cron": "^3.0.11",
-    "prisma": "^6.11.0",
+    "i": "^0.3.7",
+    "npm": "^11.4.2",
+    "prisma": "^6.11.1",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3"
   },

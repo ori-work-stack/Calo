@@ -8,11 +8,11 @@ import dotenv from "dotenv";
 import { errorHandler } from "./middleware/errorHandler";
 import { authRoutes } from "./routes/auth";
 import { nutritionRoutes } from "./routes/nutrition";
-import { userRoutes } from "./routes/user";
 import { calendarRoutes } from "./routes/calendar";
 import { deviceRoutes } from "./routes/devices";
-import { mealPlanRoutes } from "./routes/mealPlans";
+import { userRoutes } from "./routes/user";
 import statisticsRoutes from "./routes/statistics";
+import { mealPlanRoutes } from "./routes/mealPlans";
 import "./services/cron";
 
 // Load environment variables

@@ -10,6 +10,7 @@ import {
   ScrollView,
   TextInput,
   Modal,
+  Platform,
 } from "react-native";
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
@@ -45,6 +46,19 @@ export default function CameraScreen() {
       ]);
     }
   }, [error, dispatch]);
+
+  // Request media library permissions on mount
+  useEffect(() => {
+    (async () => {
+      if (Platform.OS !== "web") {
+        const { status } =
+          await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== "granted") {
+          console.log("Media library permission not granted");
+        }
+      }
+    })();
+  }, []);
 
   if (!permission) {
     return <View />;
@@ -88,47 +102,55 @@ export default function CameraScreen() {
   };
 
   const pickImage = async () => {
-    if (isAnalyzing) return;
-
     try {
-      console.log("🖼️ Opening image picker...");
+      console.log("🖼️ Attempting to pick image...");
+
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
         base64: true,
+        exif: false,
       });
 
-      if (!result.canceled && result.assets[0]) {
+      console.log("📋 Image picker result:", result);
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
-        console.log("✅ Image selected, processing...");
 
         if (asset.base64) {
-          setPostedMealId(null); // Reset posted meal ID
+          console.log("✅ Image selected, starting analysis...");
+          setPostedMealId(null);
           dispatch(analyzeMeal(asset.base64));
         } else {
-          Alert.alert("Error", "Failed to process selected image");
+          console.error("❌ No base64 data in selected image");
+          Alert.alert("Error", "Failed to process the selected image.");
         }
+      } else {
+        console.log("📱 User canceled image selection");
       }
     } catch (error) {
-      console.error("💥 Image picker error:", error);
-      Alert.alert("Error", "Failed to select image");
+      console.error("💥 Error in pickImage:", error);
+      Alert.alert("Error", "Failed to open photo library. Please try again.");
     }
   };
 
   const handlePost = async () => {
     if (pendingMeal && !isPosting) {
       const result = await dispatch(postMeal());
+
       if (postMeal.fulfilled.match(result)) {
-        // Store the meal ID from the posted meal
         const mealId =
           result.payload?.id || result.payload?.meal_id?.toString();
+
         setPostedMealId(mealId);
+
         Alert.alert(
           "Success",
           "Meal posted successfully! You can now update it if needed."
         );
+      } else {
+        console.warn("Meal post failed:", result.payload);
       }
     }
   };
@@ -211,6 +233,7 @@ export default function CameraScreen() {
             <TouchableOpacity
               style={styles.closeButton}
               onPress={() => setShowCamera(false)}
+              activeOpacity={0.7}
             >
               <Ionicons name="close" size={30} color="white" />
             </TouchableOpacity>
@@ -220,6 +243,7 @@ export default function CameraScreen() {
               onPress={() =>
                 setFacing((current) => (current === "back" ? "front" : "back"))
               }
+              activeOpacity={0.7}
             >
               <Ionicons name="camera-reverse" size={30} color="white" />
             </TouchableOpacity>
@@ -228,6 +252,7 @@ export default function CameraScreen() {
               style={styles.captureButton}
               onPress={takePicture}
               disabled={isAnalyzing}
+              activeOpacity={0.7}
             >
               <View
                 style={[
@@ -335,6 +360,7 @@ export default function CameraScreen() {
               style={[styles.actionButton, styles.discardButton]}
               onPress={handleDiscard}
               disabled={isPosting || isUpdating}
+              activeOpacity={0.7}
             >
               <Text style={styles.discardButtonText}>
                 {isPosted ? "Clear" : "Discard"}
@@ -346,6 +372,7 @@ export default function CameraScreen() {
                 style={[styles.actionButton, styles.postButton]}
                 onPress={handlePost}
                 disabled={isPosting || isUpdating}
+                activeOpacity={0.7}
               >
                 {isPosting ? (
                   <ActivityIndicator color="white" />
@@ -358,6 +385,7 @@ export default function CameraScreen() {
                 style={[styles.actionButton, styles.updateButton]}
                 onPress={handleUpdate}
                 disabled={isPosting || isUpdating}
+                activeOpacity={0.7}
               >
                 {isUpdating ? (
                   <ActivityIndicator color="white" size="small" />
@@ -400,6 +428,7 @@ export default function CameraScreen() {
                   style={[styles.modalButton, styles.cancelButton]}
                   onPress={handleUpdateCancel}
                   disabled={isUpdating}
+                  activeOpacity={0.7}
                 >
                   <Text style={styles.cancelButtonText}>Cancel</Text>
                 </TouchableOpacity>
@@ -408,6 +437,7 @@ export default function CameraScreen() {
                   style={[styles.modalButton, styles.submitButton]}
                   onPress={handleUpdateSubmit}
                   disabled={!updateText.trim() || isUpdating}
+                  activeOpacity={0.7}
                 >
                   {isUpdating ? (
                     <ActivityIndicator color="white" size="small" />
@@ -442,6 +472,7 @@ export default function CameraScreen() {
           style={[styles.cameraButton, isAnalyzing && styles.buttonDisabled]}
           onPress={() => setShowCamera(true)}
           disabled={isAnalyzing}
+          activeOpacity={0.7}
         >
           <Ionicons name="camera" size={30} color="white" />
           <Text style={styles.buttonText}>Take Photo</Text>
@@ -449,8 +480,12 @@ export default function CameraScreen() {
 
         <TouchableOpacity
           style={[styles.galleryButton, isAnalyzing && styles.buttonDisabled]}
-          onPress={pickImage}
+          onPress={() => {
+            console.log("🔘 Gallery button pressed!");
+            pickImage();
+          }}
           disabled={isAnalyzing}
+          activeOpacity={0.7}
         >
           <Ionicons name="images" size={30} color="#007AFF" />
           <Text style={styles.galleryButtonText}>Choose from Gallery</Text>
@@ -540,15 +575,23 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     flexDirection: "row",
     justifyContent: "center",
+    minHeight: 60,
   },
   galleryButton: {
     borderWidth: 2,
     borderColor: "#007AFF",
+    backgroundColor: "white",
     padding: 20,
     borderRadius: 12,
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "center",
+    minHeight: 60,
+    elevation: 2, // Android shadow
+    shadowColor: "#000", // iOS shadow
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   buttonDisabled: {
     opacity: 0.5,
@@ -654,6 +697,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
     marginHorizontal: 3,
+    minHeight: 50,
+    justifyContent: "center",
   },
   discardButton: {
     backgroundColor: "#f8f9fa",
@@ -725,6 +770,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
     marginHorizontal: 5,
+    minHeight: 50,
+    justifyContent: "center",
   },
   cancelButton: {
     backgroundColor: "#f8f9fa",

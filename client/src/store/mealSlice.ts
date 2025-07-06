@@ -34,7 +34,7 @@ const initialState: MealState = {
 const PENDING_MEAL_KEY = "pendingMeal";
 
 // Helper function to compress/resize image if needed
-const processImage = async (imageUri: string): Promise<string> => {
+export const processImage = async (imageUri: string): Promise<string> => {
   if (Platform.OS === "web") {
     try {
       console.log("Processing web image:", imageUri);

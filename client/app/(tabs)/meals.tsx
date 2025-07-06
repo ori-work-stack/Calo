@@ -105,7 +105,7 @@ export default function MealsScreen() {
           <Text style={styles.mealDescription}>{item.description}</Text>
         )}
         <Text style={styles.mealDate}>
-          {new Date(item.createdAt).toLocaleDateString("en-US", {
+          {new Date(item.created_at).toLocaleDateString("en-US", {
             month: "short",
             day: "numeric",
             hour: "2-digit",

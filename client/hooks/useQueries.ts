@@ -127,7 +127,6 @@ export function useSaveMeal() {
 
       // Generate a temporary numeric ID for meal_id
       const tempId = Date.now();
-
       // Optimistically update to the new value
       const optimisticMeal: Meal = {
         // Primary fields matching Prisma schema
@@ -145,7 +144,7 @@ export function useSaveMeal() {
         fiber_g: mealData.fiber || null,
         sugar_g: mealData.sugar || null,
         sodium_mg: mealData.sodium || null,
-        createdAt: new Date().toISOString(),
+        created_at: new Date().toISOString(),
 
         // Computed fields for compatibility
         name: mealData.name || "New Meal",

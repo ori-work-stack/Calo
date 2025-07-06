@@ -10,23 +10,23 @@ datasource db {
 }
 
 model User {
-  user_id            String                @id @default(cuid())
-  email              String                @unique
-  password_hash      String
-  name               String?
-  signup_date        DateTime              @default(now())
-  subscription_type  SubscriptionType
-  subscription_start DateTime?
-  subscription_end   DateTime?
-  height_cm          Float?
-  weight_kg          Float?
-  age                Int
+  user_id              String                @id @default(cuid())
+  email                String                @unique
+  password_hash        String
+  name                 String?
+  signup_date          DateTime              @default(now())
+  subscription_type    SubscriptionType
+  subscription_start   DateTime?
+  subscription_end     DateTime?
+  height_cm            Float?
+  weight_kg            Float?
+  age                  Int
   ai_requests_count    Int                   @default(0)
-  ai_requests_reset_at  DateTime              @default(now())
-  questionnaires     UserQuestionnaire[]
-  meals              Meal[]
-  nutritionPlans     NutritionPlan[]
-  payments           SubscriptionPayment[]
+  ai_requests_reset_at DateTime              @default(now())
+  questionnaires       UserQuestionnaire[]
+  meals                Meal[]
+  nutritionPlans       NutritionPlan[]
+  payments             SubscriptionPayment[]
 
   connectedDevices  ConnectedDevice[]
   activitySummaries DailyActivitySummary[]
@@ -51,7 +51,7 @@ model Session {
   user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
   created_at DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt  DateTime @updatedAt
 
   @@map("sessions")
 }
@@ -142,7 +142,7 @@ model UserQuestionnaire {
   family_medical_history     Json?
   smoking_status             SmokingStatus
   sleep_hours_per_night      Float?
-  created_at                  DateTime                @default(now())
+  created_at                 DateTime                @default(now())
 }
 
 model Meal {
@@ -182,7 +182,7 @@ model Meal {
   cooking_method         String?
   additives_json         Json?
   health_risk_notes      String?
-  created_at              DateTime       @default(now())
+  created_at             DateTime       @default(now())
 }
 
 model NutritionPlan {
@@ -207,7 +207,7 @@ model SubscriptionPayment {
   amount         Float
   payment_date   DateTime         @default(now())
   payment_method String?
-  created_at      DateTime         @default(now())
+  created_at     DateTime         @default(now())
 }
 
 model AdminDashboard {
@@ -219,7 +219,7 @@ model AdminDashboard {
   api_calls       Int
   marketing_spend Float
   notes           String?
-  created_at       DateTime @default(now())
+  created_at      DateTime @default(now())
 }
 
 // NEW MEAL PLAN MODELS
@@ -436,7 +436,7 @@ enum DeviceType {
 enum MealPlanType {
   DAILY
   WEEKLY
-  THREE_DAYS  
+  THREE_DAYS
 }
 
 enum MealTiming {

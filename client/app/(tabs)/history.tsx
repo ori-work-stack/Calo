@@ -86,13 +86,13 @@ export default function HistoryScreen() {
     // Date filters
     if (filters.dateFrom) {
       filtered = filtered.filter(
-        (meal) => new Date(meal.createdAt) >= filters.dateFrom!
+        (meal) => new Date(meal.created_at) >= filters.dateFrom!
       );
     }
 
     if (filters.dateTo) {
       filtered = filtered.filter(
-        (meal) => new Date(meal.createdAt) <= filters.dateTo!
+        (meal) => new Date(meal.created_at) <= filters.dateTo!
       );
     }
 
@@ -164,7 +164,7 @@ export default function HistoryScreen() {
     if (meals.length === 0) return;
 
     const lastWeekMeals = meals.filter((meal) => {
-      const mealDate = new Date(meal.createdAt);
+      const mealDate = new Date(meal.created_at);
       const weekAgo = new Date();
       weekAgo.setDate(weekAgo.getDate() - 7);
       return mealDate >= weekAgo;
@@ -322,7 +322,7 @@ export default function HistoryScreen() {
 
   const renderMealItem = ({ item }: { item: MealWithFeedback }) => {
     const mealScore = getMealScore(item);
-    const mealDate = new Date(item.createdAt);
+    const mealDate = new Date(item.created_at);
 
     return (
       <View style={styles.mealCard}>

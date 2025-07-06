@@ -144,7 +144,7 @@ const transformMealData = (serverMeal: any): Meal => {
     fiber_g: serverMeal.fiber_g,
     sugar_g: serverMeal.sugar_g,
     sodium_mg: serverMeal.sodium_mg,
-    createdAt: serverMeal.createdAt,
+    created_at: serverMeal.created_at,
 
     // Computed fields for compatibility
     id: serverMeal.meal_id?.toString() || serverMeal.id,
@@ -807,7 +807,21 @@ export const mealPlanAPI = {
       console.log("🔄 Loading current meal plan");
       const response = await api.get("/meal-plans/current");
       console.log("✅ loadMealPlan response:", response.data);
-      return response.data;
+
+      if (response.data.success) {
+        return {
+          success: true,
+          data: {
+            weeklyPlan: response.data.data,
+            planId: null, // Will be set when we have an active plan
+          },
+        };
+      } else {
+        return {
+          success: false,
+          error: response.data.error || "Failed to load meal plan",
+        };
+      }
     } catch (error: any) {
       console.error("💥 loadMealPlan error:", error);
       return {
