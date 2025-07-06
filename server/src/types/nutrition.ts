@@ -29,7 +29,7 @@ export const mealSchema = z.object({
   sugar_g: z.number().nullable(),
   analysis_status: z.enum(["PENDING", "COMPLETED"]),
   upload_time: z.date(),
-  createdAt: z.date(),
+  created_at: z.date(),
 });
 
 export type MealAnalysisInput = z.infer<typeof mealAnalysisSchema>;

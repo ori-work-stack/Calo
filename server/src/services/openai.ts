@@ -28,13 +28,14 @@ export class OpenAIService {
       const systemPrompt = `You are a professional nutritionist and food analyst. Analyze the food image and provide detailed nutritional information.
 
 IMPORTANT INSTRUCTIONS:
-1. Analyze the food items visible in the image
-2. Estimate portion sizes based on visual cues
-3. Provide accurate nutritional values per serving shown
-4. If multiple items, sum up the total nutrition
-5. Be conservative with estimates - better to underestimate than overestimate
-6. Consider cooking methods that affect nutrition
-7. Account for added oils, sauces, and seasonings visible
+1. Analyze all visible food items in the image.
+2. Estimate portion sizes based on visual cues.
+3. Provide accurate nutritional values for the full visible serving.
+4. If there are multiple items, estimate and sum their nutritional values.
+5. Be conservative with estimates – prefer underestimating rather than overestimating.
+6. Consider cooking methods that affect nutrition (frying, boiling, grilling, etc.).
+7. Account for visible added oils, sauces, and seasonings.
+8. Include potential allergens, additives, and micronutrients where observable.
 
 ${
   updateText
@@ -44,20 +45,69 @@ ${
 
 Respond with a JSON object containing:
 {
-  "name": "Brief descriptive name of the meal/food",
-  "description": "Detailed description of what you see",
+  "meal_name": "Brief descriptive name of the meal/food",
+  "description": "Detailed description of what is visible in the image",
   "calories": number,
-  "protein": number,
-  "carbs": number,
-  "fat": number,
-  "fiber": number,
-  "sugar": number,
-  "sodium": number,
-  "confidence": number,
-  "ingredients": ["list", "of", "main", "ingredients"],
-  "servingSize": "description of portion size",
-  "cookingMethod": "how the food appears to be prepared",
-  "healthNotes": "brief health assessment or notes"
+  "protein_g": number,
+  "carbs_g": number,
+  "fats_g": number,
+  "saturated_fats_g": number,
+  "polyunsaturated_fats_g": number,
+  "monounsaturated_fats_g": number,
+  "omega_3_g": number,
+  "omega_6_g": number,
+  "fiber_g": number,
+  "soluble_fiber_g": number,
+  "insoluble_fiber_g": number,
+  "sugar_g": number,
+  "cholesterol_mg": number,
+  "sodium_mg": number,
+  "alcohol_g": number,
+  "caffeine_mg": number,
+  "liquids_ml": number,
+  "serving_size_g": number,
+  "allergens_json": {
+    "possible_allergens": ["list", "of", "common", "allergens", "if", "any"]
+  },
+  "vitamins_json": {
+    "vitamin_a_mcg": number,
+    "vitamin_c_mg": number,
+    "vitamin_d_mcg": number,
+    "vitamin_e_mg": number,
+    "vitamin_k_mcg": number,
+    "vitamin_b12_mcg": number,
+    "folate_mcg": number,
+    "niacin_mg": number,
+    "thiamin_mg": number,
+    "riboflavin_mg": number,
+    "pantothenic_acid_mg": number,
+    "vitamin_b6_mg": number
+  },
+  "micronutrients_json": {
+    "iron_mg": number,
+    "magnesium_mg": number,
+    "zinc_mg": number,
+    "calcium_mg": number,
+    "potassium_mg": number,
+    "phosphorus_mg": number,
+    "selenium_mcg": number,
+    "copper_mg": number,
+    "manganese_mg": number
+  },
+  "glycemic_index": number,
+  "insulin_index": number,
+  "food_category": "e.g. Fast Food, Homemade, Snack, Beverage, etc.",
+  "processing_level": "e.g. Unprocessed, Minimally processed, Ultra-processed",
+  "cooking_method": "e.g. Grilled, Fried, Boiled, Raw, Baked",
+  "additives_json": {
+    "observed_additives": ["list", "of", "known", "or", "assumed", "additives"]
+  },
+  "health_risk_notes": "Brief health assessment, e.g., high in sodium, ultra-processed, rich in fiber, etc.",
+  "confidence": number (between 0 and 1, indicating how confident you are in this analysis),
+  "ingredients": ["list", "of", "main", "visible", "ingredients"],
+  "servingSize": "e.g. One sandwich, 1 bowl, 2 slices",
+  "cookingMethod": "How the food appears to be prepared",
+  "healthNotes": "Brief notes on healthiness or potential dietary concerns"
 }
 
 Language for response: ${language}`;
@@ -519,7 +569,10 @@ Respond with a valid JSON object in this exact format:
         return this.generateChunkedMealPlan(userProfile);
       }
 
-      console.log("✅ AI meal plan generated and validated successfully");
+      console.log(
+        "✅ AI meal plan generated and validated successfully",
+        response
+      );
       return mealPlan as MealPlanResponse;
     } catch (error) {
       console.error("💥 OpenAI meal plan generation error:", error);

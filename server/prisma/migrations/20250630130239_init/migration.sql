@@ -25,12 +25,12 @@ CREATE TABLE "users" (
     "activityLevel" "ActivityLevel" NOT NULL DEFAULT 'MODERATE',
     "dietaryGoals" TEXT,
     "allergies" TEXT[],
-    "aiRequestsCount" INTEGER NOT NULL DEFAULT 0,
-    "aiRequestsResetAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "ai_requests_count" INTEGER NOT NULL DEFAULT 0,
+    "ai_requests_reset_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "smartWatchConnected" BOOLEAN NOT NULL DEFAULT false,
     "smartWatchType" TEXT,
     "lastSyncAt" TIMESTAMP(3),
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "users_pkey" PRIMARY KEY ("id")
@@ -42,7 +42,7 @@ CREATE TABLE "sessions" (
     "userId" TEXT NOT NULL,
     "token" TEXT NOT NULL,
     "expiresAt" TIMESTAMP(3) NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "sessions_pkey" PRIMARY KEY ("id")
@@ -65,7 +65,7 @@ CREATE TABLE "meals" (
     "recommendations" TEXT,
     "mealType" "MealType" NOT NULL DEFAULT 'OTHER',
     "consumedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "meals_pkey" PRIMARY KEY ("id")
@@ -83,7 +83,7 @@ CREATE TABLE "food_items" (
     "fat" DOUBLE PRECISION NOT NULL,
     "fiber" DOUBLE PRECISION,
     "sugar" DOUBLE PRECISION,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "food_items_pkey" PRIMARY KEY ("id")
@@ -100,7 +100,7 @@ CREATE TABLE "nutrition_goals" (
     "dailyFiber" DOUBLE PRECISION,
     "dailySugar" DOUBLE PRECISION,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "nutrition_goals_pkey" PRIMARY KEY ("id")
@@ -115,7 +115,7 @@ CREATE TABLE "health_metrics" (
     "unit" TEXT NOT NULL,
     "recordedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "source" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "health_metrics_pkey" PRIMARY KEY ("id")

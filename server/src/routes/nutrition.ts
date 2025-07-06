@@ -50,7 +50,7 @@ router.post("/analyze", async (req: AuthRequest, res) => {
       date: date || new Date().toISOString().split("T")[0],
       updateText,
     });
-
+    console.log("nutrition.ts in routes", result);
     console.log("Analysis completed successfully");
     res.json(result);
   } catch (error) {

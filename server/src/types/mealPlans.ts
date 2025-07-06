@@ -21,6 +21,7 @@ export interface MealPlanTemplate {
 
 export interface UserMealPlanConfig {
   name: string;
+  plan_type: "WEEKLY" | "DAILY" | "THREE_DAYS";
   meals_per_day: number;
   snacks_per_day: number;
   rotation_frequency_days: number;

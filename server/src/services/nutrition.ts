@@ -37,7 +37,7 @@ export class NutritionService {
     console.log("✅ User found:", user.email);
 
     const now = new Date();
-    const resetTime = new Date(user.aiRequestsResetAt);
+    const resetTime = new Date(user.ai_requests_reset_at);
 
     const needsReset =
       now.getDate() !== resetTime.getDate() ||
@@ -47,9 +47,9 @@ export class NutritionService {
     if (needsReset) {
       await prisma.user.update({
         where: { user_id: user_id },
-        data: { aiRequestsCount: 0, aiRequestsResetAt: now },
+        data: { ai_requests_count: 0, ai_requests_reset_at: now },
       });
-      user.aiRequestsCount = 0;
+      user.ai_requests_count = 0;
     }
 
     const permissions = await AuthService.getRolePermissions(
@@ -58,7 +58,7 @@ export class NutritionService {
 
     if (
       permissions.dailyRequests !== -1 &&
-      user.aiRequestsCount >= permissions.dailyRequests
+      user.ai_requests_count >= permissions.dailyRequests
     ) {
       throw new Error("Daily AI request limit reached.");
     }
@@ -72,39 +72,46 @@ export class NutritionService {
       await prisma.user.update({
         where: { user_id: user_id },
         data: {
-          aiRequestsCount: user.aiRequestsCount + 1,
+          ai_requests_count: user.ai_requests_count + 1,
         },
       });
 
-      let totalCalories = 0;
-      let totalProtein = 0;
-      let totalCarbs = 0;
-      let totalFat = 0;
-      let totalFiber = 0;
-      let totalSugar = 0;
+      console.log("Raw analysis from OpenAI:", analysis);
 
-      for (const item of analysis.items || []) {
-        totalCalories += parseFloat(item.calories) || 0;
-        totalProtein += parseFloat(item.protein) || 0;
-        totalCarbs += parseFloat(item.carbs) || 0;
-        totalFat += parseFloat(item.fat) || 0;
-        totalFiber += parseFloat(item.fiber || "0") || 0;
-        totalSugar += parseFloat(item.sugar || "0") || 0;
-      }
+      // Use the nutrition data directly from the analysis object
+      // The OpenAI service returns the totals directly, not in an items array
+      const totalCalories = analysis.calories || 0;
+      const totalProtein = analysis.protein || 0;
+      const totalCarbs = analysis.carbs || 0;
+      const totalFat = analysis.fat || 0;
+      const totalFiber = analysis.fiber || 0;
+      const totalSugar = analysis.sugar || 0;
+
+      // Create items array from the ingredients if needed for display
+      const items =
+        analysis.ingredients?.map((ingredient: string, index: number) => ({
+          id: index,
+          name: ingredient,
+          calories: "0", // Individual item calories aren't provided by OpenAI
+          protein: "0",
+          carbs: "0",
+          fat: "0",
+          fiber: "0",
+          sugar: "0",
+        })) || [];
 
       const formattedAnalysis = {
         description: analysis.description || "Unknown meal",
-        items: analysis.items || [],
+        items: items,
         totalCalories: totalCalories.toString(),
         totalProtein: totalProtein.toString(),
         totalCarbs: totalCarbs.toString(),
         totalFat: totalFat.toString(),
         totalFiber: totalFiber.toString(),
         totalSugar: totalSugar.toString(),
-        healthScore: analysis.healthScore?.toString() || "0",
-        recommendations:
-          analysis.recommendations || "No recommendations available",
-        name: analysis.description || "Unknown meal",
+        healthScore: (analysis.confidence * 100).toString() || "0", // Convert confidence to health score
+        recommendations: analysis.healthNotes || "No recommendations available",
+        name: analysis.name || analysis.description || "Unknown meal",
         calories: totalCalories,
         protein: totalProtein,
         carbs: totalCarbs,
@@ -113,13 +120,15 @@ export class NutritionService {
         sugar: totalSugar,
       };
 
+      console.log("Formatted analysis being returned:", formattedAnalysis);
+
       return {
         success: true,
         data: formattedAnalysis,
         remainingRequests:
           permissions.dailyRequests === -1
             ? -1
-            : permissions.dailyRequests - (user.aiRequestsCount + 1),
+            : permissions.dailyRequests - (user.ai_requests_count + 1),
       };
     } catch (error) {
       console.error("Error analyzing meal:", error);
@@ -166,7 +175,7 @@ export class NutritionService {
 
     if (
       permissions.dailyRequests !== -1 &&
-      user.aiRequestsCount >= permissions.dailyRequests
+      user.ai_requests_count >= permissions.dailyRequests
     ) {
       throw new Error("Daily AI request limit reached.");
     }
@@ -198,7 +207,7 @@ export class NutritionService {
       await prisma.user.update({
         where: { user_id: user_id },
         data: {
-          aiRequestsCount: user.aiRequestsCount + 1,
+          ai_requests_count: user.ai_requests_count + 1,
         },
       });
 
@@ -250,7 +259,7 @@ export class NutritionService {
         fats_g: updatedMeal.fats_g,
         fiber_g: updatedMeal.fiber_g,
         sugar_g: updatedMeal.sugar_g,
-        createdAt: updatedMeal.createdAt,
+        created_at: updatedMeal.created_at,
 
         // Computed fields for compatibility
         id: updatedMeal.meal_id.toString(),
@@ -277,7 +286,7 @@ export class NutritionService {
 
   static async saveMeal(user_id: string, mealData: any, imageBase64?: string) {
     try {
-      console.log("💾 Saving meal for user:", user_id);
+      console.log("💾 Saving meal for user:", user_id, mealData);
 
       const calories =
         typeof mealData.calories === "number"
@@ -337,7 +346,7 @@ export class NutritionService {
         fats_g: meal.fats_g,
         fiber_g: meal.fiber_g,
         sugar_g: meal.sugar_g,
-        createdAt: meal.createdAt,
+        created_at: meal.created_at,
 
         // Computed fields for compatibility
         id: meal.meal_id.toString(),
@@ -365,7 +374,7 @@ export class NutritionService {
 
       const meals = await prisma.meal.findMany({
         where: { user_id: user_id },
-        orderBy: { createdAt: "desc" },
+        orderBy: { created_at: "desc" },
       });
 
       console.log("✅ Found", meals.length, "meals for user");
@@ -391,7 +400,7 @@ export class NutritionService {
           fats_g: meal.fats_g,
           fiber_g: meal.fiber_g,
           sugar_g: meal.sugar_g,
-          createdAt: meal.createdAt,
+          created_at: meal.created_at,
 
           // Computed fields for compatibility
           id: meal.meal_id.toString(),
@@ -432,7 +441,7 @@ export class NutritionService {
       const meals = await prisma.meal.findMany({
         where: {
           user_id: user_id,
-          createdAt: {
+          created_at: {
             gte: startDate,
             lt: endDate,
           },
@@ -627,7 +636,7 @@ export class NutritionService {
           sodium_mg: originalMeal.sodium_mg,
           analysis_status: originalMeal.analysis_status,
           upload_time: duplicateDate,
-          createdAt: duplicateDate,
+          created_at: duplicateDate,
           // Don't copy feedback or favorite status
           additives_json: {
             duplicatedFrom: originalMeal.meal_id,
@@ -656,7 +665,7 @@ export class NutritionService {
         fats_g: duplicatedMeal.fats_g,
         fiber_g: duplicatedMeal.fiber_g,
         sugar_g: duplicatedMeal.sugar_g,
-        createdAt: duplicatedMeal.createdAt,
+        created_at: duplicatedMeal.created_at,
 
         // Computed fields for compatibility
         id: duplicatedMeal.meal_id.toString(),

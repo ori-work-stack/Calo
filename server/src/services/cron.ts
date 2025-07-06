@@ -6,8 +6,8 @@ export async function resetDailyLimits() {
     
     await prisma.user.updateMany({
       data: {
-        aiRequestsCount: 0,
-        aiRequestsResetAt: now,
+        ai_requests_count: 0,
+        ai_requests_reset_at: now,
       }
     });
 

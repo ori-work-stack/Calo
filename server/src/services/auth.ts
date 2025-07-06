@@ -15,9 +15,9 @@ const userSelectFields = {
   age: true,
   weight_kg: true,
   height_cm: true,
-  aiRequestsCount: true,
-  aiRequestsResetAt: true,
-  createdAt: true,
+  ai_requests_count: true,
+  ai_requests_reset_at: true,
+  created_at: true,
 };
 
 function generateToken(payload: object) {
@@ -57,8 +57,8 @@ export class AuthService {
         age: Number(age),
         weight_kg: weight,
         height_cm: height,
-        aiRequestsCount: 0,
-        aiRequestsResetAt: new Date(),
+        ai_requests_count: 0,
+        ai_requests_reset_at: new Date(),
       },
       select: userSelectFields,
     });

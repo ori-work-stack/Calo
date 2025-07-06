@@ -284,7 +284,7 @@ export class DeviceService {
       const meals = await prisma.meal.findMany({
         where: {
           user_id,
-          createdAt: {
+          created_at: {
             gte: startDate,
             lt: endDate,
           },

@@ -30,13 +30,13 @@ export class CalendarService {
       const meals = await prisma.meal.findMany({
         where: {
           user_id: user_id,
-          createdAt: {
+          created_at: {
             gte: startDate,
             lte: new Date(endDate.getTime() + 24 * 60 * 60 * 1000), // Include the last day
           },
         },
         orderBy: {
-          createdAt: "asc",
+          created_at: "asc",
         },
       });
 
@@ -48,7 +48,7 @@ export class CalendarService {
       // Group meals by date
       const mealsByDate: Record<string, any[]> = {};
       meals.forEach((meal) => {
-        const dateStr = meal.createdAt.toISOString().split("T")[0];
+        const dateStr = meal.created_at.toISOString().split("T")[0];
         if (!mealsByDate[dateStr]) {
           mealsByDate[dateStr] = [];
         }
@@ -214,7 +214,7 @@ export class CalendarService {
         title,
         type,
         date,
-        createdAt: new Date().toISOString(),
+        created_at: new Date().toISOString(),
       };
 
       // Store event in user's additional data (you might want to create a separate table)

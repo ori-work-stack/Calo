@@ -20,9 +20,9 @@ export class StatisticsService {
       const meals = await prisma.meal.findMany({
         where: {
           user_id: userId,
-          createdAt: { gte: startDate },
+          created_at: { gte: startDate },
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: { created_at: "desc" },
       });
 
       console.log(`✅ Found ${meals.length} meals for statistics`);
@@ -34,7 +34,7 @@ export class StatisticsService {
 
       const nutritionPlan = await prisma.nutritionPlan.findFirst({
         where: { user_id: userId },
-        orderBy: { createdAt: "desc" },
+        orderBy: { created_at: "desc" },
       });
 
       const dailyCalorieGoal = nutritionPlan?.goal_calories || 2000;
@@ -86,7 +86,7 @@ export class StatisticsService {
     // Group meals by day
     const dailyData = new Map<string, any[]>();
     meals.forEach((meal) => {
-      const day = meal.createdAt.toISOString().split("T")[0];
+      const day = meal.created_at.toISOString().split("T")[0];
       if (!dailyData.has(day)) {
         dailyData.set(day, []);
       }
@@ -169,7 +169,7 @@ export class StatisticsService {
 
     // Calculate eating hours
     const eatingTimes = meals
-      .map((meal) => meal.createdAt.getHours())
+      .map((meal) => meal.created_at.getHours())
       .filter((hour) => hour !== null);
 
     const averageEatingHours = {

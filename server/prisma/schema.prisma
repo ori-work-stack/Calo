@@ -21,8 +21,8 @@ model User {
   height_cm          Float?
   weight_kg          Float?
   age                Int
-  aiRequestsCount    Int                   @default(0)
-  aiRequestsResetAt  DateTime              @default(now())
+  ai_requests_count    Int                   @default(0)
+  ai_requests_reset_at  DateTime              @default(now())
   questionnaires     UserQuestionnaire[]
   meals              Meal[]
   nutritionPlans     NutritionPlan[]
@@ -36,7 +36,7 @@ model User {
   mealPreferences UserMealPreference[]
   shoppingLists   ShoppingList[]
 
-  createdAt DateTime @default(now())
+  created_at DateTime @default(now())
 
   Session Session[]
 }
@@ -50,7 +50,7 @@ model Session {
   // Relationships
   user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
-  createdAt DateTime @default(now())
+  created_at DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("sessions")
@@ -142,7 +142,7 @@ model UserQuestionnaire {
   family_medical_history     Json?
   smoking_status             SmokingStatus
   sleep_hours_per_night      Float?
-  createdAt                  DateTime                @default(now())
+  created_at                  DateTime                @default(now())
 }
 
 model Meal {
@@ -182,14 +182,13 @@ model Meal {
   cooking_method         String?
   additives_json         Json?
   health_risk_notes      String?
-  createdAt              DateTime       @default(now())
+  created_at              DateTime       @default(now())
 }
 
 model NutritionPlan {
   plan_id          Int      @id @default(autoincrement())
   user             User     @relation(fields: [user_id], references: [user_id])
   user_id          String
-  created_at       DateTime @default(now())
   goal_calories    Float?
   goal_protein_g   Float?
   goal_carbs_g     Float?
@@ -197,7 +196,7 @@ model NutritionPlan {
   target_weight_kg Float?
   duration_days    Int?
   notes            String?
-  createdAt        DateTime @default(now())
+  created_at       DateTime @default(now())
 }
 
 model SubscriptionPayment {
@@ -208,7 +207,7 @@ model SubscriptionPayment {
   amount         Float
   payment_date   DateTime         @default(now())
   payment_method String?
-  createdAt      DateTime         @default(now())
+  created_at      DateTime         @default(now())
 }
 
 model AdminDashboard {
@@ -220,7 +219,7 @@ model AdminDashboard {
   api_calls       Int
   marketing_spend Float
   notes           String?
-  createdAt       DateTime @default(now())
+  created_at       DateTime @default(now())
 }
 
 // NEW MEAL PLAN MODELS
@@ -313,7 +312,7 @@ model UserMealPreference {
   preference_id   String   @id @default(cuid())
   user_id         String
   template_id     String
-  preference_type String 
+  preference_type String
   rating          Int?
   notes           String?
   created_at      DateTime @default(now())
@@ -437,7 +436,7 @@ enum DeviceType {
 enum MealPlanType {
   DAILY
   WEEKLY
-  MONTHLY
+  THREE_DAYS  
 }
 
 enum MealTiming {

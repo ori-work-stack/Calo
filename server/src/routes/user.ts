@@ -24,8 +24,8 @@ router.put(
           age: true,
           weight_kg: true,
           height_cm: true,
-          aiRequestsCount: true,
-          createdAt: true,
+          ai_requests_count: true,
+          created_at: true,
         },
       });
 
@@ -65,8 +65,8 @@ router.get(
       success: true,
       subscription: {
         ...info,
-        currentRequests: req.user.aiRequestsCount,
-        resetAt: req.user.aiRequestsResetAt,
+        currentRequests: req.user.ai_requests_count,
+        resetAt: req.user.ai_requests_reset_at,
       },
     });
   }

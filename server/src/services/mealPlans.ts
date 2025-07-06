@@ -12,12 +12,16 @@ function sanitizeString(input: string): string {
   if (!input || typeof input !== "string") return "";
   return input.trim().replace(/[<>]/g, "");
 }
+type MealPlanType = "WEEKLY" | "DAILY" | "THREE_DAYS";
 
 // Helper function to validate arrays
 function validateArray<T>(input: any, fallback: T[] = []): T[] {
   return Array.isArray(input) ? input : fallback;
 }
 
+function isValidMealPlanType(type: string): type is MealPlanType {
+  return ["WEEKLY", "DAILY", "THREE_DAYS"].includes(type);
+}
 // Helper function to validate enums
 function validateEnum<T>(value: any, validValues: T[], fallback: T): T {
   return validValues.includes(value) ? value : fallback;
@@ -49,7 +53,11 @@ export class MealPlanService {
 
   static async createUserMealPlan(user_id: string, config: UserMealPlanConfig) {
     try {
-      console.log("🍽️ Creating AI-powered meal plan for user:", user_id);
+      console.log(
+        "🍽️ Creating AI-powered meal plan for user:",
+        user_id,
+        config
+      );
 
       // Validate and sanitize input
       const sanitizedConfig = this.sanitizeConfig(config);
@@ -76,7 +84,7 @@ export class MealPlanService {
         },
       });
 
-      // Generate AI meal plan with error handling
+      // Generate AI meal plan BEFORE starting transaction
       const aiMealPlan = await this.generateAIMealPlan(
         sanitizedConfig,
         questionnaire,
@@ -93,38 +101,44 @@ export class MealPlanService {
         throw new Error("Invalid AI meal plan response structure");
       }
 
-      // Create the meal plan using transaction
-      const result = await prisma.$transaction(async (tx) => {
-        const mealPlan = await tx.userMealPlan.create({
-          data: {
-            user_id,
-            name: sanitizedConfig.name,
-            plan_type: "WEEKLY",
-            meals_per_day: sanitizedConfig.meals_per_day,
-            snacks_per_day: sanitizedConfig.snacks_per_day,
-            rotation_frequency_days: sanitizedConfig.rotation_frequency_days,
-            include_leftovers: sanitizedConfig.include_leftovers,
-            fixed_meal_times: sanitizedConfig.fixed_meal_times,
-            target_calories_daily: nutritionPlan?.goal_calories || 2000,
-            target_protein_daily: nutritionPlan?.goal_protein_g || 150,
-            target_carbs_daily: nutritionPlan?.goal_carbs_g || 250,
-            target_fats_daily: nutritionPlan?.goal_fats_g || 67,
-            dietary_preferences: sanitizedConfig.dietary_preferences,
-            excluded_ingredients: sanitizedConfig.excluded_ingredients,
-            start_date: new Date(),
-            is_active: true,
-          },
-        });
+      // Create the meal plan using transaction (now much faster)
+      const result = await prisma.$transaction(
+        async (tx) => {
+          const mealPlan = await tx.userMealPlan.create({
+            data: {
+              user_id,
+              name: sanitizedConfig.name,
+              plan_type: sanitizedConfig.plan_type,
+              meals_per_day: sanitizedConfig.meals_per_day,
+              snacks_per_day: sanitizedConfig.snacks_per_day,
+              rotation_frequency_days: sanitizedConfig.rotation_frequency_days,
+              include_leftovers: sanitizedConfig.include_leftovers,
+              fixed_meal_times: sanitizedConfig.fixed_meal_times,
+              target_calories_daily: nutritionPlan?.goal_calories || 2000,
+              target_protein_daily: nutritionPlan?.goal_protein_g || 150,
+              target_carbs_daily: nutritionPlan?.goal_carbs_g || 250,
+              target_fats_daily: nutritionPlan?.goal_fats_g || 67,
+              dietary_preferences: sanitizedConfig.dietary_preferences,
+              excluded_ingredients: sanitizedConfig.excluded_ingredients,
+              start_date: new Date(),
+              is_active: true,
+            },
+          });
 
-        // Store AI-generated meal templates and create schedule
-        await this.storeAIMealTemplatesAndScheduleTransaction(
-          tx,
-          mealPlan.plan_id,
-          aiMealPlan
-        );
+          // Store AI-generated meal templates and create schedule
+          await this.storeAIMealTemplatesAndScheduleTransaction(
+            tx,
+            mealPlan.plan_id,
+            aiMealPlan
+          );
 
-        return mealPlan;
-      });
+          return mealPlan;
+        },
+        {
+          timeout: 30000, // 30 seconds timeout
+          maxWait: 35000, // 35 seconds max wait
+        }
+      );
 
       console.log("✅ AI meal plan created successfully");
       return result;
@@ -141,8 +155,14 @@ export class MealPlanService {
   private static sanitizeConfig(
     config: UserMealPlanConfig
   ): UserMealPlanConfig {
+    const cleanedType = sanitizeString(config.plan_type);
+
     return {
       name: sanitizeString(config.name),
+
+      // ✅ Validate the string against allowed values
+      plan_type: isValidMealPlanType(cleanedType) ? cleanedType : "WEEKLY",
+
       meals_per_day: Math.max(1, Math.min(6, Math.floor(config.meals_per_day))),
       snacks_per_day: Math.max(
         0,
@@ -504,28 +524,52 @@ export class MealPlanService {
     });
   }
 
-  private static async storeAIMealTemplatesAndScheduleTransaction(
+  static async storeAIMealTemplatesAndScheduleTransaction(
     tx: any,
     plan_id: string,
     aiMealPlan: AIMealPlanResponse
   ) {
     try {
-      console.log("💾 Storing AI-generated meal templates and schedule...");
+      const templateIds: { [key: string]: string } = {};
 
-      const templateIds: Record<string, string> = {};
+      // 🔍 Debug: Log the structure we're getting
+      console.log("🔍 AI Meal Plan Structure:");
+      console.log("Weekly plan length:", aiMealPlan.weekly_plan.length);
+      aiMealPlan.weekly_plan.forEach((dayPlan, index) => {
+        console.log(
+          `Day ${index}: day=${
+            dayPlan.day
+          } (type: ${typeof dayPlan.day}), meals: ${dayPlan.meals.length}`
+        );
+      });
 
-      // Store each unique meal template with error handling
+      // Process each day's meals
       for (const dayPlan of aiMealPlan.weekly_plan) {
+        // Fix: Convert day to number and validate
+        const dayOfWeek = this.convertDayToNumber(dayPlan.day);
+
+        console.log(`🔍 Converting day: ${dayPlan.day} -> ${dayOfWeek}`);
+
+        if (dayOfWeek === null) {
+          console.error(
+            `❌ Invalid day value: ${dayPlan.day}, skipping this day`
+          );
+          continue;
+        }
+
         for (const meal of dayPlan.meals) {
-          const templateKey = `${meal.name}-${meal.meal_timing}`;
+          const templateKey = `${meal.name}_${meal.meal_timing}`;
+
+          // Check if template already exists in current batch
           if (!templateIds[templateKey]) {
             try {
+              // Create meal template
               const template = await tx.mealTemplate.create({
                 data: {
                   name: meal.name,
                   description: meal.description,
-                  meal_timing: meal.meal_timing as any,
-                  dietary_category: meal.dietary_category as any,
+                  meal_timing: meal.meal_timing,
+                  dietary_category: meal.dietary_category,
                   prep_time_minutes: meal.prep_time_minutes,
                   difficulty_level: meal.difficulty_level,
                   calories: meal.calories,
@@ -541,55 +585,114 @@ export class MealPlanService {
                   image_url: meal.image_url,
                 },
               });
+
               templateIds[templateKey] = template.template_id;
-            } catch (error) {
-              console.error(`Error creating template for ${meal.name}:`, error);
-              // Continue with other meals instead of failing completely
+              console.log(`✅ Created template: ${meal.name}`);
+            } catch (templateError) {
+              console.error(
+                `❌ Error creating template for ${meal.name}:`,
+                templateError
+              );
               continue;
             }
           }
-        }
-      }
 
-      // Create meal schedule with error handling
-      for (
-        let dayIndex = 0;
-        dayIndex < aiMealPlan.weekly_plan.length;
-        dayIndex++
-      ) {
-        const dayPlan = aiMealPlan.weekly_plan[dayIndex];
-
-        for (let mealIndex = 0; mealIndex < dayPlan.meals.length; mealIndex++) {
-          const meal = dayPlan.meals[mealIndex];
-          const templateKey = `${meal.name}-${meal.meal_timing}`;
-
+          // Create meal plan schedule entry
           if (templateIds[templateKey]) {
             try {
               await tx.mealPlanSchedule.create({
                 data: {
-                  plan_id,
+                  plan_id: plan_id,
                   template_id: templateIds[templateKey],
-                  day_of_week: dayIndex,
-                  meal_timing: meal.meal_timing as any,
-                  meal_order: mealIndex + 1,
+                  day_of_week: dayOfWeek, // ✅ Now guaranteed to be a valid number
+                  meal_timing: meal.meal_timing,
                   portion_multiplier: meal.portion_multiplier || 1.0,
                   is_optional: meal.is_optional || false,
                 },
               });
-            } catch (error) {
-              console.error(`Error creating schedule for ${meal.name}:`, error);
-              // Continue with other meals
-              continue;
+              console.log(
+                `✅ Created schedule entry for ${meal.name} on day ${dayOfWeek}`
+              );
+            } catch (scheduleError) {
+              console.error(
+                `❌ Error creating schedule for ${meal.name}:`,
+                scheduleError
+              );
             }
           }
         }
       }
 
-      console.log("✅ AI meal templates and schedule stored successfully");
+      console.log("✅ All meal templates and schedules processed");
     } catch (error) {
-      console.error("💥 Error storing AI meal templates:", error);
+      console.error(
+        "💥 Error in storeAIMealTemplatesAndScheduleTransaction:",
+        error
+      );
       throw error;
     }
+  }
+
+  // Helper function to convert day names/numbers to valid day_of_week integers
+  private static convertDayToNumber(day: any): number | null {
+    console.log(`🔍 convertDayToNumber input: ${day} (type: ${typeof day})`);
+
+    // Handle null/undefined
+    if (day === null || day === undefined) {
+      console.log("❌ Day is null/undefined");
+      return null;
+    }
+
+    // If it's already a number, validate it's in range 0-6
+    if (typeof day === "number") {
+      if (isNaN(day)) {
+        console.log("❌ Day is NaN");
+        return null;
+      }
+      const validDay = day >= 0 && day <= 6 ? day : null;
+      console.log(`✅ Number day: ${day} -> ${validDay}`);
+      return validDay;
+    }
+
+    // If it's a string, try to parse it
+    if (typeof day === "string") {
+      // Try parsing as number first
+      const numDay = parseInt(day.trim(), 10);
+      if (!isNaN(numDay) && numDay >= 0 && numDay <= 6) {
+        console.log(`✅ String number day: "${day}" -> ${numDay}`);
+        return numDay;
+      }
+
+      // Try parsing as day name
+      const dayName = day.toLowerCase().trim();
+      const dayMap: { [key: string]: number } = {
+        sunday: 0,
+        monday: 1,
+        tuesday: 2,
+        wednesday: 3,
+        thursday: 4,
+        friday: 5,
+        saturday: 6,
+        sun: 0,
+        mon: 1,
+        tue: 2,
+        wed: 3,
+        thu: 4,
+        fri: 5,
+        sat: 6,
+        // Handle variations
+        tues: 2,
+        thurs: 4,
+        weds: 3,
+      };
+
+      const result = dayMap[dayName] !== undefined ? dayMap[dayName] : null;
+      console.log(`✅ String day name: "${day}" -> ${result}`);
+      return result;
+    }
+
+    console.log(`❌ Unknown day type: ${typeof day}`);
+    return null;
   }
 
   static async getUserMealPlan(
@@ -648,27 +751,43 @@ export class MealPlanService {
           const timing = schedule.meal_timing;
           if (!acc[timing]) acc[timing] = [];
 
-          // Add type safety for JSON fields
-          const ingredients = Array.isArray(schedule.template.ingredients_json)
-            ? (schedule.template.ingredients_json as any[])
-            : [];
-          const instructions = Array.isArray(
-            schedule.template.instructions_json
-          )
-            ? (schedule.template.instructions_json as any[])
-            : [];
-          const allergens = Array.isArray(schedule.template.allergens_json)
-            ? (schedule.template.allergens_json as string[])
-            : [];
+          // Safe JSON parsing with fallbacks
+          let ingredients: string[] = [];
+          let instructions: string[] = [];
+          let allergens: string[] = [];
+
+          try {
+            ingredients = Array.isArray(schedule.template.ingredients_json)
+              ? (schedule.template.ingredients_json as string[])
+              : [];
+          } catch (e) {
+            console.warn("Failed to parse ingredients_json:", e);
+          }
+
+          try {
+            instructions = Array.isArray(schedule.template.instructions_json)
+              ? (schedule.template.instructions_json as string[])
+              : [];
+          } catch (e) {
+            console.warn("Failed to parse instructions_json:", e);
+          }
+
+          try {
+            allergens = Array.isArray(schedule.template.allergens_json)
+              ? (schedule.template.allergens_json as string[])
+              : [];
+          } catch (e) {
+            console.warn("Failed to parse allergens_json:", e);
+          }
 
           acc[timing].push({
             template_id: schedule.template.template_id,
             name: schedule.template.name,
-            description: schedule.template.description,
+            description: schedule.template.description || undefined,
             meal_timing: schedule.template.meal_timing,
             dietary_category: schedule.template.dietary_category,
-            prep_time_minutes: schedule.template.prep_time_minutes,
-            difficulty_level: schedule.template.difficulty_level,
+            prep_time_minutes: schedule.template.prep_time_minutes || undefined,
+            difficulty_level: schedule.template.difficulty_level || undefined,
             calories: Math.round(
               (Number(schedule.template.calories) || 0) *
                 schedule.portion_multiplier
@@ -710,7 +829,7 @@ export class MealPlanService {
             ingredients,
             instructions,
             allergens,
-            image_url: schedule.template.image_url,
+            image_url: schedule.template.image_url || undefined,
           });
           return acc;
         }, {} as Record<string, MealPlanTemplate[]>);

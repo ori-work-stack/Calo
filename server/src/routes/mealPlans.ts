@@ -11,6 +11,7 @@ router.use(authenticateToken);
 // Validation schemas
 const createMealPlanSchema = z.object({
   name: z.string().min(1, "Plan name is required"),
+  plan_type: z.enum(["WEEKLY", "DAILY", "THREE_DAYS"] as const),
   meals_per_day: z.number().min(2).max(6),
   snacks_per_day: z.number().min(0).max(3),
   rotation_frequency_days: z.number().min(1).max(14),
@@ -144,20 +145,20 @@ router.get("/current", async (req: AuthRequest, res) => {
 });
 
 // Get specific meal plan
-router.get("/:planId", async (req: AuthRequest, res) => {
+router.get("/:plan_id", async (req: AuthRequest, res) => {
   try {
-    const { planId } = req.params;
+    const { plan_id } = req.params;
 
     console.log(
       "📋 Get meal plan request:",
-      planId,
+      plan_id,
       "for user:",
       req.user.user_id
     );
 
     const weeklyPlan = await MealPlanService.getUserMealPlan(
       req.user.user_id,
-      planId
+      plan_id
     );
 
     res.json({
@@ -176,16 +177,16 @@ router.get("/:planId", async (req: AuthRequest, res) => {
 });
 
 // Replace a meal in the plan with AI-generated alternative
-router.put("/:planId/replace", async (req: AuthRequest, res) => {
+router.put("/:plan_id/replace", async (req: AuthRequest, res) => {
   try {
-    const { planId } = req.params;
+    const { plan_id } = req.params;
     const validatedData = replaceMealSchema.parse(req.body);
 
-    console.log("🔄 AI meal replacement request for plan:", planId);
+    console.log("🔄 AI meal replacement request for plan:", plan_id);
 
     const result = await MealPlanService.replaceMealInPlan(
       req.user.user_id,
-      planId,
+      plan_id,
       validatedData.day_of_week,
       validatedData.meal_timing,
       validatedData.meal_order,
@@ -209,9 +210,9 @@ router.put("/:planId/replace", async (req: AuthRequest, res) => {
 });
 
 // Generate shopping list
-router.post("/:planId/shopping-list", async (req: AuthRequest, res) => {
+router.post("/:plan_id/shopping-list", async (req: AuthRequest, res) => {
   try {
-    const { planId } = req.params;
+    const { plan_id } = req.params;
     const { week_start_date } = req.body;
 
     if (!week_start_date) {
@@ -221,11 +222,11 @@ router.post("/:planId/shopping-list", async (req: AuthRequest, res) => {
       });
     }
 
-    console.log("🛒 Generate shopping list request for plan:", planId);
+    console.log("🛒 Generate shopping list request for plan:", plan_id);
 
     const shoppingList = await MealPlanService.generateShoppingList(
       req.user.user_id,
-      planId,
+      plan_id,
       week_start_date
     );
 

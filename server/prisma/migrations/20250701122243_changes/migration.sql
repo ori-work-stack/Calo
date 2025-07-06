@@ -17,8 +17,8 @@ DROP COLUMN "medical_conditions",
 DROP COLUMN "medications",
 DROP COLUMN "sleep_hours_per_night",
 DROP COLUMN "smoking_status",
-ADD COLUMN     "aiRequestsCount" INTEGER NOT NULL DEFAULT 0,
-ADD COLUMN     "aiRequestsResetAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+ADD COLUMN     "ai_requests_count" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "ai_requests_reset_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
 -- AlterTable
 ALTER TABLE "UserQuestionnaire" ADD COLUMN     "allergies" JSONB,
