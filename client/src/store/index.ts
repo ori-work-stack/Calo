@@ -4,9 +4,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
-import authReducer from "./authSlice";
-import mealReducer from "./mealSlice";
-import calendarReducer from "./calendarSlice";
+import authSlice from "./authSlice";
+import mealSlice from "./mealSlice";
+import calendarSlice from "./calendarSlice";
+import questionnaireSlice from "./questionnaireSlice";
 
 // Cross-platform storage adapter for redux-persist
 const createCrossPlatformStorage = () => {
@@ -66,11 +67,11 @@ const calendarPersistConfig = {
   whitelist: ["calendarData"],
 };
 
-const persistedAuthReducer = persistReducer(authPersistConfig, authReducer);
-const persistedMealReducer = persistReducer(mealPersistConfig, mealReducer);
+const persistedAuthReducer = persistReducer(authPersistConfig, authSlice);
+const persistedMealReducer = persistReducer(mealPersistConfig, mealSlice);
 const persistedCalendarReducer = persistReducer(
   calendarPersistConfig,
-  calendarReducer
+  calendarSlice
 );
 
 export const store = configureStore({
@@ -78,6 +79,7 @@ export const store = configureStore({
     auth: persistedAuthReducer,
     meal: persistedMealReducer,
     calendar: persistedCalendarReducer,
+    questionnaire: questionnaireSlice,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

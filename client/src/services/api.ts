@@ -21,7 +21,7 @@ console.log("🌐 API Base URL:", API_BASE_URL);
 console.log("📱 Platform:", Platform.OS);
 
 // Create axios instance with optimizations
-const api = axios.create({
+export const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
   headers: {
@@ -793,6 +793,15 @@ export const userAPI = {
         throw new Error("Failed to fetch global statistics");
       }
     }
+  },
+  updateProfile: async (data: any) => {
+    const response = await api.put("/user/profile", data);
+    return response.data;
+  },
+
+  updateSubscription: async (subscription_type: string) => {
+    const response = await api.put("/user/subscription", { subscription_type });
+    return response.data;
   },
 };
 

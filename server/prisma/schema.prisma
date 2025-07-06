@@ -10,23 +10,24 @@ datasource db {
 }
 
 model User {
-  user_id              String                @id @default(cuid())
-  email                String                @unique
-  password_hash        String
-  name                 String?
-  signup_date          DateTime              @default(now())
-  subscription_type    SubscriptionType
-  subscription_start   DateTime?
-  subscription_end     DateTime?
-  height_cm            Float?
-  weight_kg            Float?
-  age                  Int
-  ai_requests_count    Int                   @default(0)
-  ai_requests_reset_at DateTime              @default(now())
-  questionnaires       UserQuestionnaire[]
-  meals                Meal[]
-  nutritionPlans       NutritionPlan[]
-  payments             SubscriptionPayment[]
+  user_id                    String                @id @default(cuid())
+  email                      String                @unique
+  password_hash              String
+  name                       String?
+  signup_date                DateTime              @default(now())
+  subscription_type          SubscriptionType
+  subscription_start         DateTime?
+  subscription_end           DateTime?
+  height_cm                  Float?
+  weight_kg                  Float?
+  age                        Int
+  ai_requests_count          Int                   @default(0)
+  ai_requests_reset_at       DateTime              @default(now())
+  is_questionnaire_completed Boolean               @default(false)
+  questionnaires             UserQuestionnaire[]
+  meals                      Meal[]
+  nutritionPlans             NutritionPlan[]
+  payments                   SubscriptionPayment[]
 
   connectedDevices  ConnectedDevice[]
   activitySummaries DailyActivitySummary[]
@@ -111,38 +112,87 @@ model DailyActivitySummary {
 }
 
 model UserQuestionnaire {
-  questionnaire_id           Int                     @id @default(autoincrement())
-  user                       User                    @relation(fields: [user_id], references: [user_id])
-  user_id                    String
-  date_completed             DateTime                @default(now())
-  physical_activity_level    PhysicalActivityLevel
-  sport_frequency            SportFrequency
-  sport_types                Json?
-  sport_duration_min         Int?
-  meals_per_day              Int?
-  dietary_preferences        Json?
-  avoided_foods              Json?
-  regular_drinks             Json?
-  meal_texture_preference    String?
-  main_goal                  MainGoal
-  specific_goal              String?
-  goal_timeframe_days        Int?
-  program_duration           ProgramDuration
+  questionnaire_id Int      @id @default(autoincrement())
+  user             User     @relation(fields: [user_id], references: [user_id])
+  user_id          String
+  date_completed   DateTime @default(now())
+
+  // Personal data
+  age                      Int
+  gender                   String?
+  height_cm                Float?
+  weight_kg                Float?
+  target_weight_kg         Float?
+  body_fat_percentage      Float?
+  additional_personal_info String?
+
+  // Goals
+  main_goal              MainGoal
+  main_goal_text         String?
+  specific_goal          String?
+  goal_timeframe_days    Int?
+  commitment_level       String?
+  most_important_outcome String?
+  special_personal_goal  String?
+
+  // Physical activity
+  physical_activity_level  PhysicalActivityLevel
+  sport_frequency          SportFrequency
+  sport_types              Json?
+  sport_duration_min       Int?
+  workout_times            String?
+  uses_fitness_devices     Boolean?
+  fitness_device_type      String?
+  additional_activity_info String?
+
+  // Health
+  medical_conditions          Json?
+  medical_conditions_text     String?
+  medications                 String?
+  health_goals                String?
+  functional_issues           String?
+  food_related_medical_issues String?
+
+  // Means and conditions
+  meals_per_day             Int?
+  snacks_between_meals      Boolean?
+  meal_times                String?
+  cooking_preference        String?
+  available_cooking_methods Json?
+  daily_food_budget         Float?
+  shopping_method           String?
+  daily_cooking_time        String?
+
+  // Dietary preferences and restrictions
+  kosher                  Boolean?
+  allergies               Json?
+  allergies_text          String?
+  dietary_style           String?
+  meal_texture_preference String?
+  disliked_foods          String?
+  liked_foods             String?
+  regular_drinks          Json?
+  intermittent_fasting    Boolean?
+  fasting_hours           String?
+
+  // Additional fields
+  past_diet_difficulties String?
+
+  // Legacy fields (keeping for compatibility)
+  program_duration           ProgramDuration?
   meal_timing_restrictions   String?
   dietary_restrictions       String?
   willingness_to_follow      Boolean?
   upcoming_events            String?
-  upload_frequency           UploadFrequency
-  notifications_preference   NotificationsPreference
+  upload_frequency           UploadFrequency?
+  notifications_preference   NotificationsPreference?
   personalized_tips          Boolean?
   health_metrics_integration Boolean?
-  medical_conditions         Json?
-  medications                String?
-  allergies                  Json?
   family_medical_history     Json?
-  smoking_status             SmokingStatus
+  smoking_status             SmokingStatus?
   sleep_hours_per_night      Float?
-  created_at                 DateTime                @default(now())
+
+  created_at DateTime @default(now())
 }
 
 model Meal {
@@ -351,8 +401,8 @@ model ShoppingList {
 
 enum SubscriptionType {
   FREE
-  BASIC
   PREMIUM
+  GOLD
 }
 
 enum SmokingStatus {
@@ -383,6 +433,10 @@ enum MainGoal {
   GENERAL_HEALTH
   MEDICAL_CONDITION
   SPORTS_PERFORMANCE
+  ALERTNESS
+  ENERGY
+  SLEEP_QUALITY
+  OTHER
 }
 
 enum ProgramDuration {

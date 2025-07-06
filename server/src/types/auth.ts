@@ -24,10 +24,14 @@ export const signInSchema = z.object({
 });
 
 export const updateProfileSchema = z.object({
-  name: z.string().min(2).max(50).optional(),
+  name: z.string().min(1).optional(),
   age: z.number().min(1).max(120).optional(),
   weight_kg: z.number().positive().optional(),
   height_cm: z.number().positive().optional(),
+});
+
+export const updateSubscriptionSchema = z.object({
+  subscription_type: z.enum(["FREE", "PREMIUM", "GOLD"]),
 });
 
 export type SignUpInput = z.infer<typeof signUpSchema>;

@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
   ScrollView,
 } from "react-native";
-import { Link, router } from "expo-router";
+import { Link } from "expo-router";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState, AppDispatch } from "@/src/store";
 import { signUp, clearError } from "@/src/store/authSlice";
@@ -17,9 +17,7 @@ import { SignUpSchema } from "@/src/types";
 
 export default function SignUp() {
   const dispatch = useDispatch<AppDispatch>();
-  const { isLoading, error, isAuthenticated } = useSelector(
-    (state: RootState) => state.auth
-  );
+  const { isLoading, error } = useSelector((state: RootState) => state.auth);
 
   const [formData, setFormData] = useState({
     email: "",
@@ -32,7 +30,7 @@ export default function SignUp() {
 
   const handleSignUp = async () => {
     try {
-      console.log("hello world");
+      console.log("Starting sign up process...");
 
       // Parse numeric fields with proper validation
       const parsedAge = parseInt(formData.age);
@@ -63,15 +61,17 @@ export default function SignUp() {
         weight: isNaN(parsedWeight) ? undefined : parsedWeight,
         height: isNaN(parsedHeight) ? undefined : parsedHeight,
       };
-      console.log(data);
+      console.log("Sign up data:", data);
 
       const validatedData = SignUpSchema.parse(data);
       const result = await dispatch(signUp(validatedData));
-      console.log(result);
+      console.log("Sign up result:", result);
 
       if (signUp.fulfilled.match(result)) {
-        console.log("Sign up successful, navigating to tabs...");
-        router.replace("/(tabs)");
+        console.log(
+          "Sign up successful! Navigation will be handled by _layout.tsx"
+        );
+        // Don't navigate here - let the main navigation logic handle it
       } else {
         console.log("Sign up failed:", result.payload);
       }
@@ -87,13 +87,13 @@ export default function SignUp() {
     }
   }, [error, dispatch]);
 
-  // Navigate to tabs when authentication is successful
-  React.useEffect(() => {
-    if (isAuthenticated) {
-      console.log("User is authenticated, navigating to tabs...");
-      router.replace("/(tabs)");
-    }
-  }, [isAuthenticated]);
+  // Remove this useEffect - it was bypassing your main navigation logic!
+  // React.useEffect(() => {
+  //   if (isAuthenticated) {
+  //     console.log("User is authenticated, navigating to tabs...");
+  //     router.replace("/(tabs)");
+  //   }
+  // }, [isAuthenticated]);
 
   return (
     <ScrollView style={styles.container}>

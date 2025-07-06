@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../lib/database";
-import { updateProfileSchema } from "../types/auth";
+import { updateProfileSchema, updateSubscriptionSchema } from "../types/auth";
 import { authenticateToken, AuthRequest } from "../middleware/auth";
 import { StatisticsService } from "../services/statistics";
 
@@ -25,6 +25,51 @@ router.put(
           weight_kg: true,
           height_cm: true,
           ai_requests_count: true,
+          is_questionnaire_completed: true,
+          created_at: true,
+        },
+      });
+
+      res.json({
+        success: true,
+        user: updatedUser,
+      });
+    } catch (error) {
+      if (error instanceof Error) {
+        res.status(400).json({
+          success: false,
+          error: error.message,
+        });
+      } else {
+        next(error);
+      }
+    }
+  }
+);
+
+router.put(
+  "/subscription",
+  authenticateToken,
+  async (req: AuthRequest, res, next) => {
+    try {
+      const validatedData = updateSubscriptionSchema.parse(req.body);
+
+      const updatedUser = await prisma.user.update({
+        where: { user_id: req.user.user_id },
+        data: {
+          subscription_type: validatedData.subscription_type,
+          subscription_start: new Date(),
+        },
+        select: {
+          user_id: true,
+          email: true,
+          name: true,
+          subscription_type: true,
+          age: true,
+          weight_kg: true,
+          height_cm: true,
+          ai_requests_count: true,
+          is_questionnaire_completed: true,
           created_at: true,
         },
       });

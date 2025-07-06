@@ -131,6 +131,19 @@ const authSlice = createSlice({
       state.isAuthenticated = false;
       state.error = null;
     },
+    updateUserSubscription: (
+      state,
+      action: PayloadAction<{ subscription_type: string }>
+    ) => {
+      if (state.user) {
+        state.user.subscription_type = action.payload.subscription_type as any;
+      }
+    },
+    setQuestionnaireCompleted: (state) => {
+      if (state.user) {
+        state.user.is_questionnaire_completed = true;
+      }
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -211,5 +224,10 @@ const authSlice = createSlice({
   },
 });
 
-export const { clearError, forceSignOut } = authSlice.actions;
+export const {
+  clearError,
+  forceSignOut,
+  updateUserSubscription,
+  setQuestionnaireCompleted,
+} = authSlice.actions;
 export default authSlice.reducer;

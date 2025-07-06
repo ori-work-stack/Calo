@@ -46,8 +46,9 @@ export interface User {
   age: number;
   weight_kg?: number;
   height_cm?: number;
-  subscription_type: string;
+  subscription_type: "FREE" | "PREMIUM" | "GOLD";
   aiRequestsCount: number;
+  is_questionnaire_completed: boolean;
   aiRequestsResetAt: string;
   created_at: string;
 }
@@ -142,4 +143,76 @@ export interface DailyStats {
   fiber: number;
   sugar: number;
   mealCount: number;
+}
+
+export interface SignUpInput {
+  email: string;
+  password: string;
+  name: string;
+  age: number;
+  weight?: number;
+  height?: number;
+}
+
+export interface QuestionnaireData {
+  // Personal data
+  age: number;
+  gender?: string;
+  height_cm?: number;
+  weight_kg?: number;
+  target_weight_kg?: number;
+  body_fat_percentage?: number;
+  additional_personal_info?: string;
+
+  // Goals
+  main_goal: string;
+  main_goal_text?: string;
+  specific_goal?: string;
+  goal_timeframe_days?: number;
+  commitment_level?: string;
+  most_important_outcome?: string;
+  special_personal_goal?: string;
+
+  // Physical activity
+  physical_activity_level: string;
+  sport_frequency: string;
+  sport_types?: string[];
+  sport_duration_min?: number;
+  workout_times?: string;
+  uses_fitness_devices?: boolean;
+  fitness_device_type?: string;
+  additional_activity_info?: string;
+
+  // Health
+  medical_conditions?: string[];
+  medical_conditions_text?: string;
+  medications?: string;
+  health_goals?: string;
+  functional_issues?: string;
+  food_related_medical_issues?: string;
+
+  // Means and conditions
+  meals_per_day?: number;
+  snacks_between_meals?: boolean;
+  meal_times?: string;
+  cooking_preference?: string;
+  available_cooking_methods?: string[];
+  daily_food_budget?: number;
+  shopping_method?: string;
+  daily_cooking_time?: string;
+
+  // Dietary preferences and restrictions
+  kosher?: boolean;
+  allergies?: string[];
+  allergies_text?: string;
+  dietary_style?: string;
+  meal_texture_preference?: string;
+  disliked_foods?: string;
+  liked_foods?: string;
+  regular_drinks?: string[];
+  intermittent_fasting?: boolean;
+  fasting_hours?: string;
+
+  // Additional
+  past_diet_difficulties?: string;
 }
