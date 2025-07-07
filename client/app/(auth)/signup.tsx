@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,12 +8,15 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
+  Button,
+  Platform,
 } from "react-native";
 import { Link } from "expo-router";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState, AppDispatch } from "@/src/store";
 import { signUp, clearError } from "@/src/store/authSlice";
 import { SignUpSchema } from "@/src/types";
+import DateTimePicker from "@react-native-community/datetimepicker";
 
 export default function SignUp() {
   const dispatch = useDispatch<AppDispatch>();
@@ -23,33 +26,24 @@ export default function SignUp() {
     email: "",
     password: "",
     name: "",
-    age: "",
-    weight: "",
-    height: "",
+    birth_date: new Date(),
   });
+
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  const onChangeDate = (event: any, selectedDate?: Date) => {
+    const currentDate = selectedDate || formData.birth_date;
+    setShowDatePicker(Platform.OS === "ios");
+    setFormData({ ...formData, birth_date: currentDate });
+  };
 
   const handleSignUp = async () => {
     try {
       console.log("Starting sign up process...");
 
-      // Parse numeric fields with proper validation
-      const parsedAge = parseInt(formData.age);
-      const parsedWeight = parseFloat(formData.weight);
-      const parsedHeight = parseFloat(formData.height);
-
       // Validate required fields
-      if (
-        !formData.email ||
-        !formData.password ||
-        !formData.name ||
-        !formData.age
-      ) {
+      if (!formData.email || !formData.password || !formData.name) {
         Alert.alert("Error", "Please fill in all required fields");
-        return;
-      }
-
-      if (isNaN(parsedAge)) {
-        Alert.alert("Error", "Please enter a valid age");
         return;
       }
 
@@ -57,9 +51,7 @@ export default function SignUp() {
         email: formData.email,
         password: formData.password,
         name: formData.name,
-        age: parsedAge,
-        weight: isNaN(parsedWeight) ? undefined : parsedWeight,
-        height: isNaN(parsedHeight) ? undefined : parsedHeight,
+        birth_date: formData.birth_date,
       };
       console.log("Sign up data:", data);
 
@@ -80,20 +72,12 @@ export default function SignUp() {
     }
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (error) {
       Alert.alert("Error", error);
       dispatch(clearError());
     }
   }, [error, dispatch]);
-
-  // Remove this useEffect - it was bypassing your main navigation logic!
-  // React.useEffect(() => {
-  //   if (isAuthenticated) {
-  //     console.log("User is authenticated, navigating to tabs...");
-  //     router.replace("/(tabs)");
-  //   }
-  // }, [isAuthenticated]);
 
   return (
     <ScrollView style={styles.container}>
@@ -123,29 +107,20 @@ export default function SignUp() {
         onChangeText={(text) => setFormData({ ...formData, name: text })}
       />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Age *"
-        value={formData.age}
-        onChangeText={(text) => setFormData({ ...formData, age: text })}
-        keyboardType="numeric"
+      <Text style={styles.label}>Birth Date *</Text>
+      <Button
+        title={formData.birth_date.toDateString()}
+        onPress={() => setShowDatePicker(true)}
       />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Weight (kg, optional)"
-        value={formData.weight}
-        onChangeText={(text) => setFormData({ ...formData, weight: text })}
-        keyboardType="numeric"
-      />
-
-      <TextInput
-        style={styles.input}
-        placeholder="Height (cm, optional)"
-        value={formData.height}
-        onChangeText={(text) => setFormData({ ...formData, height: text })}
-        keyboardType="numeric"
-      />
+      {showDatePicker && (
+        <DateTimePicker
+          value={formData.birth_date}
+          mode="date"
+          display="default"
+          onChange={onChangeDate}
+        />
+      )}
 
       <TouchableOpacity
         style={styles.button}
@@ -187,12 +162,18 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     fontSize: 16,
   },
+  label: {
+    fontSize: 16,
+    marginBottom: 8,
+    fontWeight: "500",
+  },
   button: {
     backgroundColor: "#007AFF",
     padding: 15,
     borderRadius: 8,
     alignItems: "center",
     marginBottom: 20,
+    marginTop: 20,
   },
   buttonText: {
     color: "white",

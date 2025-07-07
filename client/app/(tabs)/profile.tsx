@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -21,40 +20,35 @@ import { authAPI, userAPI } from "@/src/services/api";
 
 interface ProfileFormData {
   name: string;
-  age: string;
-  gender: string;
-  weight_kg: string;
-  height_cm: string;
-  health_goal: string;
+  birth_date: string; // Changed from age to birth_date
+  // Removed: gender, weight_kg, height_cm, health_goal (not in User schema)
 }
 
 export default function ProfileScreen() {
   const dispatch = useDispatch<AppDispatch>();
   const { user, isLoading } = useSelector((state: RootState) => state.auth);
 
-  // Form states
+  // Form states - aligned with User schema
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<ProfileFormData>({
     name: user?.name || "",
-    age: user?.age?.toString() || "",
-    gender: user?.gender || "",
-    weight_kg: user?.weight_kg?.toString() || "",
-    height_cm: user?.height_cm?.toString() || "",
-    health_goal: user?.health_goal || "",
+    birth_date: user?.birth_date
+      ? new Date(user.birth_date).toISOString().split("T")[0]
+      : "",
   });
 
-  // Notification settings
+  // Notification settings (these would need to be stored elsewhere or removed)
   const [mealReminders, setMealReminders] = useState(true);
   const [waterReminders, setWaterReminders] = useState(true);
   const [goalAlerts, setGoalAlerts] = useState(true);
 
-  // Display settings
+  // Display settings (these would need to be stored elsewhere or removed)
   const [language, setLanguage] = useState("hebrew");
   const [units, setUnits] = useState("metric");
   const [darkMode, setDarkMode] = useState("auto");
 
-  // Verification status
-  const [emailVerified] = useState(true); // Assuming verified for now
+  // Verification status - using email from User schema
+  const [emailVerified] = useState(true);
   const [phoneVerified] = useState(false);
 
   // Modal states
@@ -73,11 +67,9 @@ export default function ProfileScreen() {
     if (user) {
       setFormData({
         name: user.name || "",
-        age: user.age?.toString() || "",
-        gender: user.gender || "",
-        weight_kg: user.weight_kg?.toString() || "",
-        height_cm: user.height_cm?.toString() || "",
-        health_goal: user.health_goal || "",
+        birth_date: user.birth_date
+          ? new Date(user.birth_date).toISOString().split("T")[0]
+          : "",
       });
     }
   }, [user]);
@@ -88,11 +80,9 @@ export default function ProfileScreen() {
 
     const originalData = {
       name: user.name || "",
-      age: user.age?.toString() || "",
-      gender: user.gender || "",
-      weight_kg: user.weight_kg?.toString() || "",
-      height_cm: user.height_cm?.toString() || "",
-      health_goal: user.health_goal || "",
+      birth_date: user.birth_date
+        ? new Date(user.birth_date).toISOString().split("T")[0]
+        : "",
     };
 
     const isChanged = Object.keys(originalData).some(
@@ -109,16 +99,13 @@ export default function ProfileScreen() {
     try {
       setIsDeleting(true);
 
-      // Call your API service
       const response = await userAPI.deleteProfile();
 
       if (response.success) {
-        // Show success message
         Alert.alert("חשבון נמחק בהצלחה", "החשבון שלך נמחק לצמיתות מהמערכת", [
           {
             text: "אישור",
             onPress: () => {
-              // Clear any stored tokens/data and sign out
               dispatch(forceSignOut());
               router.replace("/(auth)/signin");
             },
@@ -129,9 +116,11 @@ export default function ProfileScreen() {
       }
     } catch (error: any) {
       console.error("Error deleting account:", error);
-      Alert.alert("שגיאה", error.message || "אירעה שגיאה במחיקת החשבון. נסה שנית.", [
-        { text: "אישור" },
-      ]);
+      Alert.alert(
+        "שגיאה",
+        error.message || "אירעה שגיאה במחיקת החשבון. נסה שנית.",
+        [{ text: "אישור" }]
+      );
     } finally {
       setIsDeleting(false);
       setShowDeleteModal(false);
@@ -156,48 +145,27 @@ export default function ProfileScreen() {
       setIsSaving(true);
 
       // Validate required fields
-      if (!formData.name || !formData.age) {
-        Alert.alert("שגיאה", "אנא מלא את כל השדות הנדרשים");
+      if (!formData.name) {
+        Alert.alert("שגיאה", "אנא מלא את השם");
         return;
       }
 
-      // Validate age
-      const age = parseInt(formData.age);
-      if (isNaN(age) || age <= 0 || age > 120) {
-        Alert.alert("שגיאה", "אנא הכנס גיל תקין");
+      // Validate birth_date
+      if (!formData.birth_date) {
+        Alert.alert("שגיאה", "אנא הכנס תאריך לידה");
         return;
       }
 
-      // Validate weight if provided
-      if (formData.weight_kg && (isNaN(parseFloat(formData.weight_kg)) || parseFloat(formData.weight_kg) <= 0)) {
-        Alert.alert("שגיאה", "אנא הכנס משקל תקין");
+      const birthDate = new Date(formData.birth_date);
+      if (isNaN(birthDate.getTime())) {
+        Alert.alert("שגיאה", "אנא הכנס תאריך לידה תקין");
         return;
       }
 
-      // Validate height if provided
-      if (formData.height_cm && (isNaN(parseFloat(formData.height_cm)) || parseFloat(formData.height_cm) <= 0)) {
-        Alert.alert("שגיאה", "אנא הכנס גובה תקין");
-        return;
-      }
-
-      const updateData: any = {
+      const updateData = {
         name: formData.name.trim(),
-        age: age,
+        birth_date: birthDate.toISOString(),
       };
-
-      // Add optional fields only if they have values
-      if (formData.gender) {
-        updateData.gender = formData.gender;
-      }
-      if (formData.weight_kg) {
-        updateData.weight_kg = parseFloat(formData.weight_kg);
-      }
-      if (formData.height_cm) {
-        updateData.height_cm = parseFloat(formData.height_cm);
-      }
-      if (formData.health_goal) {
-        updateData.health_goal = formData.health_goal;
-      }
 
       // Call the API
       const response = await userAPI.updateProfile(updateData);
@@ -206,8 +174,6 @@ export default function ProfileScreen() {
         Alert.alert("הצלחה", "הפרטים עודכנו בהצלחה");
         setIsEditing(false);
         setHasChanges(false);
-        // You might want to update the user in your Redux store here
-        // dispatch(updateUser(response.user));
       } else {
         throw new Error(response.error || "Failed to update profile");
       }
@@ -244,7 +210,6 @@ export default function ProfileScreen() {
     try {
       setIsChangingPassword(true);
 
-      // You'll need to add this method to your userAPI
       const response = await userAPI.changePassword?.({
         currentPassword,
         newPassword,
@@ -267,6 +232,22 @@ export default function ProfileScreen() {
     }
   };
 
+  // Calculate age from birth_date for display
+  const calculateAge = (birthDate: string) => {
+    if (!birthDate) return null;
+    const today = new Date();
+    const birth = new Date(birthDate);
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (
+      monthDiff < 0 ||
+      (monthDiff === 0 && today.getDate() < birth.getDate())
+    ) {
+      age--;
+    }
+    return age;
+  };
+
   const renderPersonalInfo = () => (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>פרטי חשבון אישיים</Text>
@@ -286,119 +267,53 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.infoRow}>
-        <Text style={styles.infoLabel}>גיל *</Text>
+        <Text style={styles.infoLabel}>תאריך לידה *</Text>
         {isEditing ? (
           <TextInput
             style={styles.editInput}
-            value={formData.age}
-            onChangeText={(text) => setFormData({ ...formData, age: text })}
-            placeholder="הכנס גיל"
-            keyboardType="numeric"
-          />
-        ) : (
-          <Text style={styles.infoValue}>{formData.age || "לא הוגדר"}</Text>
-        )}
-      </View>
-
-      <View style={styles.infoRow}>
-        <Text style={styles.infoLabel}>מין</Text>
-        {isEditing ? (
-          <View style={styles.segmentedControl}>
-            <TouchableOpacity
-              style={[
-                styles.segmentButton,
-                formData.gender === "male" && styles.segmentButtonActive,
-              ]}
-              onPress={() => setFormData({ ...formData, gender: "male" })}
-            >
-              <Text
-                style={[
-                  styles.segmentText,
-                  formData.gender === "male" && styles.segmentTextActive,
-                ]}
-              >
-                זכר
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.segmentButton,
-                formData.gender === "female" && styles.segmentButtonActive,
-              ]}
-              onPress={() => setFormData({ ...formData, gender: "female" })}
-            >
-              <Text
-                style={[
-                  styles.segmentText,
-                  formData.gender === "female" && styles.segmentTextActive,
-                ]}
-              >
-                נקבה
-              </Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <Text style={styles.infoValue}>
-            {formData.gender === "male" ? "זכר" : formData.gender === "female" ? "נקבה" : "לא הוגדר"}
-          </Text>
-        )}
-      </View>
-
-      <View style={styles.infoRow}>
-        <Text style={styles.infoLabel}>משקל נוכחי (ק"ג)</Text>
-        {isEditing ? (
-          <TextInput
-            style={styles.editInput}
-            value={formData.weight_kg}
+            value={formData.birth_date}
             onChangeText={(text) =>
-              setFormData({ ...formData, weight_kg: text })
+              setFormData({ ...formData, birth_date: text })
             }
-            placeholder="הכנס משקל"
-            keyboardType="numeric"
+            placeholder="YYYY-MM-DD"
           />
         ) : (
           <Text style={styles.infoValue}>
-            {formData.weight_kg ? `${formData.weight_kg} ק"ג` : "לא הוגדר"}
+            {formData.birth_date
+              ? `${new Date(formData.birth_date).toLocaleDateString(
+                  "he-IL"
+                )} (גיל ${calculateAge(formData.birth_date)})`
+              : "לא הוגדר"}
           </Text>
         )}
       </View>
 
       <View style={styles.infoRow}>
-        <Text style={styles.infoLabel}>גובה (ס"מ)</Text>
-        {isEditing ? (
-          <TextInput
-            style={styles.editInput}
-            value={formData.height_cm}
-            onChangeText={(text) =>
-              setFormData({ ...formData, height_cm: text })
-            }
-            placeholder="הכנס גובה"
-            keyboardType="numeric"
-          />
-        ) : (
-          <Text style={styles.infoValue}>
-            {formData.height_cm ? `${formData.height_cm} ס"מ` : "לא הוגדר"}
-          </Text>
-        )}
+        <Text style={styles.infoLabel}>סוג מנוי</Text>
+        <Text style={styles.infoValue}>
+          {user?.subscription_type || "לא מוגדר"}
+        </Text>
       </View>
 
       <View style={styles.infoRow}>
-        <Text style={styles.infoLabel}>יעד בריאותי כללי</Text>
-        {isEditing ? (
-          <TextInput
-            style={styles.editInput}
-            value={formData.health_goal}
-            onChangeText={(text) =>
-              setFormData({ ...formData, health_goal: text })
-            }
-            placeholder="הכנס יעד בריאותי"
-            multiline
-          />
-        ) : (
-          <Text style={styles.infoValue}>
-            {formData.health_goal || "לא הוגדר"}
-          </Text>
-        )}
+        <Text style={styles.infoLabel}>תאריך רישום</Text>
+        <Text style={styles.infoValue}>
+          {user?.created_at
+            ? new Date(user.created_at).toLocaleDateString("he-IL")
+            : "לא מוגדר"}
+        </Text>
+      </View>
+
+      <View style={styles.infoRow}>
+        <Text style={styles.infoLabel}>בקשות AI החודש</Text>
+        <Text style={styles.infoValue}>{user?.ai_requests_count || 0}</Text>
+      </View>
+
+      <View style={styles.infoRow}>
+        <Text style={styles.infoLabel}>שאלון הושלם</Text>
+        <Text style={styles.infoValue}>
+          {user?.is_questionnaire_completed ? "כן" : "לא"}
+        </Text>
       </View>
 
       {isEditing && (
@@ -414,19 +329,16 @@ export default function ProfileScreen() {
               <Text style={styles.saveButtonText}>שמור שינויים</Text>
             )}
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={styles.cancelButton}
             onPress={() => {
               setIsEditing(false);
-              // Reset form data to original values
               setFormData({
                 name: user?.name || "",
-                age: user?.age?.toString() || "",
-                gender: user?.gender || "",
-                weight_kg: user?.weight_kg?.toString() || "",
-                height_cm: user?.height_cm?.toString() || "",
-                health_goal: user?.health_goal || "",
+                birth_date: user?.birth_date
+                  ? new Date(user.birth_date).toISOString().split("T")[0]
+                  : "",
               });
             }}
           >
@@ -462,22 +374,15 @@ export default function ProfileScreen() {
           </View>
         </View>
       </View>
-
-      <View style={styles.infoRow}>
-        <Text style={styles.infoLabel}>טלפון נייד</Text>
-        <View style={styles.verificationContainer}>
-          <Text style={styles.infoValue}>לא הוגדר</Text>
-          <TouchableOpacity style={styles.verifyButton}>
-            <Text style={styles.verifyButtonText}>שלח קוד אימות</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
     </View>
   );
 
   const renderNotificationSettings = () => (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>הגדרות תזכורות והתראות</Text>
+      <Text style={styles.sectionNote}>
+        הגדרות אלו נשמרות באפליקציה ולא במסד הנתונים
+      </Text>
 
       <View style={styles.switchRow}>
         <Text style={styles.switchLabel}>תזכורות לארוחות</Text>
@@ -514,6 +419,9 @@ export default function ProfileScreen() {
   const renderDisplaySettings = () => (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>הגדרות תצוגה ומערכת</Text>
+      <Text style={styles.sectionNote}>
+        הגדרות אלו נשמרות באפליקציה ולא במסד הנתונים
+      </Text>
 
       <View style={styles.infoRow}>
         <Text style={styles.infoLabel}>שפה</Text>
@@ -766,14 +674,10 @@ export default function ProfileScreen() {
 
             <View style={styles.deleteWarningList}>
               <Text style={styles.deleteWarningItem}>• כל המידע האישי</Text>
-              <Text style={styles.deleteWarningItem}>
-                • היסטוריית הארוחות
-              </Text>
+              <Text style={styles.deleteWarningItem}>• היסטוריית הארוחות</Text>
               <Text style={styles.deleteWarningItem}>• תוכניות התזונה</Text>
               <Text style={styles.deleteWarningItem}>• רשימות הקניות</Text>
-              <Text style={styles.deleteWarningItem}>
-                • כל הנתונים האחרים
-              </Text>
+              <Text style={styles.deleteWarningItem}>• כל הנתונים האחרים</Text>
             </View>
 
             <View style={styles.modalButtons}>

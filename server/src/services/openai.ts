@@ -5,6 +5,7 @@ import {
   MealPlanResponse,
   ReplacementMealRequest,
 } from "../types/openai";
+import { extractCleanJSON } from "../utils/openai";
 
 const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({
@@ -24,31 +25,28 @@ export class OpenAIService {
       // Check if OpenAI API key is available
       if (!process.env.OPENAI_API_KEY || !openai) {
         console.log("⚠️ No OpenAI API key found, using mock analysis");
-        return this.getMockAnalysis(updateText);
+        // Return a mock result when API key is not available
+        return this.getMockAnalysisResult();
       }
 
-      const systemPrompt = `You are a professional nutritionist and food analyst. Analyze the food image and provide detailed nutritional information.
+      const systemPrompt = `You are a professional nutritionist. Analyze the food image and provide precise nutritional data.
 
-IMPORTANT INSTRUCTIONS:
-1. Analyze all visible food items in the image.
-2. Estimate portion sizes based on visual cues.
-3. Provide accurate nutritional values for the full visible serving.
-4. If there are multiple items, estimate and sum their nutritional values.
-5. Be conservative with estimates – prefer underestimating rather than overestimating.
-6. Consider cooking methods that affect nutrition (frying, boiling, grilling, etc.).
-7. Account for visible added oils, sauces, and seasonings.
-8. Include potential allergens, additives, and micronutrients where observable.
+ANALYSIS RULES:
+1. Analyze all visible food items and estimate total serving size
+2. Provide accurate nutritional values for the complete visible portion
+3. Be conservative with estimates - prefer underestimating
+4. Consider cooking methods, visible oils, sauces, and seasonings
+5. Identify potential allergens and additives
 
 ${
   updateText
-    ? `ADDITIONAL CONTEXT: The user provided this additional information: "${updateText}". Please incorporate this into your analysis and adjust nutritional values accordingly.`
+    ? `CONTEXT: User provided: "${updateText}". Incorporate this into your analysis.`
     : ""
 }
 
-Respond with a JSON object containing:
+Return JSON with ALL fields below:
 {
-  "meal_name": "Brief descriptive name of the meal/food",
-  "description": "Detailed description of what is visible in the image",
+  "meal_name": "Brief descriptive name",
   "calories": number,
   "protein_g": number,
   "carbs_g": number,
@@ -68,9 +66,7 @@ Respond with a JSON object containing:
   "caffeine_mg": number,
   "liquids_ml": number,
   "serving_size_g": number,
-  "allergens_json": {
-    "possible_allergens": ["list", "of", "common", "allergens", "if", "any"]
-  },
+  "allergens_json": {"possible_allergens": ["gluten", "dairy", "nuts", "etc"]},
   "vitamins_json": {
     "vitamin_a_mcg": number,
     "vitamin_c_mg": number,
@@ -98,27 +94,25 @@ Respond with a JSON object containing:
   },
   "glycemic_index": number,
   "insulin_index": number,
-  "food_category": "e.g. Fast Food, Homemade, Snack, Beverage, etc.",
-  "processing_level": "e.g. Unprocessed, Minimally processed, Ultra-processed",
-  "cooking_method": "e.g. Grilled, Fried, Boiled, Raw, Baked",
-  "additives_json": {
-    "observed_additives": ["list", "of", "known", "or", "assumed", "additives"]
-  },
-  "health_risk_notes": "Brief health assessment, e.g., high in sodium, ultra-processed, rich in fiber, etc.",
-  "confidence": number (between 0 and 1, indicating how confident you are in this analysis),
-  "ingredients": ["list", "of", "main", "visible", "ingredients"],
-  "servingSize": "e.g. One sandwich, 1 bowl, 2 slices",
-  "cookingMethod": "How the food appears to be prepared",
-  "healthNotes": "Brief notes on healthiness or potential dietary concerns"
+  "food_category": "Fast Food/Homemade/Snack/Beverage/etc",
+  "processing_level": "Unprocessed/Minimally processed/Ultra-processed",
+  "cooking_method": "Grilled/Fried/Boiled/Raw/Baked/etc",
+  "additives_json": {"observed_additives": ["preservatives", "colorings", "etc"]},
+  "health_risk_notes": "Brief health assessment",
+  "confidence": number (0-1),
+  "ingredients": ["main", "visible", "ingredients"],
+  "servingSize": "1 bowl/2 slices/etc",
+  "cookingMethod": "How prepared",
+  "healthNotes": "Brief dietary notes"
 }
 
-Language for response: ${language}`;
+Language: ${language}`;
 
       const userPrompt = updateText
         ? `Please analyze this food image. Additional context: ${updateText}`
         : "Please analyze this food image and provide detailed nutritional information.";
 
-      const response = await openai.chat.completions.create({
+      const response = await openai?.chat.completions.create({
         model: "gpt-4o",
         messages: [
           {
@@ -146,153 +140,193 @@ Language for response: ${language}`;
         temperature: 0.1,
       });
 
-      const content = response.choices[0]?.message?.content;
+      const content = response?.choices[0]?.message?.content;
       if (!content) {
         throw new Error("No response from OpenAI");
       }
 
       console.log("🤖 OpenAI raw response:", content);
 
-      // Parse JSON response
-      let analysisResult: MealAnalysisResult;
+      // Parse JSON response using your extractCleanJSON function
       try {
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        const jsonString = jsonMatch ? jsonMatch[0] : content;
-        const parsed = JSON.parse(jsonString);
+        const cleanJSON = extractCleanJSON(content);
+        console.log("🧹 Cleaned JSON:", cleanJSON);
 
-        analysisResult = {
-          name: parsed.name || "Unknown Food",
+        const parsed = JSON.parse(cleanJSON);
+        console.log("📊 Parsed OpenAI response:", parsed);
+
+        const analysisResult: MealAnalysisResult = {
+          // Basic identification
+          name: parsed.meal_name || "Unknown Food",
           description: parsed.description || "",
+
+          // Core macronutrients
           calories: Math.max(0, Number(parsed.calories) || 0),
-          protein: Math.max(0, Number(parsed.protein) || 0),
-          carbs: Math.max(0, Number(parsed.carbs) || 0),
-          fat: Math.max(0, Number(parsed.fat) || 0),
-          fiber: parsed.fiber ? Math.max(0, Number(parsed.fiber)) : undefined,
-          sugar: parsed.sugar ? Math.max(0, Number(parsed.sugar)) : undefined,
-          sodium: parsed.sodium
-            ? Math.max(0, Number(parsed.sodium))
+          protein: Math.max(0, Number(parsed.protein_g) || 0),
+          carbs: Math.max(0, Number(parsed.carbs_g) || 0),
+          fat: Math.max(0, Number(parsed.fats_g) || 0),
+
+          // Detailed macronutrients
+          saturated_fats_g: parsed.saturated_fats_g
+            ? Math.max(0, Number(parsed.saturated_fats_g))
             : undefined,
+          polyunsaturated_fats_g: parsed.polyunsaturated_fats_g
+            ? Math.max(0, Number(parsed.polyunsaturated_fats_g))
+            : undefined,
+          monounsaturated_fats_g: parsed.monounsaturated_fats_g
+            ? Math.max(0, Number(parsed.monounsaturated_fats_g))
+            : undefined,
+          omega_3_g: parsed.omega_3_g
+            ? Math.max(0, Number(parsed.omega_3_g))
+            : undefined,
+          omega_6_g: parsed.omega_6_g
+            ? Math.max(0, Number(parsed.omega_6_g))
+            : undefined,
+
+          // Carbohydrate details
+          fiber: parsed.fiber_g
+            ? Math.max(0, Number(parsed.fiber_g))
+            : undefined,
+          soluble_fiber_g: parsed.soluble_fiber_g
+            ? Math.max(0, Number(parsed.soluble_fiber_g))
+            : undefined,
+          insoluble_fiber_g: parsed.insoluble_fiber_g
+            ? Math.max(0, Number(parsed.insoluble_fiber_g))
+            : undefined,
+          sugar: parsed.sugar_g
+            ? Math.max(0, Number(parsed.sugar_g))
+            : undefined,
+
+          // Other nutrients
+          cholesterol_mg: parsed.cholesterol_mg
+            ? Math.max(0, Number(parsed.cholesterol_mg))
+            : undefined,
+          sodium: parsed.sodium_mg
+            ? Math.max(0, Number(parsed.sodium_mg))
+            : undefined,
+          alcohol_g: parsed.alcohol_g
+            ? Math.max(0, Number(parsed.alcohol_g))
+            : undefined,
+          caffeine_mg: parsed.caffeine_mg
+            ? Math.max(0, Number(parsed.caffeine_mg))
+            : undefined,
+          liquids_ml: parsed.liquids_ml
+            ? Math.max(0, Number(parsed.liquids_ml))
+            : undefined,
+          serving_size_g: parsed.serving_size_g
+            ? Math.max(0, Number(parsed.serving_size_g))
+            : undefined,
+
+          // JSON fields
+          allergens_json: parsed.allergens_json || null,
+          vitamins_json: parsed.vitamins_json || null,
+          micronutrients_json: parsed.micronutrients_json || null,
+          additives_json: parsed.additives_json || null,
+
+          // Indexes and categories
+          glycemic_index: parsed.glycemic_index
+            ? Math.max(0, Number(parsed.glycemic_index))
+            : undefined,
+          insulin_index: parsed.insulin_index
+            ? Math.max(0, Number(parsed.insulin_index))
+            : undefined,
+          food_category: parsed.food_category || null,
+          processing_level: parsed.processing_level || null,
+          cooking_method: parsed.cooking_method || null,
+          health_risk_notes: parsed.health_risk_notes || null,
+
+          // Legacy fields for compatibility
           confidence: Math.min(
             100,
-            Math.max(0, Number(parsed.confidence) || 75)
+            Math.max(0, Number(parsed.confidence) * 100 || 75)
           ),
-          ingredients: Array.isArray(parsed.ingredients)
-            ? parsed.ingredients
-            : [],
+          ingredients: [],
           servingSize: parsed.servingSize || "1 serving",
           cookingMethod: parsed.cookingMethod || "Unknown",
           healthNotes: parsed.healthNotes || "",
         };
+
+        // Log the complete parsed data for debugging
+        console.log("📋 Complete OpenAI nutrition data:", {
+          meal_name: parsed.meal_name,
+          calories: parsed.calories,
+          protein_g: parsed.protein_g,
+          carbs_g: parsed.carbs_g,
+          fats_g: parsed.fats_g,
+          fiber_g: parsed.fiber_g,
+          sugar_g: parsed.sugar_g,
+          sodium_mg: parsed.sodium_mg,
+          vitamins: parsed.vitamins_json,
+          micronutrients: parsed.micronutrients_json,
+          allergens: parsed.allergens_json,
+          confidence: parsed.confidence,
+          serving_size_g: parsed.serving_size_g,
+          glycemic_index: parsed.glycemic_index,
+          insulin_index: parsed.insulin_index,
+          food_category: parsed.food_category,
+          processing_level: parsed.processing_level,
+          cooking_method: parsed.cooking_method,
+          health_risk_notes: parsed.health_risk_notes,
+        });
+
+        return analysisResult;
       } catch (parseError) {
         console.error("💥 Failed to parse OpenAI response:", parseError);
         console.error("📄 Raw content:", content);
+        console.error("🧹 Attempted to clean:", extractCleanJSON(content));
 
-        analysisResult = this.getMockAnalysis(updateText);
+        // Return fallback result when parsing fails
+        return this.getFallbackAnalysisResult();
       }
-
-      console.log("✅ Analysis completed:", analysisResult);
-      return analysisResult;
     } catch (error) {
       console.error("💥 OpenAI analysis error:", error);
-      return this.getMockAnalysis(updateText);
+
+      // Return fallback result when OpenAI API fails
+      return this.getFallbackAnalysisResult();
     }
   }
 
-  private static getMockAnalysis(updateText?: string): MealAnalysisResult {
-    console.log("🎭 Using mock meal analysis");
-
-    // Generate varied mock data based on update text or random
-    const mockMeals = [
-      {
-        name: "Grilled Chicken Salad",
-        description:
-          "Fresh mixed greens with grilled chicken breast, cherry tomatoes, and olive oil dressing",
-        calories: 350,
-        protein: 35,
-        carbs: 12,
-        fat: 18,
-        fiber: 6,
-        sugar: 8,
-        sodium: 450,
-        ingredients: [
-          "chicken breast",
-          "mixed greens",
-          "cherry tomatoes",
-          "olive oil",
-          "lemon",
-        ],
-        cookingMethod: "Grilled",
-        healthNotes: "High protein, low carb meal with healthy fats",
-      },
-      {
-        name: "Pasta with Marinara",
-        description:
-          "Whole wheat pasta with homemade marinara sauce and fresh basil",
-        calories: 420,
-        protein: 15,
-        carbs: 65,
-        fat: 8,
-        fiber: 8,
-        sugar: 12,
-        sodium: 680,
-        ingredients: [
-          "whole wheat pasta",
-          "tomatoes",
-          "garlic",
-          "basil",
-          "olive oil",
-        ],
-        cookingMethod: "Boiled and simmered",
-        healthNotes: "Good source of complex carbohydrates and fiber",
-      },
-      {
-        name: "Avocado Toast",
-        description:
-          "Whole grain bread topped with mashed avocado, tomato, and a sprinkle of salt",
-        calories: 280,
-        protein: 8,
-        carbs: 25,
-        fat: 18,
-        fiber: 10,
-        sugar: 3,
-        sodium: 320,
-        ingredients: [
-          "whole grain bread",
-          "avocado",
-          "tomato",
-          "salt",
-          "pepper",
-        ],
-        cookingMethod: "Toasted",
-        healthNotes: "Rich in healthy monounsaturated fats and fiber",
-      },
-    ];
-
-    const randomMeal = mockMeals[Math.floor(Math.random() * mockMeals.length)];
-
-    // Adjust based on update text if provided
-    if (updateText) {
-      const lowerUpdate = updateText.toLowerCase();
-      if (
-        lowerUpdate.includes("more") ||
-        lowerUpdate.includes("extra") ||
-        lowerUpdate.includes("additional")
-      ) {
-        randomMeal.calories = Math.round(randomMeal.calories * 1.3);
-        randomMeal.protein = Math.round(randomMeal.protein * 1.3);
-        randomMeal.carbs = Math.round(randomMeal.carbs * 1.3);
-        randomMeal.fat = Math.round(randomMeal.fat * 1.3);
-        randomMeal.name += " (Large Portion)";
-      }
-    }
-
+  // Helper method to provide a mock result when API key is missing
+  private static getMockAnalysisResult(): MealAnalysisResult {
     return {
-      ...randomMeal,
-      confidence: 85,
+      name: "Unknown Food (Mock)",
+      description: "Analysis unavailable - no API key",
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+      confidence: 0,
+      ingredients: [],
       servingSize: "1 serving",
+      cookingMethod: "Unknown",
+      healthNotes: "Unable to analyze without API key",
+      allergens_json: null,
+      vitamins_json: null,
+      micronutrients_json: null,
+      additives_json: null,
     };
   }
 
+  // Helper method to provide a fallback result when analysis fails
+  private static getFallbackAnalysisResult(): MealAnalysisResult {
+    return {
+      name: "Unknown Food",
+      description: "Analysis failed",
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+      confidence: 0,
+      ingredients: [],
+      servingSize: "1 serving",
+      cookingMethod: "Unknown",
+      healthNotes: "Unable to analyze this image",
+      allergens_json: null,
+      vitamins_json: null,
+      micronutrients_json: null,
+      additives_json: null,
+    };
+  }
   static async updateMealAnalysis(
     originalAnalysis: MealAnalysisResult,
     updateText: string,

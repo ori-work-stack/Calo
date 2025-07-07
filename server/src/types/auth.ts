@@ -13,9 +13,9 @@ export const signUpSchema = z.object({
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
       "Password must contain at least one lowercase letter, one uppercase letter, and one number"
     ),
-  age: z.coerce.number().min(1).max(120),
-  weight: z.coerce.number().positive().optional(),
-  height: z.coerce.number().positive().optional(),
+  birth_date: z.preprocess((arg) => {
+    if (typeof arg === "string" || arg instanceof Date) return new Date(arg);
+  }, z.date()),
 });
 
 export const signInSchema = z.object({
@@ -25,9 +25,9 @@ export const signInSchema = z.object({
 
 export const updateProfileSchema = z.object({
   name: z.string().min(1).optional(),
-  age: z.number().min(1).max(120).optional(),
-  weight_kg: z.number().positive().optional(),
-  height_cm: z.number().positive().optional(),
+  birth_date: z.preprocess((arg) => {
+    if (typeof arg === "string" || arg instanceof Date) return new Date(arg);
+  }, z.date()),
 });
 
 export const updateSubscriptionSchema = z.object({

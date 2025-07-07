@@ -12,9 +12,7 @@ const userSelectFields = {
   email: true,
   name: true,
   subscription_type: true,
-  age: true,
-  weight_kg: true,
-  height_cm: true,
+  birth_date: true,
   ai_requests_count: true,
   ai_requests_reset_at: true,
   created_at: true,
@@ -32,7 +30,7 @@ function getSessionExpiryDate() {
 
 export class AuthService {
   static async signUp(data: SignUpInput) {
-    const { email, name, password, age, weight, height } = data;
+    const { email, name, password, birth_date } = data;
 
     const existingUser = await prisma.user.findFirst({
       where: { OR: [{ email }] },
@@ -54,9 +52,7 @@ export class AuthService {
         name,
         password_hash: hashedPassword,
         subscription_type: "FREE",
-        age: Number(age),
-        weight_kg: weight,
-        height_cm: height,
+        birth_date: new Date(),
         ai_requests_count: 0,
         ai_requests_reset_at: new Date(),
       },

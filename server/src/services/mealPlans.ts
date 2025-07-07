@@ -75,8 +75,8 @@ export class MealPlanService {
       });
 
       // Get user's basic info
-      const user = await prisma.user.findUnique({
-        where: { user_id },
+      const user = await prisma.userQuestionnaire.findFirst({
+        where: { user_id: user_id },
         select: {
           age: true,
           weight_kg: true,
@@ -459,11 +459,6 @@ export class MealPlanService {
     user: any
   ) {
     return {
-      // Basic info with null safety
-      age: user?.age ?? 30,
-      weight_kg: user?.weight_kg ?? 70,
-      height_cm: user?.height_cm ?? 170,
-
       // Nutrition goals
       target_calories_daily: nutritionPlan?.goal_calories ?? 2000,
       target_protein_daily: nutritionPlan?.goal_protein_g ?? 150,
@@ -498,7 +493,7 @@ export class MealPlanService {
 
       // Cooking preferences
       cooking_skill_level: "intermediate",
-      available_cooking_time: this.getCookingTimeFromMealCount(
+      available_cooking_time: this.getCookingTimeFrommeal_count(
         config.meals_per_day
       ),
       kitchen_equipment: ["oven", "stovetop", "microwave"],
@@ -884,8 +879,8 @@ export class MealPlanService {
         orderBy: { date_completed: "desc" },
       });
 
-      const user = await prisma.user.findUnique({
-        where: { user_id },
+      const user = await prisma.userQuestionnaire.findFirst({
+        where: { user_id: user_id },
         select: { age: true, weight_kg: true, height_cm: true },
       });
 
@@ -1112,7 +1107,7 @@ export class MealPlanService {
   }
 
   // Helper methods
-  private static getCookingTimeFromMealCount(meals_per_day: number): string {
+  private static getCookingTimeFrommeal_count(meals_per_day: number): string {
     if (meals_per_day <= 2) return "minimal"; // 15-30 min total
     if (meals_per_day === 3) return "moderate"; // 30-60 min total
     return "extensive"; // 60+ min total

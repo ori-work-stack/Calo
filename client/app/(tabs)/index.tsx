@@ -207,8 +207,8 @@ export default function Dashboard() {
               <Text style={styles.statLabel}>Fat</Text>
             </View>
           </View>
-          <Text style={styles.mealCount}>
-            {dailyStats.mealCount} meals logged today
+          <Text style={styles.meal_count}>
+            {dailyStats.meal_count} meals logged today
           </Text>
         </View>
       )}
@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
     color: "#666",
     marginTop: 5,
   },
-  mealCount: {
+  meal_count: {
     textAlign: "center",
     color: "#666",
     marginTop: 10,

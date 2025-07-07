@@ -7,9 +7,9 @@ export const SignUpSchema = z.object({
   email: z.string().email("Invalid email"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   name: z.string(),
-  age: z.number().min(1).max(120),
-  weight: z.number().positive().optional(),
-  height: z.number().positive().optional(),
+  birth_date: z.preprocess((arg) => {
+    if (typeof arg === "string" || arg instanceof Date) return new Date(arg);
+  }, z.date()),
 });
 
 export const SignInSchema = z.object({
@@ -18,15 +18,28 @@ export const SignInSchema = z.object({
 });
 
 export const MealAnalysisSchema = z.object({
-  name: z.string(),
+  meal_name: z.string(),
   description: z.string().optional(),
   calories: z.number(),
-  protein: z.number(),
-  carbs: z.number(),
-  fat: z.number(),
-  fiber: z.number().optional(),
-  sugar: z.number().optional(),
-  sodium: z.number().optional(),
+  protein_g: z.number(),
+  carbs_g: z.number(),
+  fats_g: z.number(), 
+  fiber_g: z.number().optional(),
+  sugar_g: z.number().optional(),
+  sodium_g: z.number().optional(),
+  // Add other fields from your API response
+  healthScore: z.string().optional(),
+  cooking_method: z.string().optional(),
+  food_category: z.string().optional(),
+  serving_size_g: z.number().optional(),
+  glycemic_index: z.number().optional(),
+  insulin_index: z.number().optional(),
+  omega_3_g: z.number().optional(),
+  omega_6_g: z.number().optional(),
+  cholesterol_mg: z.number().optional(),
+  processing_level: z.string().optional(),
+  recommendations: z.string().optional(),
+  health_risk_notes: z.string().optional(),
 });
 
 //
@@ -43,13 +56,11 @@ export interface User {
   user_id: string;
   email: string;
   name: string;
-  age: number;
-  weight_kg?: number;
-  height_cm?: number;
+  birth_date: string;
   subscription_type: "FREE" | "PREMIUM" | "GOLD";
-  aiRequestsCount: number;
+  ai_requests_count: number;
   is_questionnaire_completed: boolean;
-  aiRequestsResetAt: string;
+  ai_requests_reset_at: string;
   created_at: string;
 }
 
@@ -58,7 +69,6 @@ export interface Meal {
   meal_id: number; // This is the actual field name in Prisma
   id: string; // For compatibility with existing code
   user_id: string;
-  image_url: string;
   upload_time: string;
   analysis_status: "PENDING" | "COMPLETED";
   meal_name: string | null;
@@ -96,7 +106,7 @@ export interface Meal {
   // Computed fields for compatibility
   name: string;
   description?: string;
-  imageUrl?: string;
+  image_url?: string;
   protein: number;
   carbs: number;
   fat: number;
@@ -106,11 +116,11 @@ export interface Meal {
   userId: string;
 
   // History features
-  isFavorite?: boolean;
-  tasteRating?: number;
-  satietyRating?: number;
-  energyRating?: number;
-  heavinessRating?: number;
+  is_favorite?: boolean;
+  taste_rating?: number;
+  satiety_rating?: number;
+  energy_rating?: number;
+  heaviness_rating?: number;
 }
 
 export interface AuthResponse {
@@ -127,8 +137,8 @@ export interface AIResponse {
 }
 
 export interface PendingMeal {
-  imageBase64: string;
-  imageUri?: string;
+  image_base_64: string;
+  image_uri?: string;
   analysis: MealAnalysisData | null;
   timestamp: number;
   meal_id?: string; // For updates
@@ -142,16 +152,14 @@ export interface DailyStats {
   fat: number;
   fiber: number;
   sugar: number;
-  mealCount: number;
+  meal_count: number;
 }
 
 export interface SignUpInput {
   email: string;
   password: string;
   name: string;
-  age: number;
-  weight?: number;
-  height?: number;
+  birth_date: Date;
 }
 
 export interface QuestionnaireData {

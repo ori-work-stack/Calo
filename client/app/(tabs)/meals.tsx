@@ -81,9 +81,9 @@ export default function MealsScreen() {
 
   const renderMeal = ({ item }: { item: Meal }) => (
     <View style={styles.mealCard}>
-      {item.imageUrl && (
+      {item.image_url && (
         <Image
-          source={{ uri: item.imageUrl }}
+          source={{ uri: item.image_url }}
           style={styles.mealImage}
           onError={(error) => {
             console.error("💥 Image load error for meal:", item.id, error);

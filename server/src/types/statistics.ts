@@ -1,24 +1,24 @@
 export interface NutritionStatistics {
-  averageCaloriesDaily: number;
-  calorieGoalAchievementPercent: number;
-  averageProteinDaily: number;
-  averageCarbsDaily: number;
-  averageFatsDaily: number;
-  averageFiberDaily: number;
-  averageSodiumDaily: number;
-  averageSugarDaily: number;
-  averageFluidsDaily: number;
-  processedFoodPercentage: number;
-  alcoholCaffeineIntake: number;
-  vegetableFruitIntake: number;
-  fullLoggingPercentage: number;
-  allergenAlerts: string[];
-  healthRiskPercentage: number;
-  averageEatingHours: { start: string; end: string };
-  intermittentFastingHours: number;
-  missedMealsAlert: number;
-  nutritionScore: number;
-  weeklyTrends: {
+  average_calories_daily: number;
+  calorie_goal_achievement_percent: number;
+  average_protein_daily: number;
+  average_carbs_daily: number;
+  average_fats_daily: number;
+  average_fiber_daily: number;
+  average_sodium_daily: number;
+  average_sugar_daily: number;
+  average_fluids_daily: number;
+  processed_food_percentage: number;
+   alcohol_caffeine_intake: number;
+  vegetable_fruit_intake: number;
+  full_logging_percentage: number;
+  allergen_alerts: string[];
+  health_risk_percentage: number;
+  average_eating_hours: { start: string; end: string };
+  intermittent_fasting_hours: number;
+  missed_meals_alert: number;
+  nutrition_score: number;
+  weekly_trends: {
     calories: number[];
     protein: number[];
     carbs: number[];

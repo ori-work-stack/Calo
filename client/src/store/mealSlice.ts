@@ -1,5 +1,11 @@
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
-import { Meal, MealAnalysisData, PendingMeal, AIResponse } from "../types";
+import {
+  Meal,
+  MealAnalysisData,
+  PendingMeal,
+  AIResponse,
+  MealAnalysisSchema,
+} from "../types";
 import { nutritionAPI } from "../services/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
@@ -195,6 +201,12 @@ export const analyzeMeal = createAsyncThunk(
         throw new Error("Image data is empty or invalid");
       }
 
+      // Validate base64 format
+      const base64Pattern = /^data:image\/(jpeg|jpg|png|gif|bmp|webp);base64,/;
+      if (!base64Pattern.test(imageBase64)) {
+        throw new Error("Invalid image format. Must be a valid base64 image.");
+      }
+
       console.log("Base64 data length:", imageBase64.length);
 
       // Make the API call with proper error handling
@@ -202,11 +214,21 @@ export const analyzeMeal = createAsyncThunk(
       console.log("API response received:", response);
 
       if (response && response.success && response.data) {
+        // Validate API response data
+        try {
+          const validatedData = MealAnalysisSchema.parse(response.data);
+          console.log("Data validation successful");
+        } catch (validationError) {
+          console.warn("API response validation failed:", validationError);
+          // Continue anyway, but log the issue
+        }
+
         const pendingMeal: PendingMeal = {
-          imageBase64: imageBase64,
+          image_base_64: imageBase64, // Use original base64, not the potentially truncated one from API
           analysis: response.data,
           timestamp: Date.now(),
         };
+        console.log(pendingMeal, "this is pending meal");
 
         // Save to storage
         try {
@@ -237,6 +259,7 @@ export const analyzeMeal = createAsyncThunk(
         errorMessage = error;
       }
 
+      // Enhanced error handling
       if (
         errorMessage.includes("Network Error") ||
         errorMessage.includes("ERR_NETWORK")
@@ -248,12 +271,35 @@ export const analyzeMeal = createAsyncThunk(
         errorMessage = "Authentication error - please log in again";
       } else if (errorMessage.includes("500")) {
         errorMessage = "Server error - please try again later";
+      } else if (errorMessage.includes("Invalid image format")) {
+        errorMessage = "Please select a valid image file (JPEG, PNG, etc.)";
       }
 
       return rejectWithValue(errorMessage);
     }
   }
 );
+
+export const validateAndFixBase64Image = (
+  base64String: string
+): string | null => {
+  try {
+    // Check if it's already a complete data URL
+    if (base64String.startsWith("data:image/")) {
+      return base64String;
+    }
+
+    // If it's just the base64 part, add the data URL prefix
+    if (base64String.match(/^[A-Za-z0-9+/]*={0,2}$/)) {
+      return `data:image/jpeg;base64,${base64String}`;
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Base64 validation error:", error);
+    return null;
+  }
+};
 
 export const updateMeal = createAsyncThunk(
   "meal/updateMeal",
@@ -309,7 +355,7 @@ export const postMeal = createAsyncThunk(
       console.log("Posting meal with analysis:", pendingMeal.analysis);
       const response = await nutritionAPI.saveMeal(
         pendingMeal.analysis,
-        pendingMeal.imageBase64
+        pendingMeal.image_base_64
       );
 
       if (response) {
@@ -477,7 +523,7 @@ const mealSlice = createSlice({
       action: PayloadAction<{ meal_id: string; imageBase64: string }>
     ) => {
       state.pendingMeal = {
-        imageBase64: action.payload.imageBase64,
+        image_base_64: action.payload.imageBase64,
         analysis: null,
         timestamp: Date.now(),
         meal_id: action.payload.meal_id,

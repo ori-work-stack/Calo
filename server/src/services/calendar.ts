@@ -76,23 +76,23 @@ export class CalendarService {
         );
 
         // Calculate quality score (simple algorithm)
-        const qualityScore = this.calculateQualityScore(totals, goals);
+        const quality_score = this.calculatequality_score(totals, goals);
 
         // Get events for this date (stored in meal additives for now)
         const events = this.extractEventsFromMeals(dayMeals);
 
         calendarData[dateStr] = {
           date: dateStr,
-          caloriesGoal: goals.calories,
-          caloriesActual: totals.calories,
-          proteinGoal: goals.protein,
-          proteinActual: totals.protein,
-          carbsGoal: goals.carbs,
-          carbsActual: totals.carbs,
-          fatGoal: goals.fat,
-          fatActual: totals.fat,
-          mealCount: dayMeals.length,
-          qualityScore,
+          calories_goal: goals.calories,
+          calories_actual: totals.calories,
+          protein_goal: goals.protein,
+          protein_actual: totals.protein,
+          carbs_goal: goals.carbs,
+          carbs_actual: totals.carbs,
+          fat_goal: goals.fat,
+          fat_actual: totals.fat,
+          meal_count: dayMeals.length,
+          quality_score,
           events,
         };
       }
@@ -135,7 +135,7 @@ export class CalendarService {
 
       // Calculate current month statistics
       const goalDays = currentDays.filter(
-        (day) => day.caloriesActual / day.caloriesGoal >= 1.0
+        (day) => day.calories_actual / day.calories_goal >= 1.0
       ).length;
 
       const totalDays = currentDays.length;
@@ -146,11 +146,11 @@ export class CalendarService {
 
       // Calculate averages
       const totalCalories = currentDays.reduce(
-        (sum, day) => sum + day.caloriesActual,
+        (sum, day) => sum + day.calories_actual,
         0
       );
       const totalProtein = currentDays.reduce(
-        (sum, day) => sum + day.proteinActual,
+        (sum, day) => sum + day.protein_actual,
         0
       );
       const averageCalories = totalDays > 0 ? totalCalories / totalDays : 0;
@@ -161,7 +161,7 @@ export class CalendarService {
 
       // Calculate improvement vs previous month
       const prevGoalDays = prevDays.filter(
-        (day) => day.caloriesActual / day.caloriesGoal >= 1.0
+        (day) => day.calories_actual / day.calories_goal >= 1.0
       ).length;
       const prevProgress =
         prevDays.length > 0 ? (prevGoalDays / prevDays.length) * 100 : 0;
@@ -243,7 +243,7 @@ export class CalendarService {
 
   // Helper methods
 
-  private static calculateQualityScore(
+  private static calculatequality_score(
     totals: { calories: number; protein: number; carbs: number; fat: number },
     goals: { calories: number; protein: number; carbs: number; fat: number }
   ): number {
@@ -292,7 +292,7 @@ export class CalendarService {
     );
 
     for (const day of sortedDays) {
-      const progress = day.caloriesActual / day.caloriesGoal;
+      const progress = day.calories_actual / day.calories_goal;
       if (progress >= 1.0) {
         streak++;
       } else {
@@ -328,7 +328,7 @@ export class CalendarService {
     weeks.forEach((week, index) => {
       const weekScore =
         week.reduce((sum, day) => {
-          const progress = (day.caloriesActual / day.caloriesGoal) * 100;
+          const progress = (day.calories_actual / day.calories_goal) * 100;
           return sum + Math.min(progress, 100);
         }, 0) / week.length;
 

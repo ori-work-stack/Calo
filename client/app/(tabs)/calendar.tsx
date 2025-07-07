@@ -13,7 +13,11 @@ import {
 } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState, AppDispatch } from "../../src/store";
-import { fetchCalendarData, addEvent, getStatistics } from "../../src/store/calendarSlice";
+import {
+  fetchCalendarData,
+  addEvent,
+  getStatistics,
+} from "../../src/store/calendarSlice";
 import { Ionicons } from "@expo/vector-icons";
 
 const { width } = Dimensions.get("window");
@@ -21,16 +25,16 @@ const CELL_SIZE = (width - 40) / 7; // 7 days per week
 
 interface DayData {
   date: string;
-  caloriesGoal: number;
-  caloriesActual: number;
-  proteinGoal: number;
-  proteinActual: number;
-  carbsGoal: number;
-  carbsActual: number;
-  fatGoal: number;
-  fatActual: number;
-  mealCount: number;
-  qualityScore: number;
+  calories_goal: number;
+  calories_actual: number;
+  protein_goal: number;
+  protein_actual: number;
+  carbs_goal: number;
+  carbs_actual: number;
+  fat_goal: number;
+  fat_actual: number;
+  meal_count: number;
+  quality_score: number;
   events: Array<{
     id: string;
     title: string;
@@ -38,26 +42,11 @@ interface DayData {
   }>;
 }
 
-interface CalendarStats {
-  monthlyProgress: number;
-  streakDays: number;
-  bestWeek: string;
-  challengingWeek: string;
-  improvementPercent: number;
-  totalGoalDays: number;
-  averageCalories: number;
-  averageProtein: number;
-  motivationalMessage: string;
-}
-
 export default function CalendarScreen() {
   const dispatch = useDispatch<AppDispatch>();
-  const { 
-    calendarData, 
-    statistics, 
-    isLoading, 
-    isAddingEvent 
-  } = useSelector((state: RootState) => state.calendar);
+  const { calendarData, statistics, isLoading, isAddingEvent } = useSelector(
+    (state: RootState) => state.calendar
+  );
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<DayData | null>(null);
@@ -87,32 +76,34 @@ export default function CalendarScreen() {
     const startingDayOfWeek = firstDay.getDay();
 
     const days = [];
-    
+
     // Add empty cells for days before the first day of the month
     for (let i = 0; i < startingDayOfWeek; i++) {
       days.push(null);
     }
-    
+
     // Add all days of the month
     for (let day = 1; day <= daysInMonth; day++) {
-      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(
+        day
+      ).padStart(2, "0")}`;
       const dayData = calendarData[dateStr] || {
         date: dateStr,
-        caloriesGoal: 2000,
-        caloriesActual: 0,
-        proteinGoal: 150,
-        proteinActual: 0,
-        carbsGoal: 250,
-        carbsActual: 0,
-        fatGoal: 67,
-        fatActual: 0,
-        mealCount: 0,
-        qualityScore: 0,
-        events: []
+        calories_goal: 2000,
+        calories_actual: 0,
+        protein_goal: 150,
+        protein_actual: 0,
+        carbs_goal: 250,
+        carbs_actual: 0,
+        fat_goal: 67,
+        fat_actual: 0,
+        meal_count: 0,
+        quality_score: 0,
+        events: [],
       };
       days.push(dayData);
     }
-    
+
     return days;
   };
 
@@ -122,8 +113,11 @@ export default function CalendarScreen() {
   };
 
   const getDayColor = (dayData: DayData) => {
-    const caloriesProgress = getProgressPercentage(dayData.caloriesActual, dayData.caloriesGoal);
-    
+    const caloriesProgress = getProgressPercentage(
+      dayData.calories_actual,
+      dayData.calories_goal
+    );
+
     if (caloriesProgress >= 110) return "#8B0000"; // Dark red for overeating
     if (caloriesProgress >= 100) return "#4CAF50"; // Green for goal achieved
     if (caloriesProgress >= 70) return "#FF9800"; // Orange for close to goal
@@ -155,12 +149,14 @@ export default function CalendarScreen() {
     }
 
     try {
-      await dispatch(addEvent({
-        date: selectedDate,
-        title: eventTitle.trim(),
-        type: eventType
-      })).unwrap();
-      
+      await dispatch(
+        addEvent({
+          date: selectedDate,
+          title: eventTitle.trim(),
+          type: eventType,
+        })
+      ).unwrap();
+
       setShowEventModal(false);
       loadCalendarData(); // Refresh data
       Alert.alert("Success", "Event added successfully!");
@@ -175,7 +171,10 @@ export default function CalendarScreen() {
     }
 
     const dayNumber = new Date(dayData.date).getDate();
-    const progress = getProgressPercentage(dayData.caloriesActual, dayData.caloriesGoal);
+    const progress = getProgressPercentage(
+      dayData.calories_actual,
+      dayData.calories_goal
+    );
     const dayColor = getDayColor(dayData);
     const hasEvents = dayData.events.length > 0;
 
@@ -185,14 +184,19 @@ export default function CalendarScreen() {
         style={[
           styles.dayCell,
           { backgroundColor: dayColor },
-          hasEvents && styles.dayWithEvents
+          hasEvents && styles.dayWithEvents,
         ]}
         onPress={() => handleDayPress(dayData)}
         onLongPress={() => handleAddEvent(dayData.date)}
       >
         <Text style={styles.dayNumber}>{dayNumber}</Text>
         <View style={styles.progressContainer}>
-          <View style={[styles.progressBar, { width: `${Math.min(progress, 100)}%` }]} />
+          <View
+            style={[
+              styles.progressBar,
+              { width: `${Math.min(progress, 100)}%` },
+            ]}
+          />
         </View>
         <Text style={styles.progressText}>{Math.round(progress)}%</Text>
         {hasEvents && (
@@ -201,18 +205,20 @@ export default function CalendarScreen() {
           </View>
         )}
         <Text style={styles.caloriesText}>
-          {Math.round(dayData.caloriesActual)}cal
+          {Math.round(dayData.calories_actual)}cal
         </Text>
       </TouchableOpacity>
     );
   };
 
   const renderWeekDays = () => {
-    const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     return (
       <View style={styles.weekDaysContainer}>
         {weekDays.map((day) => (
-          <Text key={day} style={styles.weekDayText}>{day}</Text>
+          <Text key={day} style={styles.weekDayText}>
+            {day}
+          </Text>
         ))}
       </View>
     );
@@ -226,7 +232,7 @@ export default function CalendarScreen() {
         <Text style={styles.motivationalMessage}>
           {statistics.motivationalMessage}
         </Text>
-        
+
         <View style={styles.statsGrid}>
           <View style={styles.statItem}>
             <Text style={styles.statValue}>{statistics.monthlyProgress}%</Text>
@@ -242,7 +248,8 @@ export default function CalendarScreen() {
           </View>
           <View style={styles.statItem}>
             <Text style={styles.statValue}>
-              {statistics.improvementPercent > 0 ? '+' : ''}{statistics.improvementPercent}%
+              {statistics.improvementPercent > 0 ? "+" : ""}
+              {statistics.improvementPercent}%
             </Text>
             <Text style={styles.statLabel}>vs Last Month</Text>
           </View>
@@ -281,11 +288,14 @@ export default function CalendarScreen() {
         <TouchableOpacity onPress={() => navigateMonth(-1)}>
           <Ionicons name="chevron-back" size={24} color="#007AFF" />
         </TouchableOpacity>
-        
+
         <Text style={styles.monthTitle}>
-          {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+          {currentDate.toLocaleDateString("en-US", {
+            month: "long",
+            year: "numeric",
+          })}
         </Text>
-        
+
         <TouchableOpacity onPress={() => navigateMonth(1)}>
           <Ionicons name="chevron-forward" size={24} color="#007AFF" />
         </TouchableOpacity>
@@ -307,19 +317,27 @@ export default function CalendarScreen() {
         <Text style={styles.legendTitle}>Legend</Text>
         <View style={styles.legendGrid}>
           <View style={styles.legendItem}>
-            <View style={[styles.legendColor, { backgroundColor: "#4CAF50" }]} />
+            <View
+              style={[styles.legendColor, { backgroundColor: "#4CAF50" }]}
+            />
             <Text style={styles.legendText}>Goal Achieved</Text>
           </View>
           <View style={styles.legendItem}>
-            <View style={[styles.legendColor, { backgroundColor: "#FF9800" }]} />
+            <View
+              style={[styles.legendColor, { backgroundColor: "#FF9800" }]}
+            />
             <Text style={styles.legendText}>Close (70-99%)</Text>
           </View>
           <View style={styles.legendItem}>
-            <View style={[styles.legendColor, { backgroundColor: "#F44336" }]} />
+            <View
+              style={[styles.legendColor, { backgroundColor: "#F44336" }]}
+            />
             <Text style={styles.legendText}>Below Goal</Text>
           </View>
           <View style={styles.legendItem}>
-            <View style={[styles.legendColor, { backgroundColor: "#8B0000" }]} />
+            <View
+              style={[styles.legendColor, { backgroundColor: "#8B0000" }]}
+            />
             <Text style={styles.legendText}>Overeating</Text>
           </View>
         </View>
@@ -337,10 +355,10 @@ export default function CalendarScreen() {
             {selectedDay && (
               <>
                 <Text style={styles.modalTitle}>
-                  {new Date(selectedDay.date).toLocaleDateString('en-US', {
-                    weekday: 'long',
-                    month: 'long',
-                    day: 'numeric'
+                  {new Date(selectedDay.date).toLocaleDateString("en-US", {
+                    weekday: "long",
+                    month: "long",
+                    day: "numeric",
                   })}
                 </Text>
 
@@ -348,17 +366,24 @@ export default function CalendarScreen() {
                   <View style={styles.macroItem}>
                     <Text style={styles.macroLabel}>Calories</Text>
                     <Text style={styles.macroValue}>
-                      {Math.round(selectedDay.caloriesActual)} / {selectedDay.caloriesGoal}
+                      {Math.round(selectedDay.calories_actual)} /{" "}
+                      {selectedDay.calories_goal}
                     </Text>
                     <View style={styles.macroProgress}>
-                      <View 
+                      <View
                         style={[
-                          styles.macroProgressBar, 
-                          { 
-                            width: `${Math.min(getProgressPercentage(selectedDay.caloriesActual, selectedDay.caloriesGoal), 100)}%`,
-                            backgroundColor: getDayColor(selectedDay)
-                          }
-                        ]} 
+                          styles.macroProgressBar,
+                          {
+                            width: `${Math.min(
+                              getProgressPercentage(
+                                selectedDay.calories_actual,
+                                selectedDay.calories_goal
+                              ),
+                              100
+                            )}%`,
+                            backgroundColor: getDayColor(selectedDay),
+                          },
+                        ]}
                       />
                     </View>
                   </View>
@@ -366,31 +391,34 @@ export default function CalendarScreen() {
                   <View style={styles.macroItem}>
                     <Text style={styles.macroLabel}>Protein</Text>
                     <Text style={styles.macroValue}>
-                      {Math.round(selectedDay.proteinActual)}g / {selectedDay.proteinGoal}g
+                      {Math.round(selectedDay.protein_actual)}g /{" "}
+                      {selectedDay.protein_goal}g
                     </Text>
                   </View>
 
                   <View style={styles.macroItem}>
                     <Text style={styles.macroLabel}>Carbs</Text>
                     <Text style={styles.macroValue}>
-                      {Math.round(selectedDay.carbsActual)}g / {selectedDay.carbsGoal}g
+                      {Math.round(selectedDay.carbs_actual)}g /{" "}
+                      {selectedDay.carbs_goal}g
                     </Text>
                   </View>
 
                   <View style={styles.macroItem}>
                     <Text style={styles.macroLabel}>Fat</Text>
                     <Text style={styles.macroValue}>
-                      {Math.round(selectedDay.fatActual)}g / {selectedDay.fatGoal}g
+                      {Math.round(selectedDay.fat_actual)}g /{" "}
+                      {selectedDay.fat_goal}g
                     </Text>
                   </View>
                 </View>
 
                 <View style={styles.dayStats}>
                   <Text style={styles.dayStatsText}>
-                    Meals logged: {selectedDay.mealCount}
+                    Meals logged: {selectedDay.meal_count}
                   </Text>
                   <Text style={styles.dayStatsText}>
-                    Quality score: {selectedDay.qualityScore}/10
+                    Quality score: {selectedDay.quality_score}/10
                   </Text>
                 </View>
 
@@ -440,7 +468,7 @@ export default function CalendarScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Add Event</Text>
-            
+
             <TextInput
               style={styles.eventInput}
               placeholder="Event title (e.g., Wedding, Heavy workout, Fasting day)"
@@ -453,28 +481,31 @@ export default function CalendarScreen() {
               <Text style={styles.eventTypeLabel}>Event Type:</Text>
               <View style={styles.eventTypeButtons}>
                 {[
-                  { key: 'general', label: 'General', icon: 'calendar' },
-                  { key: 'workout', label: 'Workout', icon: 'fitness' },
-                  { key: 'social', label: 'Social', icon: 'people' },
-                  { key: 'health', label: 'Health', icon: 'medical' }
+                  { key: "general", label: "General", icon: "calendar" },
+                  { key: "workout", label: "Workout", icon: "fitness" },
+                  { key: "social", label: "Social", icon: "people" },
+                  { key: "health", label: "Health", icon: "medical" },
                 ].map((type) => (
                   <TouchableOpacity
                     key={type.key}
                     style={[
                       styles.eventTypeButton,
-                      eventType === type.key && styles.eventTypeButtonActive
+                      eventType === type.key && styles.eventTypeButtonActive,
                     ]}
                     onPress={() => setEventType(type.key)}
                   >
-                    <Ionicons 
-                      name={type.icon as any} 
-                      size={16} 
-                      color={eventType === type.key ? "#fff" : "#007AFF"} 
+                    <Ionicons
+                      name={type.icon as any}
+                      size={16}
+                      color={eventType === type.key ? "#fff" : "#007AFF"}
                     />
-                    <Text style={[
-                      styles.eventTypeButtonText,
-                      eventType === type.key && styles.eventTypeButtonTextActive
-                    ]}>
+                    <Text
+                      style={[
+                        styles.eventTypeButtonText,
+                        eventType === type.key &&
+                          styles.eventTypeButtonTextActive,
+                      ]}
+                    >
                       {type.label}
                     </Text>
                   </TouchableOpacity>

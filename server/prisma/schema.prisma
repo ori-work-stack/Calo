@@ -18,9 +18,7 @@ model User {
   subscription_type          SubscriptionType
   subscription_start         DateTime?
   subscription_end           DateTime?
-  height_cm                  Float?
-  weight_kg                  Float?
-  age                        Int
+  birth_date                 DateTime?
   ai_requests_count          Int                   @default(0)
   ai_requests_reset_at       DateTime              @default(now())
   is_questionnaire_completed Boolean               @default(false)
@@ -230,9 +228,10 @@ model Meal {
   food_category          String?
   processing_level       String?
   cooking_method         String?
-  additives_json         Json?
-  health_risk_notes      String?
-  created_at             DateTime       @default(now())
+  additives_json         Json?          @default("{}")
+  health_risk_notes String?
+  ingredients       Json?
+  created_at        DateTime @default(now())
 }
 
 model NutritionPlan {

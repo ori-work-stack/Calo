@@ -330,7 +330,7 @@ export default function HistoryScreen() {
           <View style={styles.mealInfo}>
             <View style={styles.mealTitleRow}>
               <Text style={styles.mealName}>{item.name}</Text>
-              {item.isFavorite && (
+              {item.is_favorite && (
                 <Ionicons name="heart" size={16} color="#FF6B6B" />
               )}
             </View>
@@ -352,8 +352,8 @@ export default function HistoryScreen() {
           </View>
         </View>
 
-        {item.imageUrl && (
-          <Image source={{ uri: item.imageUrl }} style={styles.mealImage} />
+        {item.image_url && (
+          <Image source={{ uri: item.image_url }} style={styles.mealImage} />
         )}
 
         <View style={styles.nutritionSummary}>
@@ -384,14 +384,14 @@ export default function HistoryScreen() {
         </View>
 
         {/* User Ratings Display */}
-        {item.tasteRating ||
-        item.satietyRating ||
-        item.energyRating ||
-        item.heavinessRating ? (
+        {item.taste_rating ||
+        item.satiety_rating ||
+        item.energy_rating ||
+        item.heaviness_rating ? (
           <View style={styles.ratingsDisplay}>
             <Text style={styles.ratingsTitle}>Your Ratings:</Text>
             <View style={styles.ratingsRow}>
-              {item.tasteRating ? (
+              {item.taste_rating ? (
                 <View style={styles.ratingItem}>
                   <Text style={styles.ratingLabel}>Taste</Text>
                   <View style={styles.miniStars}>
@@ -399,20 +399,20 @@ export default function HistoryScreen() {
                       <Ionicons
                         key={star}
                         name={
-                          star <= (item.tasteRating || 0)
+                          star <= (item.taste_rating || 0)
                             ? "star"
                             : "star-outline"
                         }
                         size={12}
                         color={
-                          star <= (item.tasteRating || 0) ? "#FFD700" : "#DDD"
+                          star <= (item.taste_rating || 0) ? "#FFD700" : "#DDD"
                         }
                       />
                     ))}
                   </View>
                 </View>
               ) : null}
-              {item.satietyRating ? (
+              {item.satiety_rating ? (
                 <View style={styles.ratingItem}>
                   <Text style={styles.ratingLabel}>Satiety</Text>
                   <View style={styles.miniStars}>
@@ -420,13 +420,13 @@ export default function HistoryScreen() {
                       <Ionicons
                         key={star}
                         name={
-                          star <= (item.satietyRating || 0)
+                          star <= (item.satiety_rating || 0)
                             ? "star"
                             : "star-outline"
                         }
                         size={12}
                         color={
-                          star <= (item.satietyRating || 0) ? "#FFD700" : "#DDD"
+                          star <= (item.satiety_rating || 0) ? "#FFD700" : "#DDD"
                         }
                       />
                     ))}
@@ -443,10 +443,10 @@ export default function HistoryScreen() {
             onPress={() => {
               setSelectedMeal(item);
               // Pre-fill existing ratings
-              setTasteRating(item.tasteRating || 0);
-              setSatietyRating(item.satietyRating || 0);
-              setEnergyRating(item.energyRating || 0);
-              setHeavinessRating(item.heavinessRating || 0);
+              setTasteRating(item.taste_rating || 0);
+              setSatietyRating(item.satiety_rating || 0);
+              setEnergyRating(item.energy_rating || 0);
+              setHeavinessRating(item.heaviness_rating || 0);
               setShowFeedbackModal(true);
             }}
             disabled={isSavingFeedback}
@@ -461,12 +461,12 @@ export default function HistoryScreen() {
             disabled={isTogglingFavorite}
           >
             <Ionicons
-              name={item.isFavorite ? "heart" : "heart-outline"}
+              name={item.is_favorite ? "heart" : "heart-outline"}
               size={20}
               color="#FF6B6B"
             />
             <Text style={styles.actionText}>
-              {item.isFavorite ? "Unfavorite" : "Favorite"}
+              {item.is_favorite ? "Unfavorite" : "Favorite"}
             </Text>
           </TouchableOpacity>
 

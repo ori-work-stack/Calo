@@ -1,21 +1,66 @@
+type Ingredient = {
+  name: string;            // add this
+  calories: string | number;
+  protein: string | number;
+  carbs: string | number;
+  fat: string | number;
+  fiber?: string | number;
+  sugar?: string | number;
+};
+
+
 export interface MealAnalysisResult {
+  // Basic identification
   name: string;
   description?: string;
+
+  // Core macronutrients
   calories: number;
   protein: number;
   carbs: number;
   fat: number;
+
+  // Detailed macronutrients
+  saturated_fats_g?: number;
+  polyunsaturated_fats_g?: number;
+  monounsaturated_fats_g?: number;
+  omega_3_g?: number;
+  omega_6_g?: number;
+
+  // Carbohydrate details
   fiber?: number;
+  soluble_fiber_g?: number;
+  insoluble_fiber_g?: number;
   sugar?: number;
+
+  // Other nutrients
+  cholesterol_mg?: number;
   sodium?: number;
+  alcohol_g?: number;
+  caffeine_mg?: number;
+  liquids_ml?: number;
+  serving_size_g?: number;
+
+  // JSON fields
+  allergens_json?: any;
+  vitamins_json?: any;
+  micronutrients_json?: any;
+  additives_json?: any;
+
+  // Indexes and categories
+  glycemic_index?: number;
+  insulin_index?: number;
+  food_category?: string;
+  processing_level?: string;
+  cooking_method?: string;
+  health_risk_notes?: string;
+
+  // Legacy fields for compatibility
   confidence: number;
-  ingredients?: string[];
-  servingSize?: string;
-  cookingMethod?: string;
-  healthNotes?: string;
-  items?: any[];
-  healthScore?: number;
-  recommendations?: string[];
+  ingredients: Ingredient[];
+  servingSize: string;
+  cookingMethod: string;
+  healthNotes: string;
 }
 
 export interface MealPlanRequest {

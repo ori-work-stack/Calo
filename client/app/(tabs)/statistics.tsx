@@ -14,26 +14,26 @@ import { LineChart, BarChart, PieChart } from "react-native-chart-kit";
 const { width: screenWidth } = Dimensions.get("window");
 
 interface NutritionStatistics {
-  averageCaloriesDaily: number;
-  calorieGoalAchievementPercent: number;
-  averageProteinDaily: number;
-  averageCarbsDaily: number;
-  averageFatsDaily: number;
-  averageFiberDaily: number;
-  averageSodiumDaily: number;
-  averageSugarDaily: number;
-  averageFluidsDaily: number;
-  processedFoodPercentage: number;
-  alcoholCaffeineIntake: number;
-  vegetableFruitIntake: number;
-  fullLoggingPercentage: number;
-  allergenAlerts: string[];
-  healthRiskPercentage: number;
-  averageEatingHours: { start: string; end: string };
-  intermittentFastingHours: number;
-  missedMealsAlert: number;
-  nutritionScore: number;
-  weeklyTrends: {
+  average_calories_daily: number;
+  calorie_goal_achievement_percent: number;
+  average_protein_daily: number;
+  average_carbs_daily: number;
+  average_fats_daily: number;
+  average_fiber_daily: number;
+  average_sodium_daily: number;
+  average_sugar_daily: number;
+  average_fluids_daily: number;
+  processed_food_percentage: number;
+  alcohol_caffeine_intake: number;
+  vegetable_fruit_intake: number;
+  full_logging_percentage: number;
+  allergen_alerts: string[];
+  health_risk_percentage: number;
+  average_eating_hours: { start: string; end: string };
+  intermittent_fasting_hours: number;
+  missed_meals_alert: number;
+  nutrition_score: number;
+  weekly_trends: {
     calories: number[];
     protein: number[];
     carbs: number[];
@@ -112,21 +112,21 @@ export default function StatisticsScreen() {
   const macroData = [
     {
       name: "חלבון",
-      population: Math.max(1, statistics.averageProteinDaily || 0),
+      population: Math.max(1, statistics.average_protein_daily || 0),
       color: "#FF6B6B",
       legendFontColor: "#333",
       legendFontSize: 12,
     },
     {
       name: "פחמימות",
-      population: Math.max(1, statistics.averageCarbsDaily || 0),
+      population: Math.max(1, statistics.average_carbs_daily || 0),
       color: "#4ECDC4",
       legendFontColor: "#333",
       legendFontSize: 12,
     },
     {
       name: "שומנים",
-      population: Math.max(1, statistics.averageFatsDaily || 0),
+      population: Math.max(1, statistics.average_fats_daily || 0),
       color: "#45B7D1",
       legendFontColor: "#333",
       legendFontSize: 12,
@@ -134,22 +134,22 @@ export default function StatisticsScreen() {
   ];
 
   const weeklyCaloriesData = {
-    labels: ["ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳", "א׳"],
+    labels: ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"],
     datasets: [
       {
         data:
-          statistics.weeklyTrends.calories.length > 0
-            ? statistics.weeklyTrends.calories.map((cal) => cal || 0)
+          statistics.weekly_trends.calories.length > 0
+            ? statistics.weekly_trends.calories.map((cal) => cal || 0)
             : [0, 0, 0, 0, 0, 0, 0],
       },
     ],
   };
 
-  const nutritionScoreData = {
+  const nutrition_scoreData = {
     labels: ["ציון תזונה"],
     datasets: [
       {
-        data: [statistics.nutritionScore, 100 - statistics.nutritionScore],
+        data: [statistics.nutrition_score, 100 - statistics.nutrition_score],
       },
     ],
   };
@@ -188,14 +188,14 @@ export default function StatisticsScreen() {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>ציון תזונה כללי</Text>
         <View style={styles.scoreContainer}>
-          <Text style={styles.scoreValue}>{statistics.nutritionScore}</Text>
+          <Text style={styles.scoreValue}>{statistics.nutrition_score}</Text>
           <Text style={styles.scoreMax}>/100</Text>
         </View>
         <View style={styles.scoreBar}>
           <View
             style={[
               styles.scoreProgress,
-              { width: `${statistics.nutritionScore}%` },
+              { width: `${statistics.nutrition_score}%` },
             ]}
           />
         </View>
@@ -207,25 +207,25 @@ export default function StatisticsScreen() {
         <View style={styles.metricsGrid}>
           <View style={styles.metric}>
             <Text style={styles.metricValue}>
-              {statistics.averageCaloriesDaily}
+              {statistics.average_calories_daily}
             </Text>
             <Text style={styles.metricLabel}>קלוריות יומי ממוצע</Text>
           </View>
           <View style={styles.metric}>
             <Text style={styles.metricValue}>
-              {statistics.calorieGoalAchievementPercent}%
+              {statistics.calorie_goal_achievement_percent}%
             </Text>
             <Text style={styles.metricLabel}>עמידה ביעד קלורי</Text>
           </View>
           <View style={styles.metric}>
             <Text style={styles.metricValue}>
-              {statistics.processedFoodPercentage}%
+              {statistics.processed_food_percentage}%
             </Text>
             <Text style={styles.metricLabel}>מזון מעובד</Text>
           </View>
           <View style={styles.metric}>
             <Text style={styles.metricValue}>
-              {statistics.fullLoggingPercentage}%
+              {statistics.full_logging_percentage}%
             </Text>
             <Text style={styles.metricLabel}>תיעוד מלא</Text>
           </View>
@@ -269,25 +269,25 @@ export default function StatisticsScreen() {
           <View style={styles.detailItem}>
             <Text style={styles.detailLabel}>סיבים תזונתיים</Text>
             <Text style={styles.detailValue}>
-              {statistics.averageFiberDaily}g
+              {statistics.average_fiber_daily}g
             </Text>
           </View>
           <View style={styles.detailItem}>
             <Text style={styles.detailLabel}>נתרן</Text>
             <Text style={styles.detailValue}>
-              {statistics.averageSodiumDaily}mg
+              {statistics.average_sodium_daily}mg
             </Text>
           </View>
           <View style={styles.detailItem}>
             <Text style={styles.detailLabel}>סוכר</Text>
             <Text style={styles.detailValue}>
-              {statistics.averageSugarDaily}g
+              {statistics.average_sugar_daily}g
             </Text>
           </View>
           <View style={styles.detailItem}>
             <Text style={styles.detailLabel}>ירקות ופירות</Text>
             <Text style={styles.detailValue}>
-              {statistics.vegetableFruitIntake}%
+              {statistics.vegetable_fruit_intake}%
             </Text>
           </View>
         </View>
@@ -300,20 +300,20 @@ export default function StatisticsScreen() {
           <View style={styles.patternItem}>
             <Text style={styles.patternLabel}>שעות אכילה</Text>
             <Text style={styles.patternValue}>
-              {statistics.averageEatingHours.start} -{" "}
-              {statistics.averageEatingHours.end}
+              {statistics.average_eating_hours.start} -{" "}
+              {statistics.average_eating_hours.end}
             </Text>
           </View>
           <View style={styles.patternItem}>
             <Text style={styles.patternLabel}>צום לסירוגין</Text>
             <Text style={styles.patternValue}>
-              {statistics.intermittentFastingHours} שעות
+              {statistics.intermittent_fasting_hours} שעות
             </Text>
           </View>
           <View style={styles.patternItem}>
             <Text style={styles.patternLabel}>ארוחות חסרות השבוע</Text>
             <Text style={styles.patternValue}>
-              {statistics.missedMealsAlert}
+              {statistics.missed_meals_alert}
             </Text>
           </View>
         </View>
@@ -344,10 +344,10 @@ export default function StatisticsScreen() {
       )}
 
       {/* Alerts */}
-      {statistics.allergenAlerts.length > 0 && (
+      {statistics.allergen_alerts.length > 0 && (
         <View style={[styles.card, styles.alertCard]}>
           <Text style={styles.cardTitle}>התראות אלרגנים</Text>
-          {statistics.allergenAlerts.map((allergen, index) => (
+          {statistics.allergen_alerts.map((allergen, index) => (
             <View key={index} style={styles.alertItem}>
               <Text style={styles.alertText}>⚠️ {allergen}</Text>
             </View>

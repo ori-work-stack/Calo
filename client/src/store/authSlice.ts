@@ -19,7 +19,7 @@ const initialState: AuthState = {
 };
 
 export const signUp = createAsyncThunk(
-  "auth/signUp",
+  "auth/signup",
   async (data: SignUpData, { rejectWithValue }) => {
     try {
       console.log("🔄 Starting sign up process...");

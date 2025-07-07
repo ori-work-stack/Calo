@@ -21,9 +21,7 @@ router.put(
           email: true,
           name: true,
           subscription_type: true,
-          age: true,
-          weight_kg: true,
-          height_cm: true,
+          birth_date: true,
           ai_requests_count: true,
           created_at: true,
         },
@@ -116,7 +114,7 @@ router.patch(
   async (req: AuthRequest, res, next) => {
     try {
       // Only allow updating specific fields
-      const allowedFields = ["name", "age", "weight_kg", "height_cm"];
+      const allowedFields = ["name", "birth_date"];
       const updateData: any = {};
 
       // Filter only allowed fields from request body
@@ -142,9 +140,7 @@ router.patch(
           email: true,
           name: true,
           subscription_type: true,
-          age: true,
-          weight_kg: true,
-          height_cm: true,
+          birth_date: true,
           ai_requests_count: true,
           created_at: true,
         },
@@ -276,9 +272,7 @@ router.get(
           email: true,
           name: true,
           subscription_type: true,
-          age: true,
-          weight_kg: true,
-          height_cm: true,
+          birth_date: true,
           ai_requests_count: true,
           ai_requests_reset_at: true,
           created_at: true,
