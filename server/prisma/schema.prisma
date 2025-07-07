@@ -229,9 +229,9 @@ model Meal {
   processing_level       String?
   cooking_method         String?
   additives_json         Json?          @default("{}")
-  health_risk_notes String?
-  ingredients       Json?
-  created_at        DateTime @default(now())
+  health_risk_notes      String?
+  ingredients            Json?
+  created_at             DateTime       @default(now())
 }
 
 model NutritionPlan {
@@ -394,6 +394,35 @@ model ShoppingList {
 
   @@index([user_id])
   @@map("shopping_lists")
+}
+
+model ChatMessage {
+  message_id   Int      @id @default(autoincrement())
+  user_id      String
+  user_message String   @db.Text
+  ai_response  String   @db.Text
+  created_at   DateTime @default(now())
+
+  @@index([user_id, created_at])
+}
+
+model FoodProduct {
+  product_id         Int      @id @default(autoincrement())
+  barcode            String   @unique
+  name               String
+  brand              String?
+  category           String
+  nutrition_per_100g Json // calories, protein, carbs, fat, fiber, sugar, sodium
+  ingredients        Json // array of ingredient names
+  allergens          Json // array of allergen names
+  labels             Json // array of labels like kosher, vegan, etc.
+  health_score       Int? // 0-100 score
+  image_url          String?
+  created_at         DateTime @default(now())
+  updated_at         DateTime @default(now())
+
+  @@index([category])
+  @@index([barcode])
 }
 
 // ENUMS

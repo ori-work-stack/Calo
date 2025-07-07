@@ -383,6 +383,17 @@ export default function HistoryScreen() {
           </View>
         </View>
 
+        {item.ingredients && item.ingredients.length > 0 && (
+          <View style={styles.ingredientsPreview}>
+            <Text style={styles.ingredientsPreviewTitle}>
+              Ingredients ({item.ingredients.length}):
+            </Text>
+            <Text style={styles.ingredientsPreviewText} numberOfLines={2}>
+              {item.ingredients.map((ing) => ing.name).join(", ")}
+            </Text>
+          </View>
+        )}
+
         {/* User Ratings Display */}
         {item.taste_rating ||
         item.satiety_rating ||
@@ -426,7 +437,9 @@ export default function HistoryScreen() {
                         }
                         size={12}
                         color={
-                          star <= (item.satiety_rating || 0) ? "#FFD700" : "#DDD"
+                          star <= (item.satiety_rating || 0)
+                            ? "#FFD700"
+                            : "#DDD"
                         }
                       />
                     ))}
@@ -1039,5 +1052,34 @@ const styles = StyleSheet.create({
   },
   categoryButtonTextActive: {
     color: "white",
+  },
+  editButton: {
+    backgroundColor: "#007AFF",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginLeft: 10,
+  },
+  editButtonText: {
+    color: "white",
+    fontSize: 12,
+    fontWeight: "bold",
+  },
+  ingredientsPreview: {
+    marginTop: 8,
+    padding: 8,
+    backgroundColor: "#f0f0f0",
+    borderRadius: 6,
+  },
+  ingredientsPreviewTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 4,
+  },
+  ingredientsPreviewText: {
+    fontSize: 11,
+    color: "#666",
+    lineHeight: 16,
   },
 });

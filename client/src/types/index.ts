@@ -23,7 +23,7 @@ export const MealAnalysisSchema = z.object({
   calories: z.number(),
   protein_g: z.number(),
   carbs_g: z.number(),
-  fats_g: z.number(), 
+  fats_g: z.number(),
   fiber_g: z.number().optional(),
   sugar_g: z.number().optional(),
   sodium_g: z.number().optional(),
@@ -38,6 +38,19 @@ export const MealAnalysisSchema = z.object({
   omega_6_g: z.number().optional(),
   cholesterol_mg: z.number().optional(),
   processing_level: z.string().optional(),
+  ingredients: z
+    .array(
+      z.object({
+        name: z.string(),
+        calories: z.number(),
+        protein: z.number(),
+        carbs: z.number(),
+        fat: z.number(),
+        fiber: z.number().optional(),
+        sugar: z.number().optional(),
+      })
+    )
+    .optional(),
   recommendations: z.string().optional(),
   health_risk_notes: z.string().optional(),
 });
@@ -114,6 +127,17 @@ export interface Meal {
   sugar?: number;
   sodium?: number;
   userId: string;
+
+  // Ingredients
+  ingredients?: Array<{
+    name: string;
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    fiber?: number;
+    sugar?: number;
+  }>;
 
   // History features
   is_favorite?: boolean;
@@ -223,4 +247,36 @@ export interface QuestionnaireData {
 
   // Additional
   past_diet_difficulties?: string;
+}
+
+export interface MealAnalysis {
+  name?: string;
+  meal_name?: string;
+  description?: string;
+  calories?: number;
+  totalCalories?: number;
+  protein?: number;
+  protein_g?: number;
+  totalProtein?: number;
+  carbs?: number;
+  carbs_g?: number;
+  totalCarbs?: number;
+  fat?: number;
+  fats_g?: number;
+  totalFat?: number;
+  fiber?: number;
+  fiber_g?: number;
+  sugar?: number;
+  sugar_g?: number;
+  sodium?: number;
+  sodium_mg?: number;
+  ingredients?: Array<{
+    name: string;
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    fiber?: number;
+    sugar?: number;
+  }>;
 }

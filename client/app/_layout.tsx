@@ -3,8 +3,8 @@ import { Provider } from "react-redux";
 import { PersistGate } from "redux-persist/integration/react";
 import { store, persistor } from "@/src/store";
 import { StatusBar } from "expo-status-bar";
-import { Text, View, ActivityIndicator } from "react-native";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Text, View, ActivityIndicator, StyleSheet } from "react-native";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useAppInitialization } from "@/hooks/useAppInitialization";
 import { useSelector } from "react-redux";
@@ -12,6 +12,7 @@ import { RootState } from "@/src/store";
 import { useRouter, useSegments } from "expo-router";
 import { useEffect } from "react";
 import { queryClient } from "@/src/providers/QueryProvider";
+import { GestureHandlerRootView } from "react-native-gesture-handler"; // 🟢 IMPORT THIS
 
 function AppContent() {
   useAppInitialization();
@@ -32,7 +33,6 @@ function AppContent() {
       (segment) => segment === "questionnaire"
     );
 
-    // If user is not authenticated, redirect to auth
     if (!isAuthenticated || !user) {
       if (!inAuthGroup) {
         router.replace("/(auth)/signin");
@@ -40,15 +40,11 @@ function AppContent() {
       return;
     }
 
-    // User is authenticated - handle the flow
-
-    // If user just signed up and hasn't selected a plan, go to payment plan
     if (!user.subscription_type && !onPaymentPlan) {
       router.replace("/payment-plan");
       return;
     }
 
-    // If user has PREMIUM or GOLD plan but hasn't completed questionnaire
     if (
       user.subscription_type &&
       ["PREMIUM", "GOLD"].includes(user.subscription_type) &&
@@ -59,7 +55,6 @@ function AppContent() {
       return;
     }
 
-    // If user has completed questionnaire or has FREE plan, allow access to tabs
     if (
       user.subscription_type &&
       (user.subscription_type === "FREE" || user.is_questionnaire_completed) &&
@@ -91,15 +86,27 @@ function LoadingScreen() {
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
-      <Provider store={store}>
-        <QueryClientProvider client={queryClient}>
-          <PersistGate loading={<LoadingScreen />} persistor={persistor}>
-            <AppContent />
-            <StatusBar style="auto" />
-          </PersistGate>
-        </QueryClientProvider>
-      </Provider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={styles.root}>
+      {" "}
+      {/* 🟢 WRAP YOUR ENTIRE APP */}
+      <SafeAreaProvider>
+        <Provider store={store}>
+          <QueryClientProvider client={queryClient}>
+            <PersistGate loading={<LoadingScreen />} persistor={persistor}>
+              <AppContent />
+              <StatusBar style="auto" />
+            </PersistGate>
+          </QueryClientProvider>
+        </Provider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+});
+
+

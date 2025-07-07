@@ -166,6 +166,11 @@ const transformMealData = (serverMeal: any): Meal => {
     energyRating: serverMeal.energyRating || 0,
     heavinessRating: serverMeal.heavinessRating || 0,
 
+    // Ingredients field
+    ingredients: Array.isArray(serverMeal.ingredients)
+      ? serverMeal.ingredients
+      : [],
+
     // Optional fields
     saturated_fats_g: serverMeal.saturated_fats_g,
     polyunsaturated_fats_g: serverMeal.polyunsaturated_fats_g,
@@ -384,7 +389,15 @@ export const nutritionAPI = {
   ): Promise<{ success: boolean; data?: MealAnalysisData; error?: string }> => {
     try {
       console.log("🔍 Making analyze meal API request...");
-      console.log("📊 Base64 length:", imageBase64.length);
+      console.log("📊 Data URL length:", imageBase64.length);
+
+      // Ensure we're sending the complete data URL
+      if (!imageBase64.startsWith("data:image/")) {
+        console.warn(
+          "⚠️ Image base64 doesn't start with data URL prefix, adding it"
+        );
+        imageBase64 = `data:image/jpeg;base64,${imageBase64}`;
+      }
 
       const response = await api.post("/nutrition/analyze", {
         imageBase64: imageBase64,
@@ -394,7 +407,11 @@ export const nutritionAPI = {
 
       console.log("🎯 RAW ANALYZE API RESPONSE:");
       console.log("=====================================");
-      console.log("📋 Full Response:", JSON.stringify(response.data, null, 2));
+      console.log("📋 Response Success:", response.data.success);
+      console.log(
+        "📋 Response Data Keys:",
+        Object.keys(response.data.data || {})
+      );
       console.log("=====================================");
 
       return response.data;
@@ -402,7 +419,8 @@ export const nutritionAPI = {
       console.error("💥 Analyze meal API error:", error);
 
       if (error.response) {
-        console.error("Error response:", error.response.data);
+        console.error("Error response status:", error.response.status);
+        console.error("Error response data:", error.response.data);
         return {
           success: false,
           error: error.response.data?.error || "Server error occurred",
@@ -949,5 +967,118 @@ export const statisticsAPI = {
   async getStatistics(period: "week" | "month" | "custom") {
     const response = await api.get(`/statistics?period=${period}`);
     return response.data;
+  },
+};
+
+// NEW CHAT API
+export const chatAPI = {
+  sendMessage: async (message: string, language: string = "hebrew") => {
+    try {
+      console.log("💬 Sending chat message:", message);
+
+      const response = await api.post("/chat/message", {
+        message,
+        language,
+      });
+
+      console.log("✅ Chat response:", response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error("💥 Chat API error:", error);
+      throw error;
+    }
+  },
+
+  getChatHistory: async (limit: number = 50) => {
+    try {
+      console.log("📜 Getting chat history...");
+
+      const response = await api.get("/chat/history", {
+        params: { limit },
+      });
+
+      console.log("✅ Chat history response:", response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error("💥 Chat history API error:", error);
+      throw error;
+    }
+  },
+
+  clearHistory: async () => {
+    try {
+      console.log("🗑️ Clearing chat history...");
+
+      const response = await api.delete("/chat/history");
+
+      console.log("✅ Clear history response:", response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error("💥 Clear history API error:", error);
+      throw error;
+    }
+  },
+};
+
+// NEW FOOD SCANNER API
+export const foodScannerAPI = {
+  scanBarcode: async (barcode: string) => {
+    try {
+      console.log("🔍 Scanning barcode:", barcode);
+
+      const response = await api.post("/food-scanner/barcode", {
+        barcode,
+      });
+
+      console.log("✅ Barcode scan response:", response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error("💥 Barcode scan API error:", error);
+      throw error;
+    }
+  },
+
+  scanProductImage: async (imageBase64: string) => {
+    try {
+      console.log("📷 Scanning product image...");
+
+      // Remove data URL prefix if present
+      const cleanBase64 = imageBase64.replace(
+        /^data:image\/[a-z]+;base64,/,
+        ""
+      );
+
+      const response = await api.post("/food-scanner/image", {
+        imageBase64: cleanBase64,
+      });
+
+      console.log("✅ Image scan response:", response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error("💥 Image scan API error:", error);
+      throw error;
+    }
+  },
+
+  addToMealLog: async (
+    productData: any,
+    quantity: number,
+    mealTiming: string = "SNACK"
+  ) => {
+    try {
+      console.log("📝 Adding product to meal log...");
+
+      const response = await api.post("/food-scanner/add-to-meal", {
+        productData,
+        quantity,
+        mealTiming,
+      });
+
+      console.log("✅ Add to meal response:", response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error("💥 Add to meal API error:", error);
+      throw error;
+    }
   },
 };

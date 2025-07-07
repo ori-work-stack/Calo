@@ -13,6 +13,8 @@ import { deviceRoutes } from "./routes/devices";
 import { userRoutes } from "./routes/user";
 import statisticsRoutes from "./routes/statistics";
 import { mealPlanRoutes } from "./routes/mealPlans";
+import chatRoutes from "./routes/chat";
+import foodScannerRoutes from "./routes/foodScanner";
 import "./services/cron";
 
 // Load environment variables
@@ -134,6 +136,8 @@ apiRouter.use("/user", userRoutes);
 apiRouter.use("/devices", deviceRoutes);
 apiRouter.use("/calendar", calendarRoutes);
 apiRouter.use("/meal-plans", mealPlanRoutes);
+apiRouter.use("/chat", chatRoutes);
+apiRouter.use("/food-scanner", foodScannerRoutes);
 apiRouter.use("/", statisticsRoutes);
 
 app.use("/api", apiRouter);

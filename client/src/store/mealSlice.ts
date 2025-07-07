@@ -201,16 +201,19 @@ export const analyzeMeal = createAsyncThunk(
         throw new Error("Image data is empty or invalid");
       }
 
-      // Validate base64 format
-      const base64Pattern = /^data:image\/(jpeg|jpg|png|gif|bmp|webp);base64,/;
-      if (!base64Pattern.test(imageBase64)) {
-        throw new Error("Invalid image format. Must be a valid base64 image.");
+      // Clean base64 string - handle both raw base64 and data URLs
+      let cleanBase64 = imageBase64;
+      if (imageBase64.startsWith("data:")) {
+        cleanBase64 = imageBase64.split(",")[1];
       }
 
-      console.log("Base64 data length:", imageBase64.length);
+      // Create data URL for API call
+      const dataUrl = `data:image/jpeg;base64,${cleanBase64}`;
+      console.log("Base64 data length:", cleanBase64.length);
+      console.log("Data URL length:", dataUrl.length);
 
       // Make the API call with proper error handling
-      const response = await nutritionAPI.analyzeMeal(imageBase64);
+      const response = await nutritionAPI.analyzeMeal(dataUrl);
       console.log("API response received:", response);
 
       if (response && response.success && response.data) {
@@ -224,21 +227,20 @@ export const analyzeMeal = createAsyncThunk(
         }
 
         const pendingMeal: PendingMeal = {
-          image_base_64: imageBase64, // Use original base64, not the potentially truncated one from API
+          image_base_64: cleanBase64, // Store clean base64 without data URL prefix
           analysis: response.data,
           timestamp: Date.now(),
         };
-        console.log(pendingMeal, "this is pending meal");
+        console.log("Pending meal created:", pendingMeal);
 
-        // Save to storage
+        // Save to storage with error handling
         try {
-          await AsyncStorage.setItem(
-            PENDING_MEAL_KEY,
-            JSON.stringify(pendingMeal)
-          );
-          console.log("Pending meal saved to storage");
+          const serializedMeal = JSON.stringify(pendingMeal);
+          await AsyncStorage.setItem(PENDING_MEAL_KEY, serializedMeal);
+          console.log("Pending meal saved to storage successfully");
         } catch (storageError) {
           console.warn("Failed to save pending meal to storage:", storageError);
+          // Don't fail the analysis if storage fails
         }
 
         console.log("Analysis completed successfully");
@@ -271,8 +273,6 @@ export const analyzeMeal = createAsyncThunk(
         errorMessage = "Authentication error - please log in again";
       } else if (errorMessage.includes("500")) {
         errorMessage = "Server error - please try again later";
-      } else if (errorMessage.includes("Invalid image format")) {
-        errorMessage = "Please select a valid image file (JPEG, PNG, etc.)";
       }
 
       return rejectWithValue(errorMessage);
@@ -485,10 +485,32 @@ export const loadPendingMeal = createAsyncThunk(
       console.log("Loading pending meal from storage...");
       const stored = await AsyncStorage.getItem(PENDING_MEAL_KEY);
 
-      if (stored) {
-        const pendingMeal = JSON.parse(stored);
-        console.log("Pending meal loaded from storage");
-        return pendingMeal;
+      if (stored && stored.trim() !== "") {
+        try {
+          const pendingMeal = JSON.parse(stored);
+          console.log("Pending meal loaded from storage:", pendingMeal);
+
+          // Validate the loaded data structure
+          if (
+            pendingMeal &&
+            typeof pendingMeal === "object" &&
+            pendingMeal.timestamp
+          ) {
+            return pendingMeal;
+          } else {
+            console.warn("Invalid pending meal structure, clearing storage");
+            await AsyncStorage.removeItem(PENDING_MEAL_KEY);
+            return null;
+          }
+        } catch (parseError) {
+          console.error(
+            "Failed to parse pending meal from storage:",
+            parseError
+          );
+          // Clear corrupted data
+          await AsyncStorage.removeItem(PENDING_MEAL_KEY);
+          return null;
+        }
       } else {
         console.log("No pending meal found in storage");
         return null;

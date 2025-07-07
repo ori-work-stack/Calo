@@ -22,6 +22,7 @@ import {
   updateMeal,
   clearPendingMeal,
   clearError,
+  loadPendingMeal,
 } from "@/src/store/mealSlice";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -37,6 +38,11 @@ export default function CameraScreen() {
   const [updateText, setUpdateText] = useState("");
   const [postedMealId, setPostedMealId] = useState<string | null>(null);
   const cameraRef = useRef<CameraView>(null);
+
+  // Load pending meal on component mount
+  useEffect(() => {
+    dispatch(loadPendingMeal());
+  }, [dispatch]);
 
   // Handle errors
   useEffect(() => {
@@ -87,11 +93,12 @@ export default function CameraScreen() {
         });
 
         if (photo && photo.base64) {
-          console.log("✅ Picture taken, analyzing...");
+          console.log("✅ Picture taken, base64 length:", photo.base64.length);
           setShowCamera(false);
           setPostedMealId(null); // Reset posted meal ID
           dispatch(analyzeMeal(photo.base64));
         } else {
+          console.error("❌ No base64 data in photo");
           Alert.alert("Error", "Failed to capture image data");
         }
       } catch (error) {
@@ -113,18 +120,26 @@ export default function CameraScreen() {
         exif: false,
       });
 
-      console.log("📋 Image picker result:", result);
+      console.log("📋 Image picker result canceled:", result.canceled);
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
+        console.log("📋 Asset details:", {
+          uri: asset.uri,
+          hasBase64: !!asset.base64,
+          base64Length: asset.base64?.length || 0,
+        });
 
         if (asset.base64) {
-          console.log("✅ Image selected, starting analysis...");
+          console.log("✅ Image selected, base64 length:", asset.base64.length);
           setPostedMealId(null);
           dispatch(analyzeMeal(asset.base64));
         } else {
           console.error("❌ No base64 data in selected image");
-          Alert.alert("Error", "Failed to process the selected image.");
+          Alert.alert(
+            "Error",
+            "Failed to process the selected image. Please try a different image."
+          );
         }
       } else {
         console.log("📱 User canceled image selection");
@@ -275,11 +290,21 @@ export default function CameraScreen() {
         <View style={styles.analysisContainer}>
           <Image
             source={{
-              uri: `data:image/jpeg;base64,${pendingMeal.imageBase64}`,
+              uri: `data:image/jpeg;base64,${pendingMeal.image_base_64}`,
             }}
             style={styles.analyzedImage}
             onError={(error) => {
               console.error("💥 Image display error:", error);
+              console.error(
+                "💥 Image URI:",
+                `data:image/jpeg;base64,${pendingMeal.image_base_64?.substring(
+                  0,
+                  50
+                )}...`
+              );
+            }}
+            onLoad={() => {
+              console.log("✅ Image loaded successfully");
             }}
           />
 
@@ -289,63 +314,78 @@ export default function CameraScreen() {
             </Text>
 
             <Text style={styles.mealName}>
-              {pendingMeal.analysis?.description ||
-                pendingMeal.analysis?.name ||
+              {pendingMeal.analysis?.meal_name ||
+                pendingMeal.analysis?.description ||
                 "Unknown Meal"}
             </Text>
 
-            {(pendingMeal.analysis?.description ||
-              pendingMeal.analysis?.name) && (
+            {pendingMeal.analysis?.description && (
               <Text style={styles.mealDescription}>
-                {pendingMeal.analysis.description || pendingMeal.analysis.name}
+                {pendingMeal.analysis.description}
               </Text>
             )}
 
             <View style={styles.nutritionGrid}>
               <View style={styles.nutritionItem}>
                 <Text style={styles.nutritionValue}>
-                  {Math.round(
-                    pendingMeal.analysis?.totalCalories ||
-                      pendingMeal.analysis?.calories ||
-                      0
-                  )}
+                  {Math.round(pendingMeal.analysis?.calories || 0)}
                 </Text>
                 <Text style={styles.nutritionLabel}>Calories</Text>
               </View>
               <View style={styles.nutritionItem}>
                 <Text style={styles.nutritionValue}>
-                  {Math.round(
-                    pendingMeal.analysis?.totalProtein ||
-                      pendingMeal.analysis?.protein ||
-                      0
-                  )}
-                  g
+                  {Math.round(pendingMeal.analysis?.protein_g || 0)}g
                 </Text>
                 <Text style={styles.nutritionLabel}>Protein</Text>
               </View>
               <View style={styles.nutritionItem}>
                 <Text style={styles.nutritionValue}>
-                  {Math.round(
-                    pendingMeal.analysis?.totalCarbs ||
-                      pendingMeal.analysis?.carbs ||
-                      0
-                  )}
-                  g
+                  {Math.round(pendingMeal.analysis?.carbs_g || 0)}g
                 </Text>
                 <Text style={styles.nutritionLabel}>Carbs</Text>
               </View>
               <View style={styles.nutritionItem}>
                 <Text style={styles.nutritionValue}>
-                  {Math.round(
-                    pendingMeal.analysis?.totalFat ||
-                      pendingMeal.analysis?.fat ||
-                      0
-                  )}
-                  g
+                  {Math.round(pendingMeal.analysis?.fats_g || 0)}g
                 </Text>
                 <Text style={styles.nutritionLabel}>Fat</Text>
               </View>
             </View>
+
+            {pendingMeal.analysis?.ingredients &&
+              pendingMeal.analysis.ingredients.length > 0 && (
+                <View style={styles.ingredientsContainer}>
+                  <Text style={styles.ingredientsTitle}>
+                    Ingredients Breakdown
+                  </Text>
+                  {pendingMeal.analysis.ingredients.map((ingredient, index) => (
+                    <View key={index} style={styles.ingredientItem}>
+                      <Text style={styles.ingredientName}>
+                        🥗 {ingredient.name}
+                      </Text>
+                      <View style={styles.ingredientNutrition}>
+                        <Text style={styles.ingredientDetail}>
+                          Calories: {Math.round(ingredient.calories)}
+                        </Text>
+                        <Text style={styles.ingredientDetail}>
+                          Protein: {Math.round(ingredient.protein)}g
+                        </Text>
+                        <Text style={styles.ingredientDetail}>
+                          Carbs: {Math.round(ingredient.carbs)}g
+                        </Text>
+                        <Text style={styles.ingredientDetail}>
+                          Fat: {Math.round(ingredient.fat)}g
+                        </Text>
+                        {ingredient.fiber && (
+                          <Text style={styles.ingredientDetail}>
+                            Fiber: {Math.round(ingredient.fiber)}g
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
 
             {isPosted && (
               <View style={styles.statusContainer}>
@@ -790,5 +830,45 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
     fontWeight: "bold",
+  },
+  ingredientsContainer: {
+    marginTop: 20,
+    padding: 15,
+    backgroundColor: "white",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+  },
+  ingredientsTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 10,
+    color: "#333",
+  },
+  ingredientItem: {
+    marginBottom: 12,
+    padding: 10,
+    backgroundColor: "#f8f9fa",
+    borderRadius: 8,
+  },
+  ingredientName: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 5,
+  },
+  ingredientNutrition: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  ingredientDetail: {
+    fontSize: 12,
+    color: "#666",
+    backgroundColor: "white",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    overflow: "hidden",
   },
 });

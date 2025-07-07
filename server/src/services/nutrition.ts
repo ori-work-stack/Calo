@@ -187,6 +187,7 @@ export class NutritionService {
           fats_g: totals.fat,
           fiber_g: totals.fiber,
           sugar_g: totals.sugar,
+          ingredients: updatedAnalysis.ingredients || [],
         },
       });
 

@@ -1,4 +1,7 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import Feather from "@expo/vector-icons/Feather";
 import { ComponentProps } from "react";
 import { OpaqueColorValue, StyleProp, TextStyle } from "react-native";
 
@@ -12,23 +15,69 @@ type SupportedSymbolName =
   | "watch.digital"
   | "clock.fill"
   | "person.fill"
-  | "dining";
+  | "dining"
+  | "message.fill"
+  | "barcode.viewfinder";
+
+type IconLibrary =
+  | "MaterialIcons"
+  | "Ionicons"
+  | "MaterialCommunityIcons"
+  | "Feather";
 
 type IconMapping = Record<
   SupportedSymbolName,
-  ComponentProps<typeof MaterialIcons>["name"]
+  {
+    library: IconLibrary;
+    name: string;
+  }
 >;
 
 const MAPPING: IconMapping = {
-  "house.fill": "home",
-  "fork.knife": "restaurant",
-  "camera.fill": "photo-camera",
-  "chart.bar.fill": "bar-chart",
-  calendar: "calendar-today",
-  "watch.digital": "watch",
-  "clock.fill": "access-time",
-  dining: "restaurant", // Fixed: was "dining" which doesn't exist in MaterialIcons
-  "person.fill": "person",
+  "house.fill": {
+    library: "Ionicons",
+    name: "home", // Ionicons has the best home icon
+  },
+  "fork.knife": {
+    library: "MaterialCommunityIcons",
+    name: "silverware-fork-knife", // Perfect fork and knife icon
+  },
+  "camera.fill": {
+    library: "Ionicons",
+    name: "camera", // Ionicons camera is superior
+  },
+  "chart.bar.fill": {
+    library: "MaterialCommunityIcons",
+    name: "chart-bar", // Better bar chart representation
+  },
+  calendar: {
+    library: "Ionicons",
+    name: "calendar", // Clean, modern calendar
+  },
+  "watch.digital": {
+    library: "MaterialCommunityIcons",
+    name: "watch-variant", // Best digital watch icon
+  },
+  "clock.fill": {
+    library: "Ionicons",
+    name: "time", // Beautiful filled clock
+  },
+  dining: {
+    library: "MaterialCommunityIcons",
+    name: "food-fork-drink", // Perfect dining icon with utensils and drink
+  },
+  "person.fill": {
+    library: "Ionicons",
+    name: "person", // Ionicons person is cleaner
+  },
+  "message.fill": {
+    library: "Ionicons",
+    name: "chatbubble", // Superior message bubble
+  },
+  "barcode.viewfinder": {
+    library: "MaterialCommunityIcons",
+    name: "barcode-scan", // Perfect barcode scanner icon
+  },
 };
 
 export function IconSymbol({
@@ -42,11 +91,11 @@ export function IconSymbol({
   color: string | OpaqueColorValue;
   style?: StyleProp<TextStyle>;
 }) {
-  const mappedName = MAPPING[name];
+  const iconConfig = MAPPING[name];
 
-  if (!mappedName) {
-    console.warn(`Icon "${name}" is not mapped to a MaterialIcon.`);
-    // Return a fallback icon instead of null
+  if (!iconConfig) {
+    console.warn(`Icon "${name}" is not mapped to any icon library.`);
+    // Return a fallback icon
     return (
       <MaterialIcons
         name="help-outline"
@@ -57,7 +106,57 @@ export function IconSymbol({
     );
   }
 
-  return (
-    <MaterialIcons name={mappedName} size={size} color={color} style={style} />
-  );
+  const { library, name: iconName } = iconConfig;
+
+  // Render the appropriate icon based on the library
+  switch (library) {
+    case "MaterialIcons":
+      return (
+        <MaterialIcons
+          name={iconName as ComponentProps<typeof MaterialIcons>["name"]}
+          size={size}
+          color={color}
+          style={style}
+        />
+      );
+    case "Ionicons":
+      return (
+        <Ionicons
+          name={iconName as ComponentProps<typeof Ionicons>["name"]}
+          size={size}
+          color={color}
+          style={style}
+        />
+      );
+    case "MaterialCommunityIcons":
+      return (
+        <MaterialCommunityIcons
+          name={
+            iconName as ComponentProps<typeof MaterialCommunityIcons>["name"]
+          }
+          size={size}
+          color={color}
+          style={style}
+        />
+      );
+    case "Feather":
+      return (
+        <Feather
+          name={iconName as ComponentProps<typeof Feather>["name"]}
+          size={size}
+          color={color}
+          style={style}
+        />
+      );
+    default:
+      console.warn(`Unknown icon library: ${library}`);
+      return (
+        <MaterialIcons
+          name="help-outline"
+          size={size}
+          color={color}
+          style={style}
+        />
+      );
+  }
 }
