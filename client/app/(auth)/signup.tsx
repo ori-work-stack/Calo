@@ -11,7 +11,7 @@ import {
   Button,
   Platform,
 } from "react-native";
-import { Link } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState, AppDispatch } from "@/src/store";
 import { signUp, clearError } from "@/src/store/authSlice";
@@ -21,6 +21,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 export default function SignUp() {
   const dispatch = useDispatch<AppDispatch>();
   const { isLoading, error } = useSelector((state: RootState) => state.auth);
+  const router = useRouter();
 
   const [formData, setFormData] = useState({
     email: "",
@@ -60,10 +61,9 @@ export default function SignUp() {
       console.log("Sign up result:", result);
 
       if (signUp.fulfilled.match(result)) {
-        console.log(
-          "Sign up successful! Navigation will be handled by _layout.tsx"
-        );
-        // Don't navigate here - let the main navigation logic handle it
+        console.log("Sign up successful! Redirecting to payment plan");
+        // Force redirect to payment plan after signup
+        router.replace("/payment-plan");
       } else {
         console.log("Sign up failed:", result.payload);
       }

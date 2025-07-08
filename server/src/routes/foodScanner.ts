@@ -1,6 +1,7 @@
 import express from "express";
 import { authenticateToken } from "../middleware/auth";
 import { FoodScannerService } from "../services/foodScanner";
+import { prisma } from "../lib/database";
 
 const router = express.Router();
 
@@ -27,9 +28,21 @@ router.post("/barcode", async (req, res) => {
 
     const result = await FoodScannerService.scanBarcode(barcode, userId);
 
+    // Save scanned product to database
+    await prisma.foodProduct.create({
+      data: {
+        user_id: userId,
+        barcode: barcode,
+        product_name: result.product.name,
+        brand: result.product.brand || "",
+        nutrition_data: result,
+        scanned_at: new Date(),
+      },
+    });
+
     res.json({
       success: true,
-      data: result,
+      product: result,
     });
   } catch (error) {
     console.error("Barcode scan API error:", error);
@@ -63,6 +76,17 @@ router.post("/image", async (req, res) => {
       imageBase64,
       userId
     );
+
+    // Save scanned product to database
+    await prisma.foodProduct.create({
+      data: {
+        user_id: userId,
+        product_name: result.product.name,
+        brand: result.product.brand || "",
+        nutrition_data: result,
+        scanned_at: new Date(),
+      },
+    });
 
     res.json({
       success: true,

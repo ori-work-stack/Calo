@@ -1,13 +1,16 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  ActivityIndicator,
-  RefreshControl,
   TouchableOpacity,
+  Dimensions,
+  ActivityIndicator,
 } from "react-native";
+import { PanGestureHandler } from "react-native-gesture-handler";
+import Animated from "react-native-reanimated";
+import { useSwipeNavigation } from "@/hooks/useSwipeNavigation";
 import { useSelector } from "react-redux";
 import { RootState } from "@/src/store";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,6 +20,7 @@ import FloatingChatButton from "@/components/FloatingChatButton";
 export default function Dashboard() {
   const { user } = useSelector((state: RootState) => state.auth);
   const [showGlobalStats, setShowGlobalStats] = useState(false);
+  const { gestureHandler, translateX } = useSwipeNavigation();
 
   // Get today's date
   const today = new Date().toISOString().split("T")[0];
@@ -171,97 +175,93 @@ export default function Dashboard() {
   }
 
   return (
-    <>
-      <ScrollView
-        style={styles.container}
-        refreshControl={
-          <RefreshControl refreshing={isLoading} onRefresh={onRefresh} />
-        }
-      >
-        <Text style={styles.welcome}>Welcome back, {user?.name}!</Text>
+    <PanGestureHandler onGestureEvent={gestureHandler}>
+      <Animated.View style={{ flex: 1 }}>
+        <ScrollView style={styles.container}>
+          <Text style={styles.welcome}>Welcome back, {user?.name}!</Text>
 
-        {dailyStats && (
-          <View style={styles.statsContainer}>
-            <Text style={styles.sectionTitle}>Today's Nutrition</Text>
-            <View style={styles.statsGrid}>
-              <View style={styles.statCard}>
-                <Text style={styles.statValue}>
-                  {Math.round(dailyStats.calories)}
-                </Text>
-                <Text style={styles.statLabel}>Calories</Text>
+          {dailyStats && (
+            <View style={styles.statsContainer}>
+              <Text style={styles.sectionTitle}>Today's Nutrition</Text>
+              <View style={styles.statsGrid}>
+                <View style={styles.statCard}>
+                  <Text style={styles.statValue}>
+                    {Math.round(dailyStats.calories)}
+                  </Text>
+                  <Text style={styles.statLabel}>Calories</Text>
+                </View>
+                <View style={styles.statCard}>
+                  <Text style={styles.statValue}>
+                    {Math.round(dailyStats.protein)}g
+                  </Text>
+                  <Text style={styles.statLabel}>Protein</Text>
+                </View>
+                <View style={styles.statCard}>
+                  <Text style={styles.statValue}>
+                    {Math.round(dailyStats.carbs)}g
+                  </Text>
+                  <Text style={styles.statLabel}>Carbs</Text>
+                </View>
+                <View style={styles.statCard}>
+                  <Text style={styles.statValue}>
+                    {Math.round(dailyStats.fat)}g
+                  </Text>
+                  <Text style={styles.statLabel}>Fat</Text>
+                </View>
               </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statValue}>
-                  {Math.round(dailyStats.protein)}g
-                </Text>
-                <Text style={styles.statLabel}>Protein</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statValue}>
-                  {Math.round(dailyStats.carbs)}g
-                </Text>
-                <Text style={styles.statLabel}>Carbs</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statValue}>
-                  {Math.round(dailyStats.fat)}g
-                </Text>
-                <Text style={styles.statLabel}>Fat</Text>
-              </View>
-            </View>
-            <Text style={styles.meal_count}>
-              {dailyStats.meal_count} meals logged today
-            </Text>
-          </View>
-        )}
-
-        {/* Global Statistics Toggle */}
-        <View style={styles.globalStatsToggle}>
-          <TouchableOpacity
-            style={styles.toggleButton}
-            onPress={() => setShowGlobalStats(!showGlobalStats)}
-            disabled={globalStatsLoading}
-          >
-            <Ionicons
-              name={showGlobalStats ? "chevron-up" : "chevron-down"}
-              size={20}
-              color="#007AFF"
-            />
-            <Text style={styles.toggleButtonText}>
-              {showGlobalStats ? "Hide" : "Show"} Community Insights
-            </Text>
-            {globalStatsLoading && (
-              <ActivityIndicator
-                size="small"
-                color="#007AFF"
-                style={styles.toggleLoader}
-              />
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {/* Global Statistics */}
-        {showGlobalStats && renderGlobalStatistics()}
-
-        <View style={styles.recentMeals}>
-          <Text style={styles.sectionTitle}>Recent Meals</Text>
-          {meals.slice(0, 3).map((meal) => (
-            <View key={meal.id} style={styles.mealCard}>
-              <Text style={styles.mealName}>{meal.name}</Text>
-              <Text style={styles.mealCalories}>
-                {Math.round(Number(meal.calories))} cal
+              <Text style={styles.meal_count}>
+                {dailyStats.meal_count} meals logged today
               </Text>
             </View>
-          ))}
-          {meals.length === 0 && (
-            <Text style={styles.emptyText}>
-              No meals logged yet. Start by analyzing a photo!
-            </Text>
           )}
-        </View>
-      </ScrollView>
-      <FloatingChatButton />
-    </>
+
+          {/* Global Statistics Toggle */}
+          <View style={styles.globalStatsToggle}>
+            <TouchableOpacity
+              style={styles.toggleButton}
+              onPress={() => setShowGlobalStats(!showGlobalStats)}
+              disabled={globalStatsLoading}
+            >
+              <Ionicons
+                name={showGlobalStats ? "chevron-up" : "chevron-down"}
+                size={20}
+                color="#007AFF"
+              />
+              <Text style={styles.toggleButtonText}>
+                {showGlobalStats ? "Hide" : "Show"} Community Insights
+              </Text>
+              {globalStatsLoading && (
+                <ActivityIndicator
+                  size="small"
+                  color="#007AFF"
+                  style={styles.toggleLoader}
+                />
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {/* Global Statistics */}
+          {showGlobalStats && renderGlobalStatistics()}
+
+          <View style={styles.recentMeals}>
+            <Text style={styles.sectionTitle}>Recent Meals</Text>
+            {meals.slice(0, 3).map((meal) => (
+              <View key={meal.id} style={styles.mealCard}>
+                <Text style={styles.mealName}>{meal.name}</Text>
+                <Text style={styles.mealCalories}>
+                  {Math.round(Number(meal.calories))} cal
+                </Text>
+              </View>
+            ))}
+            {meals.length === 0 && (
+              <Text style={styles.emptyText}>
+                No meals logged yet. Start by analyzing a photo!
+              </Text>
+            )}
+          </View>
+        </ScrollView>
+      </Animated.View>
+    </PanGestureHandler>
   );
 }
 

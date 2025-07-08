@@ -31,9 +31,10 @@ model User {
   activitySummaries DailyActivitySummary[]
 
   // New meal plan relationships
-  mealPlans       UserMealPlan[]
-  mealPreferences UserMealPreference[]
-  shoppingLists   ShoppingList[]
+  mealPlans        UserMealPlan[]
+  mealPreferences  UserMealPreference[]
+  shoppingLists    ShoppingList[]
+  recommendedMenus RecommendedMenu[]
 
   created_at DateTime @default(now())
 
@@ -406,7 +407,72 @@ model ChatMessage {
   @@index([user_id, created_at])
 }
 
+model RecommendedMenu {
+  menu_id        String   @id @default(cuid())
+  user_id        String
+  title          String
+  description    String?
+  total_calories Int
+  total_protein  Int
+  total_carbs    Int
+  total_fat      Int
+  created_at     DateTime @default(now())
+
+  // Relations
+  user  User              @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  meals RecommendedMeal[]
+
+  @@index([user_id])
+  @@map("recommended_menus")
+}
+
+model RecommendedMeal {
+  meal_id   String     @id @default(cuid())
+  menu_id   String
+  name      String
+  meal_type MealTiming
+  calories  Int
+  protein   Int
+  carbs     Int
+  fat       Int
+
+  // Relations
+  menu        RecommendedMenu         @relation(fields: [menu_id], references: [menu_id], onDelete: Cascade)
+  ingredients RecommendedIngredient[]
+
+  @@index([menu_id])
+  @@map("recommended_meals")
+}
+
+model RecommendedIngredient {
+  ingredient_id String  @id @default(cuid())
+  meal_id       String
+  name          String
+  quantity      String
+  unit          String?
+
+  // Relations
+  meal RecommendedMeal @relation(fields: [meal_id], references: [meal_id], onDelete: Cascade)
+
+  @@index([meal_id])
+  @@map("recommended_ingredients")
+}
+
+model ScannedProduct {
+  scan_id        String   @id @default(cuid())
+  user_id        String
+  barcode        String?
+  product_name   String
+  brand          String?
+  nutrition_data Json
+  scanned_at     DateTime @default(now())
+
+  @@index([user_id])
+  @@map("scanned_products")
+}
+
 model FoodProduct {
+  user_id            String
   product_id         Int      @id @default(autoincrement())
   barcode            String   @unique
   name               String

@@ -43,6 +43,35 @@ router.put(
     }
   }
 );
+// src/routes/user.ts
+router.put(
+  "/subscription",
+  authenticateToken,
+  async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user.user_id;
+      const { subscription_type } = req.body;
+
+      if (!["FREE", "PREMIUM", "GOLD"].includes(subscription_type)) {
+        return res
+          .status(400)
+          .json({ success: false, error: "Invalid subscription type" });
+      }
+
+      await prisma.user.update({
+        where: { user_id: userId },
+        data: { subscription_type },
+      });
+
+      return res.json({ success: true, message: "Subscription updated" });
+    } catch (error) {
+      console.error("Subscription update error:", error);
+      return res
+        .status(500)
+        .json({ success: false, error: "Failed to update subscription" });
+    }
+  }
+);
 
 router.get(
   "/subscription-info",

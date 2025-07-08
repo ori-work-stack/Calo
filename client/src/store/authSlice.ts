@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import { User, SignUpData, SignInData, AuthResponse } from "../types";
 import { authAPI } from "../services/api";
+import { clearAllQueries } from "../services/queryClient";
 
 interface AuthState {
   user: User | null;
@@ -81,13 +82,28 @@ export const signOut = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       console.log("🔄 Starting sign out process...");
+
+      // Clear AsyncStorage first
+      const AsyncStorage =
+        require("@react-native-async-storage/async-storage").default;
+      await AsyncStorage.clear();
+      console.log("✅ AsyncStorage cleared");
+
+      // Clear TanStack Query cache
+      clearAllQueries();
+
+      // Clear API auth
       await authAPI.signOut();
       console.log("✅ Sign out successful");
+
       return true;
     } catch (error: any) {
       console.error("💥 SignOut error:", error);
-      // Even if there's an error, try to clear the token
+      // Even if there's an error, try to clear everything
       try {
+        const AsyncStorage =
+          require("@react-native-async-storage/async-storage").default;
+        await AsyncStorage.clear();
         await authAPI.signOut();
       } catch {}
       return rejectWithValue(
@@ -142,6 +158,11 @@ const authSlice = createSlice({
     setQuestionnaireCompleted: (state) => {
       if (state.user) {
         state.user.is_questionnaire_completed = true;
+      }
+    },
+    updateSubscription: (state, action) => {
+      if (state.user) {
+        state.user.subscription_type = action.payload.subscription_type;
       }
     },
   },
@@ -229,5 +250,6 @@ export const {
   forceSignOut,
   updateUserSubscription,
   setQuestionnaireCompleted,
+  updateSubscription,
 } = authSlice.actions;
 export default authSlice.reducer;

@@ -2,347 +2,182 @@ import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
-  StyleSheet,
-  ScrollView,
+  FlatList,
   TouchableOpacity,
+  StyleSheet,
   ActivityIndicator,
   Alert,
   RefreshControl,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { IconSymbol } from "@/components/ui/IconSymbol";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/src/services/api";
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:5000";
-
-interface MenuItem {
-  id: string;
+interface Ingredient {
+  ingredient_id: string;
   name: string;
-  description: string;
   calories: number;
   protein: number;
   carbs: number;
   fat: number;
-  ingredients: string[];
-  instructions: string[];
-  meal_timing: "BREAKFAST" | "LUNCH" | "DINNER" | "SNACK";
-  prep_time_minutes: number;
-  allergens: string[];
 }
 
-interface MenuConfig {
-  mealsPerDay: number;
-  daysToGenerate: number;
-  dietaryPreferences: string[];
-  calorieTarget: number;
+interface Meal {
+  meal_id: string;
+  name: string;
+  meal_type: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  ingredients: Ingredient[];
+}
+
+interface RecommendedMenu {
+  menu_id: string;
+  title: string;
+  description: string;
+  total_calories: number;
+  total_protein: number;
+  total_carbs: number;
+  total_fat: number;
+  created_at: string;
+  meals: Meal[];
 }
 
 export default function RecommendedMenusScreen() {
-  const [menus, setMenus] = useState<{ [key: string]: MenuItem[] }>({});
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [showConfig, setShowConfig] = useState(false);
-  const [config, setConfig] = useState<MenuConfig>({
-    mealsPerDay: 3,
-    daysToGenerate: 7,
-    dietaryPreferences: [],
-    calorieTarget: 2000,
+  const [refreshing, setRefreshing] = useState(false);
+  const queryClient = useQueryClient();
+
+  const {
+    data: menusData,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["recommendedMenus"],
+    queryFn: async () => {
+      const response = await api.get("/meal-plans/recommended");
+      return response.data;
+    },
   });
 
-  useEffect(() => {
-    loadRecommendedMenus();
-  }, []);
-
-  const loadRecommendedMenus = async () => {
-    try {
-      const token = await AsyncStorage.getItem("userToken");
-      if (!token) return;
-
-      const response = await fetch(
-        `${API_BASE_URL}/api/meal-plans/recommended`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+  const generateMenuMutation = useMutation({
+    mutationFn: async () => {
+      const response = await api.post("/meal-plans/recommended/generate");
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["recommendedMenus"] });
+      Alert.alert("Success", "New personalized menu generated!");
+    },
+    onError: (error: any) => {
+      Alert.alert(
+        "Error",
+        error.response?.data?.error || "Failed to generate menu"
       );
-
-      if (response.ok) {
-        const data = await response.json();
-        setMenus(data);
-      } else {
-        console.error("Failed to load recommended menus");
-      }
-    } catch (error) {
-      console.error("Error loading recommended menus:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const generateNewMenus = async () => {
-    setIsLoading(true);
-    try {
-      const token = await AsyncStorage.getItem("userToken");
-      if (!token) return;
-
-      const response = await fetch(`${API_BASE_URL}/api/meal-plans/generate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(config),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setMenus(data);
-        Alert.alert("Success", "New menus generated successfully!");
-      } else {
-        Alert.alert("Error", "Failed to generate new menus");
-      }
-    } catch (error) {
-      console.error("Error generating menus:", error);
-      Alert.alert("Error", "Something went wrong");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    },
+  });
 
   const onRefresh = async () => {
-    setIsRefreshing(true);
-    await loadRecommendedMenus();
-    setIsRefreshing(false);
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
   };
 
-  const getMealTimingColor = (timing: string) => {
-    switch (timing) {
-      case "BREAKFAST":
-        return "#FF9500";
-      case "LUNCH":
-        return "#34C759";
-      case "DINNER":
-        return "#5856D6";
-      case "SNACK":
-        return "#FF2D92";
-      default:
-        return "#007AFF";
-    }
-  };
-
-  const renderMenuItem = (item: MenuItem) => (
-    <View key={item.id} style={styles.menuItem}>
-      <View style={styles.menuHeader}>
-        <Text style={styles.menuTitle}>{item.name}</Text>
-        <View
-          style={[
-            styles.timingBadge,
-            { backgroundColor: getMealTimingColor(item.meal_timing) },
-          ]}
-        >
-          <Text style={styles.timingText}>{item.meal_timing}</Text>
-        </View>
-      </View>
-
-      <Text style={styles.menuDescription}>{item.description}</Text>
-
+  const renderMeal = ({ item }: { item: Meal }) => (
+    <View style={styles.mealCard}>
+      <Text style={styles.mealName}>{item.name}</Text>
+      <Text style={styles.mealType}>{item.meal_type}</Text>
       <View style={styles.nutritionRow}>
-        <View style={styles.nutritionItem}>
-          <Text style={styles.nutritionLabel}>Calories</Text>
-          <Text style={styles.nutritionValue}>{item.calories}</Text>
-        </View>
-        <View style={styles.nutritionItem}>
-          <Text style={styles.nutritionLabel}>Protein</Text>
-          <Text style={styles.nutritionValue}>{item.protein}g</Text>
-        </View>
-        <View style={styles.nutritionItem}>
-          <Text style={styles.nutritionLabel}>Carbs</Text>
-          <Text style={styles.nutritionValue}>{item.carbs}g</Text>
-        </View>
-        <View style={styles.nutritionItem}>
-          <Text style={styles.nutritionLabel}>Fat</Text>
-          <Text style={styles.nutritionValue}>{item.fat}g</Text>
-        </View>
-      </View>
-
-      <View style={styles.metaRow}>
-        <View style={styles.metaItem}>
-          <IconSymbol name="clock" size={16} color="#666" />
-          <Text style={styles.metaText}>{item.prep_time_minutes} min</Text>
-        </View>
-        {item.allergens.length > 0 && (
-          <View style={styles.metaItem}>
-            <IconSymbol
-              name="exclamationmark.triangle"
-              size={16}
-              color="#FF9500"
-            />
-            <Text style={styles.metaText}>{item.allergens.join(", ")}</Text>
-          </View>
-        )}
+        <Text style={styles.nutritionText}>🔥 {item.calories} cal</Text>
+        <Text style={styles.nutritionText}>🥩 {item.protein}g protein</Text>
+        <Text style={styles.nutritionText}>🍞 {item.carbs}g carbs</Text>
+        <Text style={styles.nutritionText}>🥑 {item.fat}g fat</Text>
       </View>
     </View>
   );
 
-  if (isLoading && Object.keys(menus).length === 0) {
+  const renderMenu = ({ item }: { item: RecommendedMenu }) => (
+    <View style={styles.menuCard}>
+      <Text style={styles.menuTitle}>{item.title}</Text>
+      <Text style={styles.menuDescription}>{item.description}</Text>
+      <View style={styles.totalNutrition}>
+        <Text style={styles.totalText}>
+          Total: {item.total_calories} calories
+        </Text>
+        <Text style={styles.totalText}>
+          P: {item.total_protein}g | C: {item.total_carbs}g | F:{" "}
+          {item.total_fat}g
+        </Text>
+      </View>
+      <Text style={styles.mealsHeader}>Meals:</Text>
+      {item.meals.map((meal) => (
+        <View key={meal.meal_id}>{renderMeal({ item: meal })}</View>
+      ))}
+      <Text style={styles.dateText}>
+        Created: {new Date(item.created_at).toLocaleDateString()}
+      </Text>
+    </View>
+  );
+
+  if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color="#007AFF" />
         <Text style={styles.loadingText}>Loading recommended menus...</Text>
       </View>
     );
   }
 
+  if (error) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.errorText}>Failed to load menus</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={() => refetch()}>
+          <Text style={styles.retryButtonText}>Try Again</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const menus = menusData?.menus || [];
+
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
-      }
-    >
+    <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Recommended Menus</Text>
-        <Text style={styles.subtitle}>
-          Personalized meal plans based on your preferences
-        </Text>
-      </View>
-
-      <View style={styles.controls}>
         <TouchableOpacity
-          style={styles.configButton}
-          onPress={() => setShowConfig(!showConfig)}
+          style={styles.generateButton}
+          onPress={() => generateMenuMutation.mutate()}
+          disabled={generateMenuMutation.isPending}
         >
-          <IconSymbol name="gearshape" size={20} color="#007AFF" />
-          <Text style={styles.configButtonText}>Configuration</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.configButton, styles.primaryButton]}
-          onPress={generateNewMenus}
-          disabled={isLoading}
-        >
-          {isLoading ? (
+          {generateMenuMutation.isPending ? (
             <ActivityIndicator size="small" color="white" />
           ) : (
-            <>
-              <IconSymbol name="arrow.clockwise" size={20} color="white" />
-              <Text style={[styles.configButtonText, styles.primaryButtonText]}>
-                Generate New
-              </Text>
-            </>
+            <Text style={styles.generateButtonText}>Generate New Menu</Text>
           )}
         </TouchableOpacity>
       </View>
 
-      {showConfig && (
-        <View style={styles.configSection}>
-          <Text style={styles.configSectionTitle}>Menu Configuration</Text>
-          <Text style={styles.configDescription}>
-            Customize your meal plan preferences
+      {menus.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>No recommended menus yet</Text>
+          <Text style={styles.emptySubtext}>
+            Generate your first personalized menu!
           </Text>
-
-          <View style={styles.configOption}>
-            <Text style={styles.configLabel}>Meals per day</Text>
-            <View style={styles.configButtons}>
-              {[2, 3, 4, 5].map((count) => (
-                <TouchableOpacity
-                  key={count}
-                  style={[
-                    styles.configButton,
-                    config.mealsPerDay === count && styles.configButtonActive,
-                  ]}
-                  onPress={() => setConfig({ ...config, mealsPerDay: count })}
-                >
-                  <Text
-                    style={[
-                      styles.configButtonText,
-                      config.mealsPerDay === count &&
-                        styles.configButtonTextActive,
-                    ]}
-                  >
-                    {count}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.configOption}>
-            <Text style={styles.configLabel}>Days to generate</Text>
-            <View style={styles.configButtons}>
-              {[3, 7, 14].map((days) => (
-                <TouchableOpacity
-                  key={days}
-                  style={[
-                    styles.configButton,
-                    config.daysToGenerate === days && styles.configButtonActive,
-                  ]}
-                  onPress={() => setConfig({ ...config, daysToGenerate: days })}
-                >
-                  <Text
-                    style={[
-                      styles.configButtonText,
-                      config.daysToGenerate === days &&
-                        styles.configButtonTextActive,
-                    ]}
-                  >
-                    {days}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.configOption}>
-            <Text style={styles.configLabel}>Daily calorie target</Text>
-            <View style={styles.configButtons}>
-              {[1500, 2000, 2500, 3000].map((calories) => (
-                <TouchableOpacity
-                  key={calories}
-                  style={[
-                    styles.configButton,
-                    config.calorieTarget === calories &&
-                      styles.configButtonActive,
-                  ]}
-                  onPress={() =>
-                    setConfig({ ...config, calorieTarget: calories })
-                  }
-                >
-                  <Text
-                    style={[
-                      styles.configButtonText,
-                      config.calorieTarget === calories &&
-                        styles.configButtonTextActive,
-                    ]}
-                  >
-                    {calories}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
         </View>
+      ) : (
+        <FlatList
+          data={menus}
+          renderItem={renderMenu}
+          keyExtractor={(item) => item.menu_id}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          showsVerticalScrollIndicator={false}
+        />
       )}
-
-      <View style={styles.menuSection}>
-        {Object.keys(menus).length === 0 ? (
-          <View style={styles.emptyState}>
-            <IconSymbol name="doc.text" size={48} color="#ccc" />
-            <Text style={styles.emptyStateTitle}>No menus available</Text>
-            <Text style={styles.emptyStateSubtitle}>
-              Generate your first personalized meal plan
-            </Text>
-          </View>
-        ) : (
-          Object.entries(menus).map(([day, dayMenus]) => (
-            <View key={day} style={styles.daySection}>
-              <Text style={styles.dayTitle}>{day}</Text>
-              {dayMenus.map((item) => renderMenuItem(item))}
-            </View>
-          ))
-        )}
-      </View>
-    </ScrollView>
+    </View>
   );
 }
 
@@ -351,196 +186,149 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f5f5f5",
   },
-  loadingContainer: {
+  centerContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    padding: 20,
+  },
+  header: {
+    backgroundColor: "white",
+    padding: 20,
+    paddingTop: 60,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e0e0e0",
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: "bold",
+    marginBottom: 15,
+    textAlign: "center",
+  },
+  generateButton: {
+    backgroundColor: "#007AFF",
+    padding: 15,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  generateButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  menuCard: {
+    backgroundColor: "white",
+    margin: 15,
+    padding: 20,
+    borderRadius: 15,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  menuTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 5,
+    color: "#333",
+  },
+  menuDescription: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 10,
+  },
+  totalNutrition: {
+    backgroundColor: "#f0f8ff",
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 15,
+  },
+  totalText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#007AFF",
+    textAlign: "center",
+  },
+  mealsHeader: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 10,
+    color: "#333",
+  },
+  mealCard: {
+    backgroundColor: "#f9f9f9",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: "#007AFF",
+  },
+  mealName: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 2,
+  },
+  mealType: {
+    fontSize: 12,
+    color: "#666",
+    marginBottom: 8,
+    textTransform: "uppercase",
+  },
+  nutritionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  nutritionText: {
+    fontSize: 12,
+    color: "#555",
+    backgroundColor: "white",
+    padding: 4,
+    borderRadius: 4,
+  },
+  dateText: {
+    fontSize: 12,
+    color: "#999",
+    textAlign: "right",
+    marginTop: 10,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 40,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
   },
   loadingText: {
     marginTop: 10,
     fontSize: 16,
     color: "#666",
   },
-  header: {
-    backgroundColor: "white",
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 5,
-  },
-  subtitle: {
+  errorText: {
     fontSize: 16,
-    color: "#666",
-  },
-  controls: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    padding: 15,
-    backgroundColor: "white",
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-  },
-  configButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: "#f8f9fa",
-    borderWidth: 1,
-    borderColor: "#ddd",
-  },
-  configButtonText: {
-    marginLeft: 5,
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#333",
-  },
-  primaryButton: {
-    backgroundColor: "#007AFF",
-  },
-  primaryButtonText: {
-    color: "white",
-  },
-  configSection: {
-    backgroundColor: "white",
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-  },
-  configSectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 10,
-    color: "#333",
-  },
-  configDescription: {
-    fontSize: 14,
-    color: "#666",
+    color: "#ff3333",
     marginBottom: 20,
-    lineHeight: 20,
-  },
-  configOption: {
-    marginBottom: 25,
-  },
-  configLabel: {
-    fontSize: 16,
-    fontWeight: "500",
-    marginBottom: 10,
-    color: "#333",
-  },
-  configButtons: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  configButtonActive: {
-    backgroundColor: "#007AFF",
-    borderColor: "#007AFF",
-  },
-  configButtonTextActive: {
-    color: "white",
-  },
-  menuSection: {
-    padding: 15,
-  },
-  emptyState: {
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 40,
-  },
-  emptyStateTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#333",
-    marginTop: 15,
-    marginBottom: 5,
-  },
-  emptyStateSubtitle: {
-    fontSize: 14,
-    color: "#666",
     textAlign: "center",
   },
-  daySection: {
-    marginBottom: 25,
+  retryButton: {
+    backgroundColor: "#007AFF",
+    padding: 12,
+    borderRadius: 8,
   },
-  dayTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 15,
-    paddingHorizontal: 5,
-  },
-  menuItem: {
-    backgroundColor: "white",
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: "#eee",
-  },
-  menuHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  menuTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#333",
-    flex: 1,
-  },
-  timingBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-  },
-  timingText: {
+  retryButtonText: {
     color: "white",
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-  menuDescription: {
-    fontSize: 14,
-    color: "#666",
-    lineHeight: 20,
-    marginBottom: 15,
-  },
-  nutritionRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 10,
-  },
-  nutritionItem: {
-    alignItems: "center",
-  },
-  nutritionLabel: {
-    fontSize: 12,
-    color: "#666",
-    marginBottom: 2,
-  },
-  nutritionValue: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "600",
-    color: "#333",
-  },
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 15,
-  },
-  metaItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-  },
-  metaText: {
-    fontSize: 12,
-    color: "#666",
   },
 });

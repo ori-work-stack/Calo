@@ -1,6 +1,8 @@
 import { Router } from "express";
-import { authenticateToken } from "../middleware/auth";
+import { authenticateToken, AuthRequest } from "../middleware/auth";
 import { MealPlanService } from "../services/mealPlans";
+import { prisma } from "../lib/database";
+import { MealTiming } from "@prisma/client";
 
 const router = Router();
 
@@ -313,4 +315,136 @@ router.post("/:planId/deactivate", authenticateToken, async (req, res) => {
   }
 });
 
-export { router as mealPlanRoutes };
+// Get user's recommended menus
+router.get("/recommended", authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user.user_id;
+
+    const recommendedMenus = await prisma.recommendedMenu.findMany({
+      where: { user_id: userId },
+      include: {
+        meals: {
+          include: {
+            ingredients: true,
+          },
+        },
+      },
+      orderBy: { created_at: "desc" },
+      take: 10,
+    });
+
+    res.json({
+      success: true,
+      menus: recommendedMenus,
+    });
+  } catch (error) {
+    console.error("Get recommended menus error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch recommended menus",
+    });
+  }
+});
+
+// Generate new recommended menu
+router.post(
+  "/recommended/generate",
+  authenticateToken,
+  async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user.user_id;
+
+      // Get user's questionnaire and nutrition plan
+      const [questionnaire, nutritionPlan] = await Promise.all([
+        prisma.userQuestionnaire.findFirst({
+          where: { user_id: userId },
+          orderBy: { date_completed: "desc" },
+        }),
+        prisma.nutritionPlan.findFirst({
+          where: { user_id: userId },
+        }),
+      ]);
+
+      if (!questionnaire || !nutritionPlan) {
+        return res.status(400).json({
+          success: false,
+          error: "User questionnaire or nutrition plan not found",
+        });
+      }
+
+      // Create a new recommended menu
+      const menu = await prisma.recommendedMenu.create({
+        data: {
+          user_id: userId,
+          title: `Personalized Menu - ${new Date().toLocaleDateString()}`,
+          description: `Based on your ${questionnaire.main_goal} goal`,
+          total_calories: nutritionPlan.goal_calories || 2000,
+          total_protein: nutritionPlan.goal_protein_g || 150,
+          total_carbs: nutritionPlan.goal_carbs_g || 200,
+          total_fat: nutritionPlan.goal_fats_g || 70,
+          created_at: new Date(),
+        },
+      });
+
+      // Generate sample meals based on user preferences
+      const sampleMeals = [
+        {
+          menu_id: menu.menu_id,
+          name: "Protein Breakfast",
+          meal_type: MealTiming.BREAKFAST,
+          calories: Math.round((nutritionPlan.goal_calories || 2000) * 0.25),
+          protein: Math.round((nutritionPlan.goal_protein_g || 150) * 0.3),
+          carbs: Math.round((nutritionPlan.goal_carbs_g || 200) * 0.2),
+          fat: Math.round((nutritionPlan.goal_fats_g || 70) * 0.25),
+        },
+        {
+          menu_id: menu.menu_id,
+          name: "Balanced Lunch",
+          meal_type: MealTiming.LUNCH,
+          calories: Math.round((nutritionPlan.goal_calories || 2000) * 0.35),
+          protein: Math.round((nutritionPlan.goal_protein_g || 150) * 0.4),
+          carbs: Math.round((nutritionPlan.goal_carbs_g || 200) * 0.4),
+          fat: Math.round((nutritionPlan.goal_fats_g || 70) * 0.35),
+        },
+        {
+          menu_id: menu.menu_id,
+          name: "Light Dinner",
+          meal_type: MealTiming.DINNER,
+          calories: Math.round((nutritionPlan.goal_calories || 2000) * 0.3),
+          protein: Math.round((nutritionPlan.goal_protein_g || 150) * 0.25),
+          carbs: Math.round((nutritionPlan.goal_carbs_g || 200) * 0.3),
+          fat: Math.round((nutritionPlan.goal_fats_g || 70) * 0.3),
+        },
+      ];
+
+      await prisma.recommendedMeal.createMany({
+        data: sampleMeals,
+      });
+
+      // Fetch the complete menu with meals
+      const completeMenu = await prisma.recommendedMenu.findUnique({
+        where: { menu_id: menu.menu_id },
+        include: {
+          meals: {
+            include: {
+              ingredients: true,
+            },
+          },
+        },
+      });
+
+      res.json({
+        success: true,
+        menu: completeMenu,
+      });
+    } catch (error) {
+      console.error("Generate recommended menu error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to generate recommended menu",
+      });
+    }
+  }
+);
+
+export { router as mealPlansRoutes };

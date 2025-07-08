@@ -40,24 +40,35 @@ function AppContent() {
       return;
     }
 
+    // Always redirect to payment plan if no subscription
     if (!user.subscription_type && !onPaymentPlan) {
       router.replace("/payment-plan");
       return;
     }
 
+    // Block access to main app for FREE subscription users
+    if (user.subscription_type === "FREE" && !onPaymentPlan) {
+      router.replace("/payment-plan");
+      return;
+    }
+
+    // Require questionnaire completion for premium users
     if (
       user.subscription_type &&
       ["PREMIUM", "GOLD"].includes(user.subscription_type) &&
       !user.is_questionnaire_completed &&
-      !onQuestionnaire
+      !onQuestionnaire &&
+      !onPaymentPlan
     ) {
       router.replace("/questionnaire");
       return;
     }
 
+    // Only allow access to main app if premium subscription and questionnaire completed
     if (
       user.subscription_type &&
-      (user.subscription_type === "FREE" || user.is_questionnaire_completed) &&
+      ["PREMIUM", "GOLD"].includes(user.subscription_type) &&
+      user.is_questionnaire_completed &&
       !inTabsGroup
     ) {
       router.replace("/(tabs)");
@@ -108,5 +119,3 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
-
-

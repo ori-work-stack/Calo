@@ -10,9 +10,10 @@ import { authRoutes } from "./routes/auth";
 import { nutritionRoutes } from "./routes/nutrition";
 import { calendarRoutes } from "./routes/calendar";
 import { deviceRoutes } from "./routes/devices";
+import { questionnaireRoutes } from "./routes/questionnaire";
 import { userRoutes } from "./routes/user";
 import statisticsRoutes from "./routes/statistics";
-import { mealPlanRoutes } from "./routes/mealPlans";
+import { mealPlansRoutes } from "./routes/mealPlans";
 import chatRoutes from "./routes/chat";
 import foodScannerRoutes from "./routes/foodScanner";
 import "./services/cron";
@@ -131,11 +132,12 @@ app.get("/test", (req, res) => {
 // API routes with prefix
 const apiRouter = express.Router();
 apiRouter.use("/auth", authRoutes);
+apiRouter.use("/questionnaire", questionnaireRoutes);
 apiRouter.use("/nutrition", nutritionRoutes);
 apiRouter.use("/user", userRoutes);
 apiRouter.use("/devices", deviceRoutes);
 apiRouter.use("/calendar", calendarRoutes);
-apiRouter.use("/meal-plans", mealPlanRoutes);
+apiRouter.use("/meal-plans", mealPlansRoutes);
 apiRouter.use("/chat", chatRoutes);
 apiRouter.use("/food-scanner", foodScannerRoutes);
 apiRouter.use("/", statisticsRoutes);

@@ -1,181 +1,172 @@
 import { Router } from "express";
 import { prisma } from "../lib/database";
 import { authenticateToken, AuthRequest } from "../middleware/auth";
-import { questionnaireSchema } from "../types/questionnaire";
 
 const router = Router();
 
-router.post("/", authenticateToken, async (req: AuthRequest, res, next) => {
+// POST /api/questionnaire - Save user questionnaire
+router.post("/", authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const validatedData = questionnaireSchema.parse(req.body);
+    const userId = req.user.user_id;
+    const questionnaireData = req.body;
+    console.log(userId);
+
+    console.log("📝 Saving questionnaire for user:", userId);
+    console.log("📝 Questionnaire data:", questionnaireData);
 
     // Check if user already has a questionnaire
     const existingQuestionnaire = await prisma.userQuestionnaire.findFirst({
-      where: { user_id: req.user.user_id },
+      where: { user_id: userId },
     });
 
-    let questionnaire;
+    let savedQuestionnaire;
+
+    const sanitizeFloat = (val: any) => {
+      return val === "" ? null : parseFloat(val);
+    };
+    questionnaireData.body_fat_percentage = sanitizeFloat(
+      questionnaireData.body_fat_percentage
+    );
+    questionnaireData.height_cm = sanitizeFloat(questionnaireData.height_cm);
+    questionnaireData.weight_kg = sanitizeFloat(questionnaireData.weight_kg);
+    questionnaireData.target_weight_kg = sanitizeFloat(
+      questionnaireData.target_weight_kg
+    );
+    questionnaireData.daily_food_budget = sanitizeFloat(
+      questionnaireData.daily_food_budget
+    );
+
+    const allowedPhysicalActivityLevels = ["NONE", "LIGHT", "MODERATE", "HIGH"];
+
+    const normalizeEnum = (value: string, allowedValues: string[]) => {
+      return allowedValues.includes(value) ? value : null;
+    };
+
+    questionnaireData.physical_activity_level = normalizeEnum(
+      questionnaireData.physical_activity_level,
+      allowedPhysicalActivityLevels
+    );
+
     if (existingQuestionnaire) {
       // Update existing questionnaire
-      questionnaire = await prisma.userQuestionnaire.update({
+      savedQuestionnaire = await prisma.userQuestionnaire.update({
         where: { questionnaire_id: existingQuestionnaire.questionnaire_id },
         data: {
-          ...validatedData,
+          age: questionnaireData.age,
+          gender: questionnaireData.gender,
+          height_cm: questionnaireData.height_cm,
+          weight_kg: questionnaireData.weight_kg,
+          target_weight_kg: questionnaireData.target_weight_kg,
+          body_fat_percentage: questionnaireData.body_fat_percentage,
+          main_goal: questionnaireData.main_goal,
+          main_goal_text: questionnaireData.main_goal_text,
+          specific_goal: questionnaireData.specific_goal,
+          goal_timeframe_days: questionnaireData.goal_timeframe_days,
+          commitment_level: questionnaireData.commitment_level,
+          most_important_outcome: questionnaireData.most_important_outcome,
+          physical_activity_level: questionnaireData.physical_activity_level,
+          sport_frequency: questionnaireData.sport_frequency,
+          sport_types: questionnaireData.sport_types,
+          medical_conditions: questionnaireData.medical_conditions,
+          allergies: questionnaireData.allergies,
+          dietary_style: questionnaireData.dietary_style,
+          disliked_foods: questionnaireData.disliked_foods,
+          liked_foods: questionnaireData.liked_foods,
+          meals_per_day: questionnaireData.meals_per_day,
+          daily_food_budget: questionnaireData.daily_food_budget,
           date_completed: new Date(),
         },
       });
     } else {
       // Create new questionnaire
-      questionnaire = await prisma.userQuestionnaire.create({
+      savedQuestionnaire = await prisma.userQuestionnaire.create({
         data: {
-          user_id: req.user.user_id,
-          ...validatedData,
+          user_id: userId,
+          age: questionnaireData.age,
+          gender: questionnaireData.gender,
+          height_cm: questionnaireData.height_cm,
+          weight_kg: questionnaireData.weight_kg,
+          target_weight_kg: questionnaireData.target_weight_kg,
+          body_fat_percentage: questionnaireData.body_fat_percentage,
+          main_goal: questionnaireData.main_goal,
+          main_goal_text: questionnaireData.main_goal_text,
+          specific_goal: questionnaireData.specific_goal,
+          goal_timeframe_days: questionnaireData.goal_timeframe_days,
+          commitment_level: questionnaireData.commitment_level,
+          most_important_outcome: questionnaireData.most_important_outcome,
+          physical_activity_level: questionnaireData.physical_activity_level,
+          sport_frequency: questionnaireData.sport_frequency,
+          sport_types: questionnaireData.sport_types,
+          medical_conditions: questionnaireData.medical_conditions,
+          allergies: questionnaireData.allergies,
+          dietary_style: questionnaireData.dietary_style,
+          disliked_foods: questionnaireData.disliked_foods,
+          liked_foods: questionnaireData.liked_foods,
+          meals_per_day: questionnaireData.meals_per_day,
+          daily_food_budget: questionnaireData.daily_food_budget,
+          date_completed: new Date(),
         },
       });
     }
 
-    // Create or update nutrition plan based on questionnaire
-    await createNutritionPlan(req.user.user_id, validatedData);
-
-    // Mark questionnaire as completed
+    // Mark questionnaire as completed in user profile
     await prisma.user.update({
-      where: { user_id: req.user.user_id },
+      where: { user_id: userId },
       data: { is_questionnaire_completed: true },
     });
 
+    console.log("✅ Questionnaire saved successfully");
+
     res.json({
       success: true,
-      questionnaire,
       message: "Questionnaire saved successfully",
+      data: savedQuestionnaire,
     });
   } catch (error) {
-    if (error instanceof Error) {
-      res.status(400).json({
-        success: false,
-        error: error.message,
-      });
-    } else {
-      next(error);
-    }
+    console.error("💥 Questionnaire save error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to save questionnaire",
+      details: error instanceof Error ? error.message : "Unknown error",
+    });
   }
 });
 
+// GET /api/questionnaire - Retrieve user questionnaire
 router.get("/", authenticateToken, async (req: AuthRequest, res) => {
   try {
+    const userId = req.user.user_id;
+
+    console.log("📖 Fetching questionnaire for user:", userId);
+
     const questionnaire = await prisma.userQuestionnaire.findFirst({
-      where: { user_id: req.user.user_id },
+      where: { user_id: userId },
       orderBy: { date_completed: "desc" },
     });
 
+    if (!questionnaire) {
+      return res.json({
+        success: true,
+        message: "No questionnaire found",
+        data: null,
+      });
+    }
+
+    console.log("✅ Questionnaire retrieved successfully");
+
     res.json({
       success: true,
-      questionnaire,
+      message: "Questionnaire retrieved successfully",
+      data: questionnaire,
     });
   } catch (error) {
-    console.error("Get questionnaire error:", error);
+    console.error("💥 Questionnaire fetch error:", error);
     res.status(500).json({
       success: false,
       error: "Failed to fetch questionnaire",
+      details: error instanceof Error ? error.message : "Unknown error",
     });
   }
 });
-
-async function createNutritionPlan(userId: string, questionnaireData: any) {
-  try {
-    // Calculate BMR based on user data
-    const bmr = calculateBMR(
-      questionnaireData.weight_kg,
-      questionnaireData.height_cm,
-      questionnaireData.age,
-      questionnaireData.gender
-    );
-
-    // Adjust calories based on activity level and goals
-    const activityMultiplier = getActivityMultiplier(
-      questionnaireData.physical_activity_level
-    );
-    let targetCalories = bmr * activityMultiplier;
-
-    // Adjust for weight goals
-    if (questionnaireData.main_goal === "WEIGHT_LOSS") {
-      targetCalories -= 500; // 500 calorie deficit for ~1lb/week loss
-    } else if (questionnaireData.main_goal === "WEIGHT_GAIN") {
-      targetCalories += 500; // 500 calorie surplus for weight gain
-    }
-
-    // Calculate macronutrient targets
-    const proteinCalories = targetCalories * 0.25; // 25% protein
-    const carbCalories = targetCalories * 0.45; // 45% carbs
-    const fatCalories = targetCalories * 0.3; // 30% fat
-
-    const goalProteinG = proteinCalories / 4; // 4 calories per gram
-    const goalCarbsG = carbCalories / 4; // 4 calories per gram
-    const goalFatsG = fatCalories / 9; // 9 calories per gram
-
-    // Create or update nutrition plan
-    const existingPlan = await prisma.nutritionPlan.findFirst({
-      where: { user_id: userId },
-    });
-
-    const nutritionPlanData = {
-      goal_calories: targetCalories,
-      goal_protein_g: goalProteinG,
-      goal_carbs_g: goalCarbsG,
-      goal_fats_g: goalFatsG,
-      target_weight_kg: questionnaireData.target_weight_kg,
-      duration_days: questionnaireData.goal_timeframe_days || 90,
-      notes: `Generated from questionnaire. Main goal: ${questionnaireData.main_goal}`,
-    };
-
-    if (existingPlan) {
-      await prisma.nutritionPlan.update({
-        where: { plan_id: existingPlan.plan_id },
-        data: nutritionPlanData,
-      });
-    } else {
-      await prisma.nutritionPlan.create({
-        data: {
-          user_id: userId,
-          ...nutritionPlanData,
-        },
-      });
-    }
-  } catch (error) {
-    console.error("Error creating nutrition plan:", error);
-  }
-}
-
-function calculateBMR(
-  weight: number,
-  height: number,
-  age: number,
-  gender: string
-): number {
-  // Mifflin-St Jeor Equation
-  if (!weight || !height || !age) return 2000; // default fallback
-
-  const baseCalc = 10 * weight + 6.25 * height - 5 * age;
-
-  if (gender === "זכר" || gender === "male") {
-    return baseCalc + 5;
-  } else {
-    return baseCalc - 161;
-  }
-}
-
-function getActivityMultiplier(activityLevel: string): number {
-  switch (activityLevel) {
-    case "NONE":
-      return 1.2;
-    case "LIGHT":
-      return 1.375;
-    case "MODERATE":
-      return 1.55;
-    case "HIGH":
-      return 1.725;
-    default:
-      return 1.2;
-  }
-}
 
 export { router as questionnaireRoutes };

@@ -85,12 +85,18 @@ export default function PaymentPlan() {
       const response = await userAPI.updateSubscription(planId);
 
       if (response.success) {
-        // Update user in Redux store
-        // You might want to dispatch an action to update the user state
+        // Update user in Redux store with new subscription
+        dispatch({
+          type: "auth/updateSubscription",
+          payload: { subscription_type: planId },
+        });
 
         if (planId === "FREE") {
-          // FREE users can skip questionnaire and go to app
-          router.replace("/(tabs)");
+          // FREE users are blocked from main app - show error
+          Alert.alert(
+            "תוכנית לא נתמכת",
+            "תוכנית חינמית לא מאפשרת גישה לאפליקציה. אנא בחר תוכנית אחרת."
+          );
         } else {
           // PREMIUM and GOLD users must complete questionnaire
           router.replace("/questionnaire");
