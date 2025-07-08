@@ -2,6 +2,7 @@ import { Router } from "express";
 import { NutritionService } from "../services/nutrition";
 import { authenticateToken, AuthRequest } from "../middleware/auth";
 import { mealAnalysisSchema, mealUpdateSchema } from "../types/nutrition";
+import { prisma } from "../lib/database";
 
 const router = Router();
 
@@ -292,6 +293,114 @@ router.post("/meals/:mealId/duplicate", async (req: AuthRequest, res) => {
     res.status(500).json({
       success: false,
       error: message,
+    });
+  }
+});
+
+// Get meal details with full nutrition info
+router.get("/meals/:meal_id/details", authenticateToken, async (req, res) => {
+  try {
+    const { meal_id } = req.params;
+    const userId = (req as any).user.user_id;
+
+    console.log("🔍 Fetching full meal details:", meal_id);
+
+    const meal = await prisma.meal.findFirst({
+      where: {
+        meal_id: parseInt(meal_id),
+        user_id: userId,
+      },
+    });
+
+    if (!meal) {
+      return res.status(404).json({
+        success: false,
+        error: "Meal not found",
+      });
+    }
+
+    // Format the complete meal data with all nutrition fields from schema
+    const fullMealData = {
+      ...meal,
+      // Include all nutrition fields from your Prisma schema
+      protein_g: meal.protein_g,
+      carbs_g: meal.carbs_g,
+      fats_g: meal.fats_g,
+      saturated_fats_g: meal.saturated_fats_g,
+      polyunsaturated_fats_g: meal.polyunsaturated_fats_g,
+      monounsaturated_fats_g: meal.monounsaturated_fats_g,
+      omega_3_g: meal.omega_3_g,
+      omega_6_g: meal.omega_6_g,
+      fiber_g: meal.fiber_g,
+      soluble_fiber_g: meal.soluble_fiber_g,
+      insoluble_fiber_g: meal.insoluble_fiber_g,
+      sugar_g: meal.sugar_g,
+      cholesterol_mg: meal.cholesterol_mg,
+      sodium_mg: meal.sodium_mg,
+      alcohol_g: meal.alcohol_g,
+      caffeine_mg: meal.caffeine_mg,
+      liquids_ml: meal.liquids_ml,
+      serving_size_g: meal.serving_size_g,
+      allergens_json: meal.allergens_json,
+      vitamins_json: meal.vitamins_json,
+      micronutrients_json: meal.micronutrients_json,
+      glycemic_index: meal.glycemic_index,
+      insulin_index: meal.insulin_index,
+      food_category: meal.food_category,
+      processing_level: meal.processing_level,
+      cooking_method: meal.cooking_method,
+      additives_json: meal.additives_json,
+      health_risk_notes: meal.health_risk_notes,
+      ingredients: meal.ingredients,
+    };
+
+    console.log("✅ Full meal details retrieved");
+
+    res.json({
+      success: true,
+      data: fullMealData,
+    });
+  } catch (error) {
+    console.error("💥 Get meal details error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch meal details",
+    });
+  }
+});
+
+router.get("/meals/:meal_id", authenticateToken, async (req, res) => {
+  try {
+    const { meal_id } = req.params;
+    const userId = (req as any).user.user_id;
+
+    console.log("🔍 Fetching meal:", meal_id);
+
+    const meal = await prisma.meal.findFirst({
+      where: {
+        meal_id: parseInt(meal_id),
+        user_id: userId,
+      },
+    });
+
+    if (!meal) {
+      return res.status(404).json({
+        success: false,
+        error: "Meal not found",
+      });
+    }
+
+    console.log("✅ Meal retrieved");
+
+    res.json({
+      success: true,
+      data: meal,
+    });
+  } catch (error) {
+    console.error("💥 Get meal error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch meal",
     });
   }
 });

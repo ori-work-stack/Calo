@@ -77,6 +77,20 @@ interface QuestionnaireData {
 
   // Additional
   past_diet_difficulties: string;
+
+  // Additional schema fields
+  program_duration?: string;
+  meal_timing_restrictions?: string;
+  dietary_restrictions?: string;
+  willingness_to_follow?: boolean;
+  upcoming_events?: string;
+  upload_frequency?: string;
+  notifications_preference?: string;
+  personalized_tips?: boolean;
+  health_metrics_integration?: boolean;
+  family_medical_history?: string[];
+  smoking_status?: string;
+  sleep_hours_per_night?: string;
 }
 
 const MAIN_GOALS = [
@@ -160,7 +174,7 @@ export default function QuestionnaireScreen() {
   const [currentStep, setCurrentStep] = useState(1);
   const [showTip, setShowTip] = useState("");
 
-  const totalSteps = 6;
+  const totalSteps = 8;
   const progressPercentage = (currentStep / totalSteps) * 100;
 
   const [formData, setFormData] = useState<QuestionnaireData>({
@@ -218,6 +232,20 @@ export default function QuestionnaireScreen() {
     fasting_hours: "",
 
     past_diet_difficulties: "",
+
+    // Additional schema fields
+    program_duration: "",
+    meal_timing_restrictions: "",
+    dietary_restrictions: "",
+    willingness_to_follow: true,
+    upcoming_events: "",
+    upload_frequency: "",
+    notifications_preference: "",
+    personalized_tips: true,
+    health_metrics_integration: false,
+    family_medical_history: [],
+    smoking_status: "",
+    sleep_hours_per_night: "",
   });
 
   const handleArrayToggle = (
@@ -771,6 +799,225 @@ export default function QuestionnaireScreen() {
     </View>
   );
 
+  const renderLifestyleStep = () => (
+    <View style={styles.stepContainer}>
+      <Text style={styles.stepTitle}>אורח חיים ושגרה</Text>
+      <Text style={styles.stepDescription}>
+        מידע על השגרה היומית שלך יעזור לבניית תוכנית מעשית
+      </Text>
+
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>כמה שעות שינה בלילה?</Text>
+        <TextInput
+          style={styles.textInput}
+          value={formData.sleep_hours_per_night}
+          onChangeText={(text) =>
+            setFormData({ ...formData, sleep_hours_per_night: text })
+          }
+          keyboardType="numeric"
+          placeholder="לדוגמה: 7-8 שעות"
+        />
+      </View>
+
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>סטטוס עישון</Text>
+        <View style={styles.optionGroup}>
+          {["לא מעשן", "מעשן", "מעשן לשעבר", "עישון חברתי"].map((status) => (
+            <TouchableOpacity
+              key={status}
+              style={[
+                styles.optionButton,
+                formData.smoking_status === status &&
+                  styles.optionButtonSelected,
+              ]}
+              onPress={() =>
+                setFormData({ ...formData, smoking_status: status })
+              }
+            >
+              <Text
+                style={[
+                  styles.optionText,
+                  formData.smoking_status === status &&
+                    styles.optionTextSelected,
+                ]}
+              >
+                {status}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>היסטוריה רפואית משפחתית</Text>
+        <TextInput
+          style={[styles.textInput, styles.textArea]}
+          value={formData.family_medical_history?.join(", ") || ""}
+          onChangeText={(text) =>
+            setFormData({
+              ...formData,
+              family_medical_history: text
+                .split(", ")
+                .filter((item) => item.trim()),
+            })
+          }
+          multiline
+          numberOfLines={3}
+          placeholder="סכרת, לחץ דם, מחלות לב, סרטן..."
+        />
+      </View>
+
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>הגבלות זמן ארוחות</Text>
+        <TextInput
+          style={[styles.textInput, styles.textArea]}
+          value={formData.meal_timing_restrictions}
+          onChangeText={(text) =>
+            setFormData({ ...formData, meal_timing_restrictions: text })
+          }
+          multiline
+          numberOfLines={2}
+          placeholder="לדוגמה: לא יכול לאכול לפני 9:00, מגבלות עבודה..."
+        />
+      </View>
+    </View>
+  );
+
+  const renderPreferencesStep = () => (
+    <View style={styles.stepContainer}>
+      <Text style={styles.stepTitle}>העדפות ומטרות נוספות</Text>
+      <Text style={styles.stepDescription}>
+        הגדרות אחרונות לתוכנית המותאמת אישית
+      </Text>
+
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>משך התוכנית המועדף</Text>
+        <View style={styles.optionGroup}>
+          {["חודש", "3 חודשים", "6 חודשים", "שנה", "ללא הגבלה"].map(
+            (duration) => (
+              <TouchableOpacity
+                key={duration}
+                style={[
+                  styles.optionButton,
+                  formData.program_duration === duration &&
+                    styles.optionButtonSelected,
+                ]}
+                onPress={() =>
+                  setFormData({ ...formData, program_duration: duration })
+                }
+              >
+                <Text
+                  style={[
+                    styles.optionText,
+                    formData.program_duration === duration &&
+                      styles.optionTextSelected,
+                  ]}
+                >
+                  {duration}
+                </Text>
+              </TouchableOpacity>
+            )
+          )}
+        </View>
+      </View>
+
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>תדירות העלאת ארוחות</Text>
+        <View style={styles.optionGroup}>
+          {["כל ארוחה", "פעם ביום", "כמה פעמים בשבוע", "פעם בשבוע"].map(
+            (freq) => (
+              <TouchableOpacity
+                key={freq}
+                style={[
+                  styles.optionButton,
+                  formData.upload_frequency === freq &&
+                    styles.optionButtonSelected,
+                ]}
+                onPress={() =>
+                  setFormData({ ...formData, upload_frequency: freq })
+                }
+              >
+                <Text
+                  style={[
+                    styles.optionText,
+                    formData.upload_frequency === freq &&
+                      styles.optionTextSelected,
+                  ]}
+                >
+                  {freq}
+                </Text>
+              </TouchableOpacity>
+            )
+          )}
+        </View>
+      </View>
+
+      <View style={styles.inputGroup}>
+        <View style={styles.switchRow}>
+          <Text style={styles.switchLabel}>מחויבות למילוי התוכנית</Text>
+          <TouchableOpacity
+            style={[
+              styles.switch,
+              formData.willingness_to_follow && styles.switchActive,
+            ]}
+            onPress={() =>
+              setFormData({
+                ...formData,
+                willingness_to_follow: !formData.willingness_to_follow,
+              })
+            }
+          >
+            <View
+              style={[
+                styles.switchThumb,
+                formData.willingness_to_follow && styles.switchThumbActive,
+              ]}
+            />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.inputGroup}>
+        <View style={styles.switchRow}>
+          <Text style={styles.switchLabel}>טיפים מותאמים אישית</Text>
+          <TouchableOpacity
+            style={[
+              styles.switch,
+              formData.personalized_tips && styles.switchActive,
+            ]}
+            onPress={() =>
+              setFormData({
+                ...formData,
+                personalized_tips: !formData.personalized_tips,
+              })
+            }
+          >
+            <View
+              style={[
+                styles.switchThumb,
+                formData.personalized_tips && styles.switchThumbActive,
+              ]}
+            />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>אירועים קרובים</Text>
+        <TextInput
+          style={[styles.textInput, styles.textArea]}
+          value={formData.upcoming_events}
+          onChangeText={(text) =>
+            setFormData({ ...formData, upcoming_events: text })
+          }
+          multiline
+          numberOfLines={2}
+          placeholder="חתונה, חופשה, אירוע חשוב..."
+        />
+      </View>
+    </View>
+  );
+
   const renderDietaryStep = () => (
     <View style={styles.stepContainer}>
       <Text style={styles.stepTitle}>העדפות והגבלות תזונתיות</Text>
@@ -926,19 +1173,12 @@ export default function QuestionnaireScreen() {
         return renderMeansStep();
       case 6:
         return renderDietaryStep();
+      case 7:
+        return renderLifestyleStep();
+      case 8:
+        return renderPreferencesStep();
       default:
         return renderPersonalDataStep();
-    }
-  };
-
-  const canProceed = () => {
-    switch (currentStep) {
-      case 1:
-        return formData.age && formData.gender;
-      case 2:
-        return formData.main_goal;
-      default:
-        return true;
     }
   };
 
@@ -1031,6 +1271,17 @@ export default function QuestionnaireScreen() {
 
     loadExistingData();
   }, []);
+
+  const canProceed = () => {
+    switch (currentStep) {
+      case 1:
+        return formData.age && formData.gender;
+      case 2:
+        return formData.main_goal;
+      default:
+        return true;
+    }
+  };
 
   return (
     <View style={styles.container}>

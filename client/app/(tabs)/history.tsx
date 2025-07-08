@@ -50,9 +50,9 @@ export default function HistoryScreen() {
   const [showFilters, setShowFilters] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
-  const [selectedMeal, setSelectedMeal] = useState<MealWithFeedback | null>(
-    null
-  );
+  const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null);
+  const [mealDetails, setMealDetails] = useState<any>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [filters, setFilters] = useState<FilterOptions>({});
   const [smartInsight, setSmartInsight] = useState<string>("");
