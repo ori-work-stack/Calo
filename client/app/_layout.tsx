@@ -12,7 +12,9 @@ import { RootState } from "@/src/store";
 import { useRouter, useSegments } from "expo-router";
 import { useEffect } from "react";
 import { queryClient } from "@/src/providers/QueryProvider";
-import { GestureHandlerRootView } from "react-native-gesture-handler"; // 🟢 IMPORT THIS
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import "@/src/i18n"; // Initialize i18n
+import { LanguageProvider } from "@/src/i18n/context/LanguageContext";
 
 function AppContent() {
   useAppInitialization();
@@ -98,14 +100,14 @@ function LoadingScreen() {
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={styles.root}>
-      {" "}
-      {/* 🟢 WRAP YOUR ENTIRE APP */}
       <SafeAreaProvider>
         <Provider store={store}>
           <QueryClientProvider client={queryClient}>
             <PersistGate loading={<LoadingScreen />} persistor={persistor}>
-              <AppContent />
-              <StatusBar style="auto" />
+              <LanguageProvider>
+                <AppContent />
+                <StatusBar style="auto" />
+              </LanguageProvider>
             </PersistGate>
           </QueryClientProvider>
         </Provider>
