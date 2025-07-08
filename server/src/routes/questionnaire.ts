@@ -292,10 +292,12 @@ router.post("/", authenticateToken, async (req: AuthRequest, res) => {
       });
     }
 
-    // Mark questionnaire as completed in user profile
+    // Mark questionnaire as completed
     await prisma.user.update({
       where: { user_id: userId },
-      data: { is_questionnaire_completed: true },
+      data: {
+        is_questionnaire_completed: true,
+      },
     });
 
     console.log("✅ Questionnaire saved successfully");

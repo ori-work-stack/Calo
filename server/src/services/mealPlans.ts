@@ -712,7 +712,9 @@ export class MealPlanService {
       });
 
       if (!mealPlan) {
-        throw new Error("No active meal plan found");
+        console.log("⚠️ No meal plan found for user:", user_id);
+        // Return empty meal plan structure instead of throwing error
+        return {};
       }
 
       // Organize by day and meal timing

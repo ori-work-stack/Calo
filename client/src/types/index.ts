@@ -68,13 +68,14 @@ export type MealAnalysisData = z.infer<typeof MealAnalysisSchema>;
 export interface User {
   user_id: string;
   email: string;
-  name: string;
-  birth_date: string;
-  subscription_type: "FREE" | "PREMIUM" | "GOLD";
-  ai_requests_count: number;
+  name?: string;
+  birth_date?: string;
+  subscription_type: string;
+  signup_date: string;
   is_questionnaire_completed: boolean;
-  ai_requests_reset_at: string;
-  created_at: string;
+  ai_requests_count?: number;
+  ai_requests_reset_at?: string;
+  created_at?: string;
 }
 
 // Updated Meal interface to match Prisma schema exactly
@@ -188,19 +189,19 @@ export interface SignUpInput {
 
 export interface QuestionnaireData {
   // Personal data
-  age: number;
+  age: string;
   gender?: string;
-  height_cm?: number;
-  weight_kg?: number;
-  target_weight_kg?: number;
-  body_fat_percentage?: number;
+  height_cm?: string;
+  weight_kg?: string;
+  target_weight_kg?: string;
+  body_fat_percentage?: string;
   additional_personal_info?: string;
 
   // Goals
   main_goal: string;
   main_goal_text?: string;
   specific_goal?: string;
-  goal_timeframe_days?: number;
+  goal_timeframe_days?: string;
   commitment_level?: string;
   most_important_outcome?: string;
   special_personal_goal?: string;
@@ -209,7 +210,7 @@ export interface QuestionnaireData {
   physical_activity_level: string;
   sport_frequency: string;
   sport_types?: string[];
-  sport_duration_min?: number;
+  sport_duration_min?: string;
   workout_times?: string;
   uses_fitness_devices?: boolean;
   fitness_device_type?: string;
@@ -224,12 +225,12 @@ export interface QuestionnaireData {
   food_related_medical_issues?: string;
 
   // Means and conditions
-  meals_per_day?: number;
+  meals_per_day?: string;
   snacks_between_meals?: boolean;
   meal_times?: string;
   cooking_preference?: string;
   available_cooking_methods?: string[];
-  daily_food_budget?: number;
+  daily_food_budget?: string;
   shopping_method?: string;
   daily_cooking_time?: string;
 
@@ -247,6 +248,20 @@ export interface QuestionnaireData {
 
   // Additional
   past_diet_difficulties?: string;
+
+  // Legacy fields from schema (for compatibility)
+  program_duration?: string;
+  meal_timing_restrictions?: string;
+  dietary_restrictions?: string;
+  willingness_to_follow?: boolean;
+  upcoming_events?: string;
+  upload_frequency?: string;
+  notifications_preference?: string;
+  personalized_tips?: boolean;
+  health_metrics_integration?: boolean;
+  family_medical_history?: string[];
+  smoking_status?: string;
+  sleep_hours_per_night?: string;
 }
 
 export interface MealAnalysis {

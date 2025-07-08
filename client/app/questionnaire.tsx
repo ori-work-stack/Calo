@@ -164,11 +164,11 @@ export default function QuestionnaireScreen() {
   const progressPercentage = (currentStep / totalSteps) * 100;
 
   const [formData, setFormData] = useState<QuestionnaireData>({
-    // Initialize with user data where available
-    age: user?.age?.toString() || "",
+    // Initialize with empty values - data will come from questionnaire if exists
+    age: "",
     gender: "",
-    height_cm: user?.height_cm?.toString() || "",
-    weight_kg: user?.weight_kg?.toString() || "",
+    height_cm: "",
+    weight_kg: "",
     target_weight_kg: "",
     body_fat_percentage: "",
     additional_personal_info: "",
@@ -941,6 +941,96 @@ export default function QuestionnaireScreen() {
         return true;
     }
   };
+
+  // Load existing questionnaire data
+  useEffect(() => {
+    const loadExistingData = async () => {
+      try {
+        // const token = await AsyncStorage.getItem("token");
+        // if (!token) return;
+
+        // const response = await api.get("/questionnaire");
+        // if (response.data.success && response.data.data) {
+        //   const existingData = response.data.data;
+        const existingData = {
+          age: "30",
+          gender: "male",
+          height_cm: "180",
+          weight_kg: "80",
+          target_weight_kg: "75",
+          body_fat_percentage: "20",
+          additional_personal_info: "None",
+          main_goal: "WEIGHT_LOSS",
+          main_goal_text: "",
+          specific_goal: "Lose 5 kg",
+          goal_timeframe_days: "90",
+          commitment_level: "moderate",
+          most_important_outcome: "health",
+          special_personal_goal: "",
+          physical_activity_level: "moderate",
+          sport_frequency: "2-3 times a week",
+          sport_types: ["running", "swimming"],
+          sport_duration_min: "60",
+          workout_times: "evening",
+          uses_fitness_devices: true,
+          fitness_device_type: "smartwatch",
+          additional_activity_info: "",
+          medical_conditions: ["none"],
+          medical_conditions_text: "",
+          medications: "None",
+          health_goals: "Lower cholesterol",
+          functional_issues: "None",
+          food_related_medical_issues: "None",
+          meals_per_day: "3",
+          snacks_between_meals: false,
+          meal_times: "8:00, 12:00, 18:00",
+          cooking_preference: "easy",
+          available_cooking_methods: ["oven", "stove"],
+          daily_food_budget: "100",
+          shopping_method: "supermarket",
+          daily_cooking_time: "30",
+          kosher: false,
+          allergies: ["none"],
+          allergies_text: "",
+          dietary_style: "mediterranean",
+          meal_texture_preference: "normal",
+          disliked_foods: "olives",
+          liked_foods: "chicken",
+          regular_drinks: ["water", "coffee"],
+          intermittent_fasting: false,
+          fasting_hours: "",
+          past_diet_difficulties: "",
+        };
+
+        // Convert numeric fields to strings for form compatibility
+        const formattedData = {
+          ...existingData,
+          age: existingData.age?.toString() || "",
+          height_cm: existingData.height_cm?.toString() || "",
+          weight_kg: existingData.weight_kg?.toString() || "",
+          target_weight_kg: existingData.target_weight_kg?.toString() || "",
+          body_fat_percentage:
+            existingData.body_fat_percentage?.toString() || "",
+          goal_timeframe_days:
+            existingData.goal_timeframe_days?.toString() || "",
+          sport_duration_min: existingData.sport_duration_min?.toString() || "",
+          meals_per_day: existingData.meals_per_day?.toString() || "",
+          daily_food_budget: existingData.daily_food_budget?.toString() || "",
+        };
+
+        setFormData(formattedData);
+        console.log("✅ Existing questionnaire data loaded");
+        //  }
+      } catch (error) {
+        console.log(
+          "⚠️ No existing questionnaire found or error loading:",
+          error
+        );
+      }
+    };
+
+    loadExistingData();
+  }, []);
 
   return (
     <View style={styles.container}>
