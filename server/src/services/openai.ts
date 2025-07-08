@@ -14,6 +14,41 @@ const openai = process.env.OPENAI_API_KEY
   : null;
 
 export class OpenAIService {
+  private static openai = process.env.OPENAI_API_KEY
+    ? new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+      })
+    : null;
+
+  static async generateText(prompt: string): Promise<string> {
+    try {
+      if (!process.env.OPENAI_API_KEY || !openai) {
+        console.log("⚠️ No OpenAI API key found, cannot generate text");
+        return ""; // Or throw an error, depending on your error handling strategy
+      }
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a professional nutritionist and meal planner. Generate accurate, healthy meal plans in the exact JSON format requested.",
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        temperature: 0.7,
+        max_tokens: 4000,
+      });
+
+      return response.choices[0]?.message?.content || "";
+    } catch (error) {
+      console.error("OpenAI text generation error:", error);
+      throw new Error("Failed to generate menu content");
+    }
+  }
   static async analyzeMealImage(
     imageBase64: string,
     language: string = "english",
