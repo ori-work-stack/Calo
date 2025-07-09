@@ -65,7 +65,7 @@ export class FoodScannerService {
         }
 
         // Save to our database for future use
-        await this.saveProductToDatabase(productData, barcode);
+        await this.saveProductToDatabase(productData, barcode, userId);
       }
 
       // Get user-specific analysis
@@ -160,7 +160,11 @@ If you cannot read the label clearly, estimate based on visible information and 
 
       // Save to database if barcode was detected
       if (productData.barcode) {
-        await this.saveProductToDatabase(productData, productData.barcode);
+        await this.saveProductToDatabase(
+          productData,
+          productData.barcode,
+          userId
+        );
       }
 
       // Get user-specific analysis
@@ -245,7 +249,7 @@ If you cannot read the label clearly, estimate based on visible information and 
 
       return {
         barcode: product.barcode,
-        name: product.name,
+        name: product.product_name,
         brand: product.brand || undefined,
         category: product.category,
         nutrition_per_100g: product.nutrition_per_100g as any,
@@ -314,13 +318,14 @@ If you cannot read the label clearly, estimate based on visible information and 
 
   private static async saveProductToDatabase(
     productData: ProductData,
-    barcode: string
+    barcode: string,
+    user_id: string // add user_id param or get it from somewhere
   ): Promise<void> {
     try {
       await prisma.foodProduct.upsert({
         where: { barcode },
         update: {
-          name: productData.name,
+          product_name: productData.name,
           brand: productData.brand,
           category: productData.category,
           nutrition_per_100g: productData.nutrition_per_100g,
@@ -333,7 +338,7 @@ If you cannot read the label clearly, estimate based on visible information and 
         },
         create: {
           barcode,
-          name: productData.name,
+          product_name: productData.name,
           brand: productData.brand,
           category: productData.category,
           nutrition_per_100g: productData.nutrition_per_100g,
@@ -342,6 +347,7 @@ If you cannot read the label clearly, estimate based on visible information and 
           labels: productData.labels,
           health_score: productData.health_score,
           image_url: productData.image_url,
+          user_id, // <--- add this here
           created_at: new Date(),
         },
       });

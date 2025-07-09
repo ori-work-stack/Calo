@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -6,137 +6,143 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
-  ActivityIndicator,
   ScrollView,
-  Button,
-  Platform,
+  ActivityIndicator,
 } from "react-native";
-import { Link, useRouter } from "expo-router";
+import { Link, router } from "expo-router";
+import { useTranslation } from "react-i18next";
+import { useLanguage } from "@/src/i18n/context/LanguageContext";
 import { useDispatch, useSelector } from "react-redux";
+import { signUp } from "@/src/store/authSlice";
 import { RootState, AppDispatch } from "@/src/store";
-import { signUp, clearError } from "@/src/store/authSlice";
-import { SignUpSchema } from "@/src/types";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import LanguageSelector from "@/components/LanguageSelector";
 
-export default function SignUp() {
+export default function SignUpScreen() {
+  const { t } = useTranslation();
+  const { isRTL } = useLanguage();
   const dispatch = useDispatch<AppDispatch>();
   const { isLoading, error } = useSelector((state: RootState) => state.auth);
-  const router = useRouter();
 
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-    name: "",
-    birth_date: new Date(),
-  });
-
-  const [showDatePicker, setShowDatePicker] = useState(false);
-
-  const onChangeDate = (event: any, selectedDate?: Date) => {
-    const currentDate = selectedDate || formData.birth_date;
-    setShowDatePicker(Platform.OS === "ios");
-    setFormData({ ...formData, birth_date: currentDate });
-  };
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [name, setName] = useState("");
+  const [showLanguageModal, setShowLanguageModal] = useState(false);
 
   const handleSignUp = async () => {
+    if (!email || !password || !name) {
+      Alert.alert(t("common.error"), "Please fill in all fields");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert(t("common.error"), "Passwords do not match");
+      return;
+    }
+
     try {
-      console.log("Starting sign up process...");
+      const result = await dispatch(
+        signUp({
+          email,
+          password,
+          name,
+          birth_date: new Date(), // You should get this from a date picker
+        })
+      ).unwrap();
 
-      // Validate required fields
-      if (!formData.email || !formData.password || !formData.name) {
-        Alert.alert("Error", "Please fill in all required fields");
-        return;
-      }
-
-      const data = {
-        email: formData.email,
-        password: formData.password,
-        name: formData.name,
-        birth_date: formData.birth_date,
-      };
-      console.log("Sign up data:", data);
-
-      const validatedData = SignUpSchema.parse(data);
-      const result = await dispatch(signUp(validatedData));
-      console.log("Sign up result:", result);
-
-      if (signUp.fulfilled.match(result)) {
-        console.log("Sign up successful! Redirecting to payment plan");
-        // Force redirect to payment plan after signup
-        router.replace("/payment-plan");
-      } else {
-        console.log("Sign up failed:", result.payload);
+      if (result.success) {
+        router.replace("/questionnaire");
       }
     } catch (error: any) {
-      Alert.alert("Error", error.issues?.[0]?.message || "Invalid input");
+      Alert.alert(t("common.error"), error || "Failed to create account");
     }
   };
 
-  useEffect(() => {
-    if (error) {
-      Alert.alert("Error", error);
-      dispatch(clearError());
-    }
-  }, [error, dispatch]);
-
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Sign Up</Text>
+    <ScrollView style={[styles.container, isRTL && styles.containerRTL]}>
+      <View style={styles.header}>
+        <Text style={[styles.title, isRTL && styles.titleRTL]}>
+          {t("auth.createAccount")}
+        </Text>
+        <Text style={[styles.subtitle, isRTL && styles.subtitleRTL]}>
+          {t("auth.welcome")}
+        </Text>
+      </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Email *"
-        value={formData.email}
-        onChangeText={(text) => setFormData({ ...formData, email: text })}
-        keyboardType="email-address"
-        autoCapitalize="none"
-      />
-
-      <TextInput
-        style={styles.input}
-        placeholder="Password *"
-        value={formData.password}
-        onChangeText={(text) => setFormData({ ...formData, password: text })}
-        secureTextEntry
-      />
-
-      <TextInput
-        style={styles.input}
-        placeholder="Name *"
-        value={formData.name}
-        onChangeText={(text) => setFormData({ ...formData, name: text })}
-      />
-
-      <Text style={styles.label}>Birth Date *</Text>
-      <Button
-        title={formData.birth_date.toDateString()}
-        onPress={() => setShowDatePicker(true)}
-      />
-
-      {showDatePicker && (
-        <DateTimePicker
-          value={formData.birth_date}
-          mode="date"
-          display="default"
-          onChange={onChangeDate}
+      <View style={styles.languageSection}>
+        <Text style={[styles.sectionTitle, isRTL && styles.sectionTitleRTL]}>
+          {t("auth.languagePreference")}
+        </Text>
+        <LanguageSelector
+          showModal={showLanguageModal}
+          onToggleModal={() => setShowLanguageModal(!showLanguageModal)}
         />
-      )}
+      </View>
 
-      <TouchableOpacity
-        style={styles.button}
-        onPress={handleSignUp}
-        disabled={isLoading}
-      >
-        {isLoading ? (
-          <ActivityIndicator color="white" />
-        ) : (
-          <Text style={styles.buttonText}>Sign Up</Text>
-        )}
-      </TouchableOpacity>
+      <View style={styles.form}>
+        <TextInput
+          style={[styles.input, isRTL && styles.inputRTL]}
+          placeholder={t("profile.name")}
+          value={name}
+          onChangeText={setName}
+          textAlign={isRTL ? "right" : "left"}
+          editable={!isLoading}
+        />
 
-      <Link href="/(auth)/signin" style={styles.link}>
-        <Text>Already have an account? Sign In</Text>
-      </Link>
+        <TextInput
+          style={[styles.input, isRTL && styles.inputRTL]}
+          placeholder={t("auth.email")}
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          textAlign={isRTL ? "right" : "left"}
+          editable={!isLoading}
+        />
+
+        <TextInput
+          style={[styles.input, isRTL && styles.inputRTL]}
+          placeholder={t("auth.password")}
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          textAlign={isRTL ? "right" : "left"}
+          editable={!isLoading}
+        />
+
+        <TextInput
+          style={[styles.input, isRTL && styles.inputRTL]}
+          placeholder="Confirm Password"
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
+          secureTextEntry
+          textAlign={isRTL ? "right" : "left"}
+          editable={!isLoading}
+        />
+
+        <TouchableOpacity
+          style={[styles.signUpButton, isLoading && styles.buttonDisabled]}
+          onPress={handleSignUp}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.signUpButtonText}>{t("auth.signUp")}</Text>
+          )}
+        </TouchableOpacity>
+
+        {error && <Text style={styles.errorText}>{error}</Text>}
+
+        <View style={[styles.footer, isRTL && styles.footerRTL]}>
+          <Text style={styles.footerText}>{t("auth.hasAccount")} </Text>
+          <Link href="/signin" asChild>
+            <TouchableOpacity>
+              <Text style={styles.linkText}>{t("auth.signIn")}</Text>
+            </TouchableOpacity>
+          </Link>
+        </View>
+      </View>
     </ScrollView>
   );
 }
@@ -144,45 +150,95 @@ export default function SignUp() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
     backgroundColor: "#fff",
+    padding: 20,
+  },
+  containerRTL: {
+    direction: "rtl",
+  },
+  header: {
+    marginTop: 60,
+    marginBottom: 30,
   },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 40,
-    marginTop: 50,
+    color: "#333",
+    marginBottom: 8,
+  },
+  titleRTL: {
+    textAlign: "right",
+  },
+  subtitle: {
+    fontSize: 16,
+    color: "#666",
+  },
+  subtitleRTL: {
+    textAlign: "right",
+  },
+  languageSection: {
+    marginBottom: 30,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 12,
+  },
+  sectionTitleRTL: {
+    textAlign: "right",
+  },
+  form: {
+    flex: 1,
   },
   input: {
     borderWidth: 1,
     borderColor: "#ddd",
-    padding: 15,
     borderRadius: 8,
+    padding: 15,
+    fontSize: 16,
     marginBottom: 15,
-    fontSize: 16,
+    backgroundColor: "#f9f9f9",
   },
-  label: {
-    fontSize: 16,
-    marginBottom: 8,
-    fontWeight: "500",
+  inputRTL: {
+    textAlign: "right",
   },
-  button: {
+  signUpButton: {
     backgroundColor: "#007AFF",
-    padding: 15,
     borderRadius: 8,
+    padding: 15,
     alignItems: "center",
-    marginBottom: 20,
+    marginTop: 10,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  signUpButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  errorText: {
+    color: "#FF3B30",
+    fontSize: 14,
+    textAlign: "center",
+    marginTop: 10,
+  },
+  footer: {
+    flexDirection: "row",
+    justifyContent: "center",
     marginTop: 20,
   },
-  buttonText: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "bold",
+  footerRTL: {
+    flexDirection: "row-reverse",
   },
-  link: {
-    textAlign: "center",
+  footerText: {
+    fontSize: 14,
+    color: "#666",
+  },
+  linkText: {
+    fontSize: 14,
     color: "#007AFF",
-    marginBottom: 40,
+    fontWeight: "600",
   },
 });

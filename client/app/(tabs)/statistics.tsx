@@ -5,12 +5,13 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Dimensions,
   TouchableOpacity,
   ActivityIndicator,
 } from "react-native";
 import { LineChart, BarChart, PieChart } from "react-native-chart-kit";
-
+import { Dimensions } from "react-native";
+import { useTranslation } from "react-i18next";
+import { useLanguage } from "@/src/i18n/context/LanguageContext";
 const { width: screenWidth } = Dimensions.get("window");
 
 interface NutritionStatistics {
@@ -44,6 +45,8 @@ interface NutritionStatistics {
 }
 
 export default function StatisticsScreen() {
+  const { t } = useTranslation();
+  const { isRTL } = useLanguage();
   const [statistics, setStatistics] = useState<NutritionStatistics | null>(
     null
   );

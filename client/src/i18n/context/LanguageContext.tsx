@@ -23,17 +23,41 @@ export const useLanguage = () => {
   return context;
 };
 
-interface LanguageProviderProps {
-  children: React.ReactNode;
-}
-
-export const LanguageProvider: React.FC<LanguageProviderProps> = ({
+export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const { i18n } = useTranslation();
   const [currentLanguage, setCurrentLanguage] = useState<string>("en");
   const [isLoading, setIsLoading] = useState(true);
   const [isRTL, setIsRTL] = useState(false);
+
+  useEffect(() => {
+    loadLanguagePreference();
+  }, []);
+
+  const loadLanguagePreference = async () => {
+    try {
+      const savedLanguage = await AsyncStorage.getItem("userLanguage");
+      const language = savedLanguage || "en";
+
+      await i18n.changeLanguage(language);
+      setCurrentLanguage(language);
+      updateRTLDirection(language);
+    } catch (error) {
+      console.error("Error loading language preference:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const updateRTLDirection = (language: string) => {
+    const isRTLLanguage = language === "he";
+    setIsRTL(isRTLLanguage);
+
+    if (Platform.OS !== "web") {
+      I18nManager.forceRTL(isRTLLanguage);
+    }
+  };
 
   const updateRTL = (language: string) => {
     const rtl = language === "he";
@@ -98,7 +122,14 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({
   };
 
   return (
-    <LanguageContext.Provider value={value}>
+    <LanguageContext.Provider
+      value={{
+        currentLanguage,
+        isRTL,
+        changeLanguage,
+        isLoading,
+      }}
+    >
       {children}
     </LanguageContext.Provider>
   );

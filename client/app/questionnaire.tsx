@@ -267,29 +267,8 @@ export default function QuestionnaireScreen() {
         return;
       }
 
-      // Prepare data for API
-      const questionnaireData = {
-        ...formData,
-        age: parseInt(formData.age),
-        height_cm: formData.height_cm
-          ? parseFloat(formData.height_cm)
-          : undefined,
-        weight_kg: formData.weight_kg
-          ? parseFloat(formData.weight_kg)
-          : undefined,
-        target_weight_kg: formData.target_weight_kg
-          ? parseFloat(formData.target_weight_kg)
-          : undefined,
-        sport_duration_min: formData.sport_duration_min
-          ? parseInt(formData.sport_duration_min)
-          : undefined,
-        goal_timeframe_days: formData.goal_timeframe_days
-          ? parseInt(formData.goal_timeframe_days)
-          : undefined,
-        meals_per_day: parseInt(formData.meals_per_day),
-      };
-
-      const result = await dispatch(saveQuestionnaire(questionnaireData));
+      // Send raw formData as it matches QuestionnaireData type
+      const result = await dispatch(saveQuestionnaire(formData));
 
       if (saveQuestionnaire.fulfilled.match(result)) {
         Alert.alert(
@@ -339,7 +318,7 @@ export default function QuestionnaireScreen() {
         <Text style={styles.inputLabel}>גיל *</Text>
         <TextInput
           style={styles.textInput}
-          value={formData.age}
+          value={formData.age.toString()}
           onChangeText={(text) => setFormData({ ...formData, age: text })}
           keyboardType="numeric"
           placeholder="הכנס גיל"
@@ -1370,6 +1349,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f8f9fa",
   },
+  containerRTL: {
+    direction: "rtl",
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -1413,6 +1395,13 @@ const styles = StyleSheet.create({
     color: "#666",
     textAlign: "center",
   },
+  progress: {
+    fontSize: 14,
+    color: "#666",
+  },
+  progressRTL: {
+    textAlign: "right",
+  },
   content: {
     flex: 1,
   },
@@ -1426,12 +1415,31 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textAlign: "center",
   },
+  title: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 8,
+  },
+  titleRTL: {
+    textAlign: "right",
+  },
   stepDescription: {
     fontSize: 16,
     color: "#666",
     textAlign: "center",
     marginBottom: 30,
     lineHeight: 22,
+  },
+  questionText: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 24,
+    lineHeight: 24,
+  },
+  questionTextRTL: {
+    textAlign: "right",
   },
   inputGroup: {
     marginBottom: 25,
@@ -1450,9 +1458,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: "white",
   },
+  textInputRTL: {
+    textAlign: "right",
+  },
   textArea: {
     minHeight: 100,
     textAlignVertical: "top",
+  },
+  optionsContainer: {
+    marginTop: 10,
   },
   optionGroup: {
     flexDirection: "row",
@@ -1460,24 +1474,42 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   optionButton: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 25,
     borderWidth: 2,
     borderColor: "#e9ecef",
     backgroundColor: "white",
+    marginBottom: 8,
+  },
+  optionButtonRTL: {
+    flexDirection: "row-reverse",
   },
   optionButtonSelected: {
     borderColor: "#007AFF",
     backgroundColor: "#007AFF",
+  },
+  selectedOption: {
+    borderColor: "#007AFF",
+    backgroundColor: "#f0f8ff",
   },
   optionText: {
     fontSize: 14,
     color: "#333",
     fontWeight: "500",
   },
+  optionTextRTL: {
+    textAlign: "right",
+  },
   optionTextSelected: {
     color: "white",
+  },
+  selectedOptionText: {
+    color: "#007AFF",
+    fontWeight: "600",
   },
   checkboxGroup: {
     gap: 15,
@@ -1552,11 +1584,31 @@ const styles = StyleSheet.create({
     color: "#1565c0",
     lineHeight: 20,
   },
+  errorText: {
+    color: "#FF3B30",
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: 10,
+  },
   navigation: {
     padding: 20,
     backgroundColor: "white",
     borderTopWidth: 1,
     borderTopColor: "#e9ecef",
+  },
+  navigationRTL: {
+    flexDirection: "row-reverse",
+  },
+  navButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    borderRadius: 8,
+  },
+  navButtonText: {
+    fontSize: 16,
+    color: "#007AFF",
+    marginLeft: 4,
   },
   nextButton: {
     flexDirection: "row",
@@ -1588,6 +1640,9 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 18,
     fontWeight: "bold",
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   tipModalOverlay: {
     flex: 1,

@@ -24,13 +24,13 @@ dotenv.config();
 
 // Configuration
 const config = {
-  port: Number(process.env.PORT) || 3000,
+  port: Number(process.env.PORT) || 5000,
   nodeEnv: process.env.NODE_ENV || "development",
   apiBaseUrl: process.env.API_BASE_URL,
   clientUrl: process.env.CLIENT_URL,
   openaiApiKey: process.env.OPENAI_API_KEY,
   isDevelopment: process.env.NODE_ENV !== "production",
-  serverIp: process.env.SERVER_IP || "192.168.1.70",
+  serverIp: process.env.API_BASE_URL ,
 };
 
 // Derived configuration

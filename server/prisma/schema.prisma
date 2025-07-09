@@ -493,7 +493,7 @@ model FoodProduct {
   user_id            String
   product_id         Int      @id @default(autoincrement())
   barcode            String   @unique
-  name               String
+  product_name       String
   brand              String?
   category           String
   nutrition_per_100g Json // calories, protein, carbs, fat, fiber, sugar, sodium

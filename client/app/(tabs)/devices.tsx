@@ -11,6 +11,8 @@ import {
   Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useTranslation } from "react-i18next";
+import { useLanguage } from "@/src/i18n/context/LanguageContext";
 import {
   deviceAPI,
   ConnectedDevice,
@@ -97,6 +99,8 @@ const SUPPORTED_DEVICES: SupportedDevice[] = [
 ];
 
 export default function DevicesScreen() {
+  const { t } = useTranslation();
+  const { isRTL } = useLanguage();
   const [connectedDevices, setConnectedDevices] = useState<ConnectedDevice[]>(
     []
   );
@@ -484,7 +488,7 @@ export default function DevicesScreen() {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Loading devices...</Text>
+        <Text style={styles.loadingText}>{t("devices.loading")}</Text>
       </View>
     );
   }
