@@ -1262,15 +1262,19 @@ export default function QuestionnaireScreen() {
     }
   };
 
+  const handleBack = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    } else {
+      // Navigate to sibling page "payment-plan"
+      router.replace("/payment-plan");
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() =>
-            currentStep > 1 ? setCurrentStep(currentStep - 1) : router.back()
-          }
-        >
+        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
           <Ionicons name="arrow-back" size={24} color="#007AFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>בניית תוכנית אישית</Text>

@@ -573,30 +573,47 @@ export const nutritionAPI = {
 
   getDailyStats: async (date: string) => {
     try {
-      console.log("📊 Making get daily stats API request for date:", date);
+      console.log("📊 Getting daily stats for:", date);
 
-      const response = await api.get(`/nutrition/stats/${date}`);
+      const response = await api.get(`/nutrition/daily-stats?date=${date}`);
 
-      console.log("🎯 RAW DAILY STATS API RESPONSE:");
-      console.log("=====================================");
-      console.log("📋 Full Response:", JSON.stringify(response.data, null, 2));
-      console.log("=====================================");
-
-      if (response.data.success) {
-        return response.data.data;
-      } else {
-        throw new Error(response.data.error || "Failed to fetch daily stats");
-      }
+      console.log("✅ Daily stats response:", response.data);
+      return response.data;
     } catch (error: any) {
-      console.error("💥 Get daily stats API error:", error);
+      console.error("💥 Daily stats API error:", error);
+      throw error;
+    }
+  },
 
+  getRangeStatistics: async (startDate: string, endDate: string) => {
+    try {
+      console.log("📊 Getting range statistics:", { startDate, endDate });
+      console.log("✅ Raw startDate:", startDate, "Raw endDate:", endDate);
+      console.log("✅ Type of startDate:", typeof startDate);
+
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
+        throw new Error(
+          `Invalid date format. Expected YYYY-MM-DD, got: ${startDate}, ${endDate}`
+        );
+      }
+      console.log("📊 startDate:", startDate, "endDate:", endDate);
+
+      const response = await api.get("/nutrition/stats/range", {
+        params: {
+          startDate,
+          endDate,
+        },
+      });
+
+      console.log("✅ Range statistics response:", response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error("💥 Range statistics API error:", error);
       if (error.response?.data?.error) {
         throw new Error(error.response.data.error);
-      } else if (error.message) {
-        throw new Error(error.message);
-      } else {
-        throw new Error("Failed to fetch daily stats");
       }
+      throw error;
     }
   },
 

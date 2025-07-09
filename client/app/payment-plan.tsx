@@ -4,145 +4,179 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  ScrollView,
+  Alert,
   ActivityIndicator,
+  ScrollView,
 } from "react-native";
-import { router } from "expo-router";
-import { useTranslation } from "react-i18next";
-import { useLanguage } from "@/src/i18n/context/LanguageContext";
-import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { useDispatch, useSelector } from "react-redux";
+import { AppDispatch, RootState } from "@/src/store";
+import { userAPI } from "@/src/services/api";
+
+type PlanType = "FREE" | "PREMIUM" | "GOLD";
 
 interface Plan {
-  id: string;
-  nameKey: string;
+  id: PlanType;
+  name: string;
   price: string;
   features: string[];
+  color: string;
+  recommended?: boolean;
 }
 
-export default function PaymentPlanScreen() {
-  const { t } = useTranslation();
-  const { isRTL } = useLanguage();
-  const [selectedPlan, setSelectedPlan] = useState<string>("free");
+const plans: Plan[] = [
+  {
+    id: "FREE",
+    name: "תוכנית חינמית",
+    price: "חינם",
+    features: [
+      "2 ניתוחי תמונות ביום",
+      "תפריט תזונתי בסיסי",
+      "מעקב קלוריות",
+      "גישה למאגר מתכונים",
+    ],
+    color: "#4CAF50",
+  },
+  {
+    id: "PREMIUM",
+    name: "תוכנית פרימיום",
+    price: "₪49/חודש",
+    features: [
+      "20 ניתוחי תמונות ביום",
+      "תפריט תזונתי מותאם אישית",
+      "מעקב מפורט אחר מקרו וויטמינים",
+      "המלצות AI מתקדמות",
+      "גישה לכל המתכונים",
+      "תמיכה בצ'אט",
+    ],
+    color: "#2196F3",
+    recommended: true,
+  },
+  {
+    id: "GOLD",
+    name: "תוכנית זהב",
+    price: "₪99/חודש",
+    features: [
+      "50 ניתוחי תמונות ביום",
+      "תפריט מותאם אישית עם AI מתקדם",
+      "מעקב בריאותי מלא",
+      "ייעוץ תזונתי אישי",
+      "תמיכה עדיפות גבוהה",
+      "גישה מוקדמת לפיצ'רים חדשים",
+      "דוחות בריאות מפורטים",
+    ],
+    color: "#FF9800",
+  },
+];
+
+export default function PaymentPlan() {
+  const [selectedPlan, setSelectedPlan] = useState<PlanType | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
+  const dispatch = useDispatch<AppDispatch>();
+  const { user } = useSelector((state: RootState) => state.auth);
 
-  const plans: Plan[] = [
-    {
-      id: "free",
-      nameKey: "paymentPlan.free",
-      price: "$0",
-      features: ["Basic meal tracking", "Simple statistics", "Basic support"],
-    },
-    {
-      id: "premium",
-      nameKey: "paymentPlan.premium",
-      price: "$9.99/month",
-      features: [
-        "Advanced analytics",
-        "Personalized meal plans",
-        "Priority support",
-        "AI recommendations",
-      ],
-    },
-    {
-      id: "gold",
-      nameKey: "paymentPlan.gold",
-      price: "$19.99/month",
-      features: [
-        "Everything in Premium",
-        "Nutritionist consultations",
-        "24/7 support",
-        "Custom meal plans",
-      ],
-    },
-  ];
-
-  const handleContinue = async () => {
-    setIsLoading(true);
+  const handlePlanSelection = async (planId: PlanType) => {
     try {
-      // Simulate payment processing
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      router.replace("/(tabs)");
-    } catch (error) {
-      console.error("Payment error:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      setIsLoading(true);
+      setSelectedPlan(planId);
 
+      const response = await userAPI.updateSubscription(planId);
+      console.log(response);
+
+      if (!response.success) {
+        throw new Error(response.error || "Failed to update subscription");
+      }
+
+      dispatch({
+        type: "auth/updateSubscription",
+        payload: { subscription_type: planId },
+      });
+
+      if (planId === "FREE") {
+        // Reset state BEFORE navigation for FREE plan
+        setIsLoading(false);
+        router.replace("/(tabs)");
+        setSelectedPlan(null);
+        return; // Exit early to avoid finally block
+      } else {
+        // Reset state BEFORE navigation for premium plans too
+        setIsLoading(false);
+        setSelectedPlan(null);
+        router.replace("/questionnaire");
+        return; // Exit early to avoid finally block
+      }
+    } catch (error: any) {
+      console.error("Plan selection error:", error);
+      Alert.alert("שגיאה", error.message || "נכשל בעדכון התוכנית");
+      setIsLoading(false);
+      setSelectedPlan(null);
+    }
+    // Remove the finally block entirely since we handle state reset above
+  };
   const renderPlan = (plan: Plan) => (
-    <TouchableOpacity
+    <View
       key={plan.id}
-      style={[
-        styles.planCard,
-        selectedPlan === plan.id && styles.selectedPlan,
-        isRTL && styles.planCardRTL,
-      ]}
-      onPress={() => setSelectedPlan(plan.id)}
-      disabled={isLoading}
+      style={[styles.planCard, plan.recommended && styles.recommendedCard]}
     >
-      <View style={[styles.planHeader, isRTL && styles.planHeaderRTL]}>
-        <Text style={[styles.planName, isRTL && styles.planNameRTL]}>
-          {t(plan.nameKey)}
-        </Text>
-        <Text style={[styles.planPrice, isRTL && styles.planPriceRTL]}>
-          {plan.price}
-        </Text>
-      </View>
+      {plan.recommended && (
+        <View style={styles.recommendedBadge}>
+          <Text style={styles.recommendedText}>מומלץ</Text>
+        </View>
+      )}
+      <Text style={styles.planName}>{plan.name}</Text>
+      <Text style={[styles.planPrice, { color: plan.color }]}>
+        {plan.price}
+      </Text>
 
       <View style={styles.featuresContainer}>
-        <Text style={[styles.featuresTitle, isRTL && styles.featuresTitleRTL]}>
-          {t("paymentPlan.features")}:
-        </Text>
         {plan.features.map((feature, index) => (
-          <View
-            key={index}
-            style={[styles.featureRow, isRTL && styles.featureRowRTL]}
-          >
-            <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
-            <Text style={[styles.featureText, isRTL && styles.featureTextRTL]}>
-              {feature}
-            </Text>
+          <View key={index} style={styles.featureRow}>
+            <Text style={styles.checkmark}>✓</Text>
+            <Text style={styles.featureText}>{feature}</Text>
           </View>
         ))}
       </View>
 
-      {selectedPlan === plan.id && (
-        <View
-          style={[
-            styles.selectedIndicator,
-            isRTL && styles.selectedIndicatorRTL,
-          ]}
-        >
-          <Ionicons name="checkmark-circle" size={24} color="#007AFF" />
-          <Text style={[styles.selectedText, isRTL && styles.selectedTextRTL]}>
-            {t("paymentPlan.currentPlan")}
-          </Text>
-        </View>
-      )}
-    </TouchableOpacity>
+      <TouchableOpacity
+        style={[
+          styles.selectButton,
+          { backgroundColor: plan.color },
+          selectedPlan === plan.id && isLoading && styles.loadingButton,
+        ]}
+        onPress={() => handlePlanSelection(plan.id)}
+        disabled={isLoading}
+        accessibilityLabel={`Select ${plan.name} plan`}
+      >
+        {selectedPlan === plan.id && isLoading ? (
+          <ActivityIndicator color="white" />
+        ) : (
+          <Text style={styles.selectButtonText}> {plan.id}בחר תוכנית זו</Text>
+        )}
+      </TouchableOpacity>
+    </View>
   );
 
   return (
-    <ScrollView style={[styles.container, isRTL && styles.containerRTL]}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+      keyboardShouldPersistTaps="handled"
+    >
       <View style={styles.header}>
-        <Text style={[styles.title, isRTL && styles.titleRTL]}>
-          {t("paymentPlan.title")}
+        <Text style={styles.title}>בחר את התוכנית שלך</Text>
+        <Text style={styles.subtitle}>
+          התחל במסע התזונתי שלך עם התוכנית המתאימה לך
         </Text>
       </View>
 
       <View style={styles.plansContainer}>{plans.map(renderPlan)}</View>
 
-      <TouchableOpacity
-        style={[styles.continueButton, isLoading && styles.buttonDisabled]}
-        onPress={handleContinue}
-        disabled={isLoading}
-      >
-        {isLoading ? (
-          <ActivityIndicator size="small" color="#fff" />
-        ) : (
-          <Text style={styles.continueButtonText}>{t("common.continue")}</Text>
-        )}
-      </TouchableOpacity>
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>
+          ניתן לשנות או לבטל את המנוי בכל עת מהגדרות החשבון
+        </Text>
+      </View>
     </ScrollView>
   );
 }
@@ -150,131 +184,118 @@ export default function PaymentPlanScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#f8f9fa",
+  },
+  contentContainer: {
     padding: 20,
   },
-  containerRTL: {
-    direction: "rtl",
-  },
   header: {
-    marginTop: 60,
+    alignItems: "center",
     marginBottom: 30,
+    marginTop: 40,
   },
   title: {
     fontSize: 28,
     fontWeight: "bold",
     color: "#333",
     textAlign: "center",
+    marginBottom: 10,
   },
-  titleRTL: {
+  subtitle: {
+    fontSize: 16,
+    color: "#666",
     textAlign: "center",
+    lineHeight: 24,
   },
   plansContainer: {
-    flex: 1,
-    marginBottom: 20,
+    gap: 20,
   },
   planCard: {
+    backgroundColor: "white",
+    borderRadius: 16,
+    padding: 24,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    position: "relative",
+  },
+  recommendedCard: {
     borderWidth: 2,
-    borderColor: "#e0e0e0",
+    borderColor: "#2196F3",
+  },
+  recommendedBadge: {
+    position: "absolute",
+    top: -10,
+    right: 20,
+    backgroundColor: "#2196F3",
+    paddingHorizontal: 12,
+    paddingVertical: 4,
     borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
-    backgroundColor: "#fff",
   },
-  planCardRTL: {
-    alignItems: "flex-end",
-  },
-  selectedPlan: {
-    borderColor: "#007AFF",
-    backgroundColor: "#f0f8ff",
-  },
-  planHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  planHeaderRTL: {
-    flexDirection: "row-reverse",
+  recommendedText: {
+    color: "white",
+    fontSize: 12,
+    fontWeight: "bold",
   },
   planName: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: "bold",
     color: "#333",
-  },
-  planNameRTL: {
-    textAlign: "right",
-  },
-  planPrice: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#007AFF",
-  },
-  planPriceRTL: {
-    textAlign: "left",
-  },
-  featuresContainer: {
-    marginBottom: 12,
-  },
-  featuresTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333",
+    textAlign: "center",
     marginBottom: 8,
   },
-  featuresTitleRTL: {
-    textAlign: "right",
+  planPrice: {
+    fontSize: 20,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  featuresContainer: {
+    marginBottom: 24,
   },
   featureRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 4,
+    marginBottom: 12,
   },
-  featureRowRTL: {
-    flexDirection: "row-reverse",
+  checkmark: {
+    color: "#4CAF50",
+    fontSize: 16,
+    fontWeight: "bold",
+    marginRight: 12,
   },
   featureText: {
-    marginLeft: 8,
     fontSize: 14,
     color: "#666",
+    flex: 1,
   },
-  featureTextRTL: {
-    marginLeft: 0,
-    marginRight: 8,
-    textAlign: "right",
-  },
-  selectedIndicator: {
-    flexDirection: "row",
+  selectButton: {
+    paddingVertical: 16,
+    borderRadius: 12,
     alignItems: "center",
-    justifyContent: "center",
-    marginTop: 8,
   },
-  selectedIndicatorRTL: {
-    flexDirection: "row-reverse",
+  loadingButton: {
+    opacity: 0.7,
   },
-  selectedText: {
-    marginLeft: 8,
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#007AFF",
-  },
-  selectedTextRTL: {
-    marginLeft: 0,
-    marginRight: 8,
-  },
-  continueButton: {
-    backgroundColor: "#007AFF",
-    borderRadius: 8,
-    padding: 15,
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  continueButtonText: {
-    color: "#fff",
+  selectButtonText: {
+    color: "white",
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "bold",
+  },
+  footer: {
+    marginTop: 30,
+    padding: 20,
+    alignItems: "center",
+  },
+  footerText: {
+    fontSize: 12,
+    color: "#888",
+    textAlign: "center",
+    lineHeight: 18,
   },
 });

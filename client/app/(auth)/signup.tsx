@@ -29,9 +29,19 @@ export default function SignUpScreen() {
   const [name, setName] = useState("");
   const [showLanguageModal, setShowLanguageModal] = useState(false);
 
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const handleSignUp = async () => {
     if (!email || !password || !name) {
       Alert.alert(t("common.error"), "Please fill in all fields");
+      return;
+    }
+
+    if (!validateEmail(email)) {
+      Alert.alert(t("common.error"), "Please enter a valid email address");
       return;
     }
 
@@ -62,7 +72,7 @@ export default function SignUpScreen() {
     <ScrollView style={[styles.container, isRTL && styles.containerRTL]}>
       <View style={styles.header}>
         <Text style={[styles.title, isRTL && styles.titleRTL]}>
-          {t("auth.createAccount")}
+          {t("auth.create_account")}
         </Text>
         <Text style={[styles.subtitle, isRTL && styles.subtitleRTL]}>
           {t("auth.welcome")}
@@ -71,7 +81,7 @@ export default function SignUpScreen() {
 
       <View style={styles.languageSection}>
         <Text style={[styles.sectionTitle, isRTL && styles.sectionTitleRTL]}>
-          {t("auth.languagePreference")}
+          {t("auth.language_preference")}
         </Text>
         <LanguageSelector
           showModal={showLanguageModal}
@@ -128,17 +138,17 @@ export default function SignUpScreen() {
           {isLoading ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.signUpButtonText}>{t("auth.signUp")}</Text>
+            <Text style={styles.signUpButtonText}>{t("auth.sign_up")}</Text>
           )}
         </TouchableOpacity>
 
         {error && <Text style={styles.errorText}>{error}</Text>}
 
         <View style={[styles.footer, isRTL && styles.footerRTL]}>
-          <Text style={styles.footerText}>{t("auth.hasAccount")} </Text>
+          <Text style={styles.footerText}>{t("auth.has_account")} </Text>
           <Link href="/signin" asChild>
             <TouchableOpacity>
-              <Text style={styles.linkText}>{t("auth.signIn")}</Text>
+              <Text style={styles.linkText}>{t("auth.sign_in")}</Text>
             </TouchableOpacity>
           </Link>
         </View>

@@ -31,12 +31,18 @@ router.post("/barcode", async (req, res) => {
     // Save scanned product to database
     await prisma.foodProduct.create({
       data: {
+        health_score: Number(result.user_analysis.health_assessment),
+        image_url: result.product.image_url,
         user_id: userId,
-        barcode: barcode,
+        barcode: result.product.barcode || "",
         product_name: result.product.name,
         brand: result.product.brand || "",
-        nutrition_data: result,
-        scanned_at: new Date(),
+        ingredients: result.product.ingredients,
+        category: result.product.category || "Uncategorized",
+        nutrition_per_100g: result.product.nutrition_per_100g || {},
+        allergens: result.product.allergens || [],
+        labels: result.product.labels || [],
+        created_at: new Date(),
       },
     });
 
@@ -80,11 +86,18 @@ router.post("/image", async (req, res) => {
     // Save scanned product to database
     await prisma.foodProduct.create({
       data: {
+        health_score: Number(result.user_analysis.health_assessment),
+        image_url: result.product.image_url,
         user_id: userId,
+        barcode: result.product.barcode || "",
         product_name: result.product.name,
         brand: result.product.brand || "",
-        nutrition_data: result,
-        scanned_at: new Date(),
+        ingredients: result.product.ingredients,
+        category: result.product.category || "Uncategorized",
+        nutrition_per_100g: result.product.nutrition_per_100g || {},
+        allergens: result.product.allergens || [],
+        labels: result.product.labels || [],
+        created_at: new Date(),
       },
     });
 

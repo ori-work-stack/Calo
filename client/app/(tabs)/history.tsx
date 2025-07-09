@@ -23,6 +23,8 @@ import {
 } from "../../src/store/mealSlice";
 import { Meal } from "../../src/types";
 import { Ionicons } from "@expo/vector-icons";
+import { useTranslation } from "react-i18next";
+import { useRTLStyles } from "../../hooks/useRTLStyle";
 
 interface MealWithFeedback extends Meal {
   userRating?: number;

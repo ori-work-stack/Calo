@@ -44,10 +44,10 @@ export default function SignInScreen() {
     <View style={[styles.container, isRTL && styles.containerRTL]}>
       <View style={styles.header}>
         <Text style={[styles.title, isRTL && styles.titleRTL]}>
-          {t("auth.welcome")}
+          {t("auth.welcome_back")}
         </Text>
         <Text style={[styles.subtitle, isRTL && styles.subtitleRTL]}>
-          {t("auth.signIn")}
+          {t("auth.sign_in")}
         </Text>
       </View>
 
@@ -80,7 +80,7 @@ export default function SignInScreen() {
               isRTL && styles.forgotPasswordTextRTL,
             ]}
           >
-            {t("auth.forgotPassword")}
+            {t("auth.forgot_password")}
           </Text>
         </TouchableOpacity>
 
@@ -92,17 +92,17 @@ export default function SignInScreen() {
           {isLoading ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.signInButtonText}>{t("auth.signIn")}</Text>
+            <Text style={styles.signInButtonText}>{t("auth.sign_in")}</Text>
           )}
         </TouchableOpacity>
 
         {error && <Text style={styles.errorText}>{error}</Text>}
 
         <View style={[styles.footer, isRTL && styles.footerRTL]}>
-          <Text style={styles.footerText}>{t("auth.noAccount")} </Text>
+          <Text style={styles.footerText}>{t("auth.no_account")} </Text>
           <Link href="/signup" asChild>
             <TouchableOpacity>
-              <Text style={styles.linkText}>{t("auth.signUp")}</Text>
+              <Text style={styles.linkText}>{t("auth.sign_up")}</Text>
             </TouchableOpacity>
           </Link>
         </View>

@@ -198,7 +198,116 @@ router.get("/stats/:date", async (req: AuthRequest, res) => {
     });
   }
 });
+// Add this endpoint to your existing nutrition routes file
 
+// Get range statistics
+router.get("/stats/range", async (req: AuthRequest, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    console.log("📊 Getting range statistics - Raw query params:", req.query);
+    console.log("📊 Getting range statistics - Parsed params:", {
+      startDate,
+      endDate,
+    });
+
+    // Validate required parameters
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        error: "Both startDate and endDate are required",
+      });
+    }
+
+    // Convert to string and trim whitespace
+    const startDateStr = String(startDate).trim();
+    const endDateStr = String(endDate).trim();
+
+    console.log("🔍 Validating dates after string conversion:", {
+      startDateStr,
+      endDateStr,
+    });
+
+    // Validate date format (YYYY-MM-DD)
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+
+    if (!dateRegex.test(startDateStr)) {
+      console.log("❌ Start date validation failed:", {
+        startDateStr,
+        length: startDateStr.length,
+        regexTest: dateRegex.test(startDateStr),
+      });
+      return res.status(400).json({
+        success: false,
+        error: `Start date must be in YYYY-MM-DD format. Received: '${startDateStr}'`,
+      });
+    }
+
+    if (!dateRegex.test(endDateStr)) {
+      console.log("❌ End date validation failed:", {
+        endDateStr,
+        length: endDateStr.length,
+        regexTest: dateRegex.test(endDateStr),
+      });
+      return res.status(400).json({
+        success: false,
+        error: `End date must be in YYYY-MM-DD format. Received: '${endDateStr}'`,
+      });
+    }
+
+    // Additional validation: Check if dates are valid Date objects
+    const startDateObj = new Date(startDateStr);
+    const endDateObj = new Date(endDateStr);
+
+    if (isNaN(startDateObj.getTime())) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid start date: '${startDateStr}'`,
+      });
+    }
+
+    if (isNaN(endDateObj.getTime())) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid end date: '${endDateStr}'`,
+      });
+    }
+
+    // Validate date range (startDate should be before or equal to endDate)
+    if (startDateObj > endDateObj) {
+      return res.status(400).json({
+        success: false,
+        error: "startDate must be before or equal to endDate",
+      });
+    }
+
+    console.log("✅ Date validation passed:", { startDateStr, endDateStr });
+    console.log("📊 Fetching range statistics for user:", req.user.user_id);
+
+    const statistics = await NutritionService.getRangeStatistics(
+      req.user.user_id,
+      startDateStr,
+      endDateStr
+    );
+
+    console.log("✅ Range statistics retrieved successfully");
+
+    res.json({
+      success: true,
+      data: statistics,
+    });
+  } catch (error) {
+    console.error("💥 Get range statistics error:", error);
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Failed to fetch range statistics";
+    res.status(500).json({
+      success: false,
+      error: message,
+    });
+  }
+});
 // NEW ENDPOINTS FOR HISTORY FEATURES
 
 // Save meal feedback (ratings)

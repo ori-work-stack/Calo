@@ -5,27 +5,32 @@ import {
   StyleSheet,
   FlatList,
   Image,
-  RefreshControl,
-  ActivityIndicator,
   TouchableOpacity,
   Modal,
   TextInput,
   Alert,
+  RefreshControl,
+  ActivityIndicator,
 } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState, AppDispatch } from "../../src/store";
 import { fetchMeals, updateMeal } from "../../src/store/mealSlice";
 import { Meal } from "../../src/types";
 import { Ionicons } from "@expo/vector-icons";
+import { useTranslation } from "react-i18next";
+import { useRTLStyles } from "../../hooks/useRTLStyle";
 
 export default function MealsScreen() {
   const dispatch = useDispatch<AppDispatch>();
   const { meals, isLoading, isUpdating } = useSelector(
     (state: RootState) => state.meal
   );
-  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);
   const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null);
   const [updateText, setUpdateText] = useState("");
+  const { t } = useTranslation();
+  const rtlStyles = useRTLStyles(styles);
 
   useEffect(() => {
     dispatch(fetchMeals());
@@ -39,7 +44,7 @@ export default function MealsScreen() {
     console.log("🔄 Opening update modal for meal:", meal);
     setSelectedMeal(meal);
     setUpdateText("");
-    setShowUpdateModal(true);
+    setEditModalVisible(true);
   };
 
   const handleUpdateSubmit = async () => {
@@ -56,7 +61,7 @@ export default function MealsScreen() {
 
       if (updateMeal.fulfilled.match(result)) {
         Alert.alert("Success", "Meal updated successfully!");
-        setShowUpdateModal(false);
+        setEditModalVisible(false);
         setUpdateText("");
         setSelectedMeal(null);
         // Refresh meals to get updated data
@@ -74,7 +79,7 @@ export default function MealsScreen() {
   };
 
   const handleUpdateCancel = () => {
-    setShowUpdateModal(false);
+    setEditModalVisible(false);
     setUpdateText("");
     setSelectedMeal(null);
   };
@@ -165,31 +170,29 @@ export default function MealsScreen() {
         }
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>No meals yet</Text>
-            <Text style={styles.emptyText}>
-              Start by taking a photo of your meal to analyze its nutrition!
-            </Text>
+            <Text style={styles.emptyTitle}>{t("noMealsYet")}</Text>
+            <Text style={styles.emptyText}>{t("startByTakingPhoto")}</Text>
           </View>
         }
       />
 
       {/* Update Modal */}
       <Modal
-        visible={showUpdateModal}
+        visible={editModalVisible}
         animationType="slide"
         transparent={true}
         onRequestClose={handleUpdateCancel}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Update Meal</Text>
+            <Text style={styles.modalTitle}>{t("updateMeal")}</Text>
             <Text style={styles.modalSubtitle}>
-              Add additional information about "{selectedMeal?.name}"
+              {t("addInfoAbout")} "{selectedMeal?.name}"
             </Text>
 
             <TextInput
               style={styles.updateInput}
-              placeholder="Enter additional meal information..."
+              placeholder={t("enterMealInfo")}
               value={updateText}
               onChangeText={setUpdateText}
               multiline
@@ -204,7 +207,7 @@ export default function MealsScreen() {
                 onPress={handleUpdateCancel}
                 disabled={isUpdating}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={styles.cancelButtonText}>{t("cancel")}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -215,7 +218,7 @@ export default function MealsScreen() {
                 {isUpdating ? (
                   <ActivityIndicator color="white" size="small" />
                 ) : (
-                  <Text style={styles.submitButtonText}>Update</Text>
+                  <Text style={styles.submitButtonText}>{t("update")}</Text>
                 )}
               </TouchableOpacity>
             </View>

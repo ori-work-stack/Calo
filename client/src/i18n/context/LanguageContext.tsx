@@ -68,11 +68,13 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({
       if (I18nManager.isRTL !== rtl) {
         I18nManager.allowRTL(rtl);
         I18nManager.forceRTL(rtl);
+        // Note: App restart is required for RTL changes in React Native
       }
     } else {
       // For web
       document.documentElement.dir = rtl ? "rtl" : "ltr";
       document.documentElement.lang = language;
+      document.body.style.direction = rtl ? "rtl" : "ltr";
     }
   };
 

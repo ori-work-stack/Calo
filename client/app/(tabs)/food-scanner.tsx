@@ -4,17 +4,26 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  Image,
   Alert,
   ScrollView,
-  Modal,
   TextInput,
   ActivityIndicator,
+  Modal,
+  FlatList,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { CameraView, Camera } from "expo-camera";
-import { Ionicons } from "@expo/vector-icons";
+import { Camera, CameraType, CameraView } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
-import { foodScannerAPI } from "../../src/services/api";
+import { Ionicons } from "@expo/vector-icons";
+import { useDispatch, useSelector } from "react-redux";
+import { RootState, AppDispatch } from "../../src/store";
+import { analyzeMeal } from "../../src/store/mealSlice";
+import saveMeal from "../../src/store/mealSlice";
+import { useTranslation } from "react-i18next";
+import { useRTLStyles } from "../../hooks/useRTLStyle";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { foodScannerAPI } from "@/src/services/api";
+import { t } from "i18next";
 
 interface ProductData {
   barcode?: string;
@@ -60,7 +69,70 @@ export default function FoodScannerScreen() {
   const [showResults, setShowResults] = useState(false);
   const [quantity, setQuantity] = useState("100");
   const [showAddToMeal, setShowAddToMeal] = useState(false);
+  const [mealRating, setMealRating] = useState(0);
+  const [hasRated, setHasRated] = useState(false);
 
+  const getHealthDeviationColor = (rate: number) => {
+    if (rate <= 10) return "#4CAF50"; // Green - Good
+    if (rate <= 25) return "#FF9800"; // Orange - Moderate
+    return "#F44336"; // Red - High deviation
+  };
+
+  const renderMealComponents = () => {
+    if (!productData || !productData.ingredients) return null;
+
+    return (
+      <View style={styles.componentsContainer}>
+        <Text style={styles.sectionTitle}>{t("food_scanner.ingredients")}</Text>
+        <View style={styles.componentsGrid}>
+          {productData.ingredients.map((ingredient, index) => (
+            <View key={index} style={styles.componentItem}>
+              <Text style={styles.componentName}>{ingredient}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  };
+
+  const renderRatingSection = () => {
+    if (hasRated) return null;
+
+    return (
+      <View style={styles.ratingContainer}>
+        <Text style={styles.sectionTitle}>{t("history.rate_meal")}</Text>
+        <Text style={styles.ratingDescription}>
+          {t("history.rating_scale")}
+        </Text>
+        <View style={styles.starsContainer}>
+          {[1, 2, 3, 4, 5].map((star) => (
+            <TouchableOpacity
+              key={star}
+              onPress={() => setMealRating(star)}
+              style={styles.starButton}
+            >
+              <Ionicons
+                name={star <= mealRating ? "star" : "star-outline"}
+                size={32}
+                color={star <= mealRating ? "#FFD700" : "#ddd"}
+              />
+            </TouchableOpacity>
+          ))}
+        </View>
+        {mealRating > 0 && (
+          <TouchableOpacity
+            style={styles.submitRatingButton}
+            onPress={() => {
+              setHasRated(true);
+              Alert.alert("Success", "Rating saved successfully!");
+            }}
+          >
+            <Text style={styles.submitRatingText}>{t("common.save")}</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
   useEffect(() => {
     getCameraPermissions();
   }, []);
@@ -512,6 +584,29 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
   },
+  componentsContainer: {
+    marginVertical: 16,
+    paddingHorizontal: 12,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 8,
+  },
+  componentsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "flex-start",
+  },
+  componentItem: {
+    backgroundColor: "#eee",
+    borderRadius: 8,
+    padding: 8,
+    margin: 4,
+  },
+  componentName: {
+    fontSize: 14,
+  },
   header: {
     padding: 16,
     borderBottomWidth: 1,
@@ -703,6 +798,39 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "500",
   },
+  ratingContainer: {
+    padding: 16,
+    backgroundColor: "#f9f9f9",
+    borderRadius: 12,
+    marginVertical: 16,
+    alignItems: "center",
+  },
+  ratingDescription: {
+    fontSize: 14,
+    color: "#666",
+    marginVertical: 8,
+    textAlign: "center",
+  },
+  starsContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginVertical: 12,
+  },
+  starButton: {
+    marginHorizontal: 6,
+  },
+  submitRatingButton: {
+    backgroundColor: "#007AFF",
+    paddingVertical: 10,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+    marginTop: 8,
+  },
+  submitRatingText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 16,
+  },
   quantityInput: {
     borderWidth: 1,
     borderColor: "#ddd",
@@ -715,12 +843,6 @@ const styles = StyleSheet.create({
   },
   nutritionContainer: {
     padding: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 12,
-    textAlign: "right",
   },
   nutritionGrid: {
     flexDirection: "row",

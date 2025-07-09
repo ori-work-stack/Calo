@@ -230,11 +230,13 @@ model Meal {
   insulin_index          Float?
   food_category          String?
   processing_level       String?
+  confidence             Int?
   cooking_method         String?
   additives_json         Json?          @default("{}")
   health_risk_notes      String?
   ingredients            Json?
   created_at             DateTime       @default(now())
+  updated_at             DateTime?
 }
 
 model NutritionPlan {
