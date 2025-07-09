@@ -269,7 +269,7 @@ If you cannot read the label clearly, estimate based on visible information and 
     barcode: string
   ): Promise<ProductData | null> {
     try {
-      // Try OpenFoodFacts API
+      // ✅ Try OpenFoodFacts
       const response = await axios.get(
         `https://world.openfoodfacts.org/api/v0/product/${barcode}.json`,
         { timeout: 5000 }
@@ -293,7 +293,7 @@ If you cannot read the label clearly, estimate based on visible information and 
             sugar: nutriments.sugars_100g || undefined,
             sodium: nutriments.sodium_100g
               ? nutriments.sodium_100g * 1000
-              : undefined, // Convert to mg
+              : undefined,
           },
           ingredients:
             product.ingredients_text_en
@@ -309,11 +309,65 @@ If you cannot read the label clearly, estimate based on visible information and 
         };
       }
 
-      return null;
-    } catch (error) {
-      console.warn("External API request failed:", error);
-      return null;
+      // ⚠️ If OpenFoodFacts found no result, fallback
+      return await this.tryFallbackAPIs(barcode);
+    } catch (error: any) {
+      console.warn("❌ OpenFoodFacts failed:", error.message || error);
+      // Fallback to alternate sources
+      return await this.tryFallbackAPIs(barcode);
     }
+  }
+
+  private static async tryFallbackAPIs(
+    barcode: string
+  ): Promise<ProductData | null> {
+    // Fallback 1: Nutritionix (requires appId + appKey)
+    try {
+      const nutritionixResponse = await axios.get(
+        `https://trackapi.nutritionix.com/v2/search/item?upc=${barcode}`,
+        {
+          headers: {
+            "x-app-id": process.env.NUTRITIONIX_APP_ID!,
+            "x-app-key": process.env.NUTRITIONIX_APP_KEY!,
+          },
+          timeout: 5000,
+        }
+      );
+
+      const item = nutritionixResponse.data.foods?.[0];
+      if (item) {
+        return {
+          barcode,
+          name: item.food_name,
+          brand: item.brand_name,
+          category: "Unknown",
+          nutrition_per_100g: {
+            calories: item.nf_calories || 0,
+            protein: item.nf_protein || 0,
+            carbs: item.nf_total_carbohydrate || 0,
+            fat: item.nf_total_fat || 0,
+            fiber: item.nf_dietary_fiber || undefined,
+            sugar: item.nf_sugars || undefined,
+            sodium: item.nf_sodium || undefined,
+          },
+          ingredients: item.nf_ingredient_statement
+            ? item.nf_ingredient_statement
+                .split(",")
+                .map((i: string) => i.trim())
+            : [],
+          allergens: [], // Nutritionix has allergen data but via another endpoint
+          labels: [],
+          health_score: undefined,
+          image_url: item.photo?.thumb,
+        };
+      }
+    } catch (e: any) {
+      console.warn("⚠️ Nutritionix fallback failed:", e.message || e);
+    }
+
+    // Fallback 2: Add USDA fallback here if needed...
+
+    return null; // Nothing worked
   }
 
   private static async saveProductToDatabase(

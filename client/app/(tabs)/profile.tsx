@@ -32,7 +32,7 @@ export default function ProfileScreen() {
   const menuItems = [
     {
       id: "editProfile",
-      title: t("profile.editProfile"),
+      title: t("profile.edit_profile"),
       icon: "person-outline",
       color: "#007AFF",
       gradient: ["#007AFF", "#0051D5"],
@@ -83,7 +83,7 @@ export default function ProfileScreen() {
   };
 
   const handleSignOut = () => {
-    Alert.alert(t("profile.signout"), t("profile.signoutConfirmation"), [
+    Alert.alert(t("profile.signout"), t("profile.signout_confirmation"), [
       { text: t("common.cancel"), style: "cancel" },
       {
         text: t("profile.signout"),
@@ -186,7 +186,7 @@ export default function ProfileScreen() {
           </View>
           <View style={[styles.statItem, isRTL && styles.statItemRTL]}>
             <Text style={styles.statValue}>
-              {formatDate(user?.signup_date ?? "")}
+              {formatDate(user?.created_at ?? "")}
             </Text>
             <Text style={styles.statLabel}>Member Since</Text>
           </View>

@@ -71,6 +71,8 @@ export default function FoodScannerScreen() {
   const [showAddToMeal, setShowAddToMeal] = useState(false);
   const [mealRating, setMealRating] = useState(0);
   const [hasRated, setHasRated] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [scannedHistory, setScannedHistory] = useState<ProductData[]>([]);
 
   const getHealthDeviationColor = (rate: number) => {
     if (rate <= 10) return "#4CAF50"; // Green - Good
@@ -135,7 +137,48 @@ export default function FoodScannerScreen() {
   };
   useEffect(() => {
     getCameraPermissions();
+    loadScannedHistory();
   }, []);
+
+  const loadScannedHistory = async () => {
+    try {
+      const response = await foodScannerAPI.getScannedHistory();
+      console.log(response)
+      if (response.success) {
+        const historyData = response.data.map((item: any) => ({
+          name: item.product_name,
+          brand: item.brand,
+          category: item.category,
+          nutrition_per_100g: item.nutrition_per_100g,
+          ingredients: item.ingredients || [],
+          allergens: item.allergens || [],
+          labels: item.labels || [],
+          health_score: item.health_score,
+          image_url: item.image_url,
+          barcode: item.barcode,
+        }));
+        setScannedHistory(historyData);
+      }
+      console.log(scannedHistory,"hello world")
+    } catch (error) {
+      console.error("Error loading scanned history:", error);
+      // Fallback to localStorage
+      try {
+        const stored = localStorage.getItem("scannedHistory");
+        if (stored) {
+          setScannedHistory(JSON.parse(stored));
+        }
+      } catch (e) {
+        console.error("Error loading from localStorage:", e);
+      }
+    }
+  };
+
+  const saveToHistory = (product: ProductData) => {
+    const newHistory = [product, ...scannedHistory].slice(0, 20); // Keep last 20 items
+    setScannedHistory(newHistory);
+    localStorage.setItem("scannedHistory", JSON.stringify(newHistory));
+  };
 
   const getCameraPermissions = async () => {
     const { status } = await Camera.requestCameraPermissionsAsync();
@@ -152,13 +195,16 @@ export default function FoodScannerScreen() {
       const response = await foodScannerAPI.scanBarcode(scanningResult.data);
 
       if (response.success && response.data) {
-        setProductData(response.data.product);
+        const productData = response.data.product;
+        setProductData(productData);
         setUserAnalysis(response.data.user_analysis);
+        saveToHistory(productData);
         setShowResults(true);
       } else {
         Alert.alert(
-          "מוצר לא נמצא",
-          "לא הצלחנו למצוא את המוצר במסד הנתונים שלנו"
+          t("food_scanner.product_not_found") || "מוצר לא נמצא",
+          t("food_scanner.product_not_found_message") ||
+            "לא הצלחנו למצוא את המוצר במסד הנתונים שלנו"
         );
       }
     } catch (error) {
@@ -188,11 +234,17 @@ export default function FoodScannerScreen() {
           );
 
           if (response.success && response.data) {
-            setProductData(response.data.product);
+            const productData = response.data.product;
+            setProductData(productData);
             setUserAnalysis(response.data.user_analysis);
+            saveToHistory(productData);
             setShowResults(true);
           } else {
-            Alert.alert("סריקה נכשלה", "לא הצלחנו לזהות את המוצר בתמונה");
+            Alert.alert(
+              t("food_scanner.scan_failed") || "סריקה נכשלה",
+              t("food_scanner.scan_failed_message") ||
+                "לא הצלחנו לזהות את המוצר בתמונה"
+            );
           }
         } catch (error) {
           console.error("Image scan error:", error);
@@ -360,48 +412,56 @@ export default function FoodScannerScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>סריקת מוצרי מזון</Text>
-        <View style={styles.modeSelector}>
-          <TouchableOpacity
-            style={[
-              styles.modeButton,
-              scanMode === "barcode" && styles.activeModeButton,
-            ]}
-            onPress={() => setScanMode("barcode")}
-          >
-            <Ionicons
-              name="barcode"
-              size={20}
-              color={scanMode === "barcode" ? "#fff" : "#666"}
-            />
-            <Text
+        <View style={styles.headerControls}>
+          <View style={styles.modeSelector}>
+            <TouchableOpacity
               style={[
-                styles.modeButtonText,
-                scanMode === "barcode" && styles.activeModeButtonText,
+                styles.modeButton,
+                scanMode === "barcode" && styles.activeModeButton,
               ]}
+              onPress={() => setScanMode("barcode")}
             >
-              ברקוד
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.modeButton,
-              scanMode === "image" && styles.activeModeButton,
-            ]}
-            onPress={() => setScanMode("image")}
-          >
-            <Ionicons
-              name="camera"
-              size={20}
-              color={scanMode === "image" ? "#fff" : "#666"}
-            />
-            <Text
+              <Ionicons
+                name="barcode"
+                size={20}
+                color={scanMode === "barcode" ? "#fff" : "#666"}
+              />
+              <Text
+                style={[
+                  styles.modeButtonText,
+                  scanMode === "barcode" && styles.activeModeButtonText,
+                ]}
+              >
+                {t("food_scanner.barcode") || "ברקוד"}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
               style={[
-                styles.modeButtonText,
-                scanMode === "image" && styles.activeModeButtonText,
+                styles.modeButton,
+                scanMode === "image" && styles.activeModeButton,
               ]}
+              onPress={() => setScanMode("image")}
             >
-              תמונה
-            </Text>
+              <Ionicons
+                name="camera"
+                size={20}
+                color={scanMode === "image" ? "#fff" : "#666"}
+              />
+              <Text
+                style={[
+                  styles.modeButtonText,
+                  scanMode === "image" && styles.activeModeButtonText,
+                ]}
+              >
+                {t("food_scanner.image") || "תמונה"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity
+            style={styles.historyButton}
+            onPress={() => setShowHistory(true)}
+          >
+            <Ionicons name="time" size={24} color="#007AFF" />
           </TouchableOpacity>
         </View>
       </View>
@@ -416,12 +476,14 @@ export default function FoodScannerScreen() {
               color="#007AFF"
             />
             <Text style={styles.instructionsTitle}>
-              {scanMode === "barcode" ? "סרוק ברקוד" : "צלם תווית"}
+              {scanMode === "barcode"
+                ? `${t("food_scanner.scan_food")}`
+                : `${t("food_scanner.photo_food")}`}
             </Text>
             <Text style={styles.instructionsText}>
               {scanMode === "barcode"
-                ? "כוון את המצלמה לברקוד המוצר"
-                : "צלם את התווית התזונתית של המוצר"}
+                ? `${t("food_scanner.barcode_instructions")}`
+                : `${t("food_scanner.image_instructions")}`}
             </Text>
           </View>
           <TouchableOpacity
@@ -431,7 +493,9 @@ export default function FoodScannerScreen() {
             }
           >
             <Text style={styles.scanButtonText}>
-              {scanMode === "barcode" ? "התחל סריקה" : "צלם תווית"}
+              {scanMode === "barcode"
+                ? `${t("food_scanner.start_scan")}`
+                : `${t("food_scanner.take_photo")}`}
             </Text>
           </TouchableOpacity>
         </View>
@@ -575,6 +639,59 @@ export default function FoodScannerScreen() {
           </View>
         </SafeAreaView>
       </Modal>
+
+      {/* History Modal */}
+      <Modal
+        visible={showHistory}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowHistory(false)}>
+              <Ionicons name="close" size={24} color="#666" />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>
+              {t("food_scanner.scan_history") || "היסטוריית סריקות"}
+            </Text>
+            <View style={{ width: 50 }} />
+          </View>
+
+          <ScrollView style={styles.historyContainer}>
+            {scannedHistory.length === 0 ? (
+              <View style={styles.emptyHistoryContainer}>
+                <Ionicons name="time-outline" size={64} color="#ccc" />
+                <Text style={styles.emptyHistoryText}>
+                  {t("food_scanner.no_history") || "אין היסטוריית סריקות"}
+                </Text>
+              </View>
+            ) : (
+              scannedHistory.map((item, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.historyItem}
+                  onPress={() => {
+                    setProductData(item);
+                    setShowHistory(false);
+                    setShowResults(true);
+                  }}
+                >
+                  <View style={styles.historyItemContent}>
+                    <Text style={styles.historyItemName}>{item.name}</Text>
+                    {item.brand && (
+                      <Text style={styles.historyItemBrand}>{item.brand}</Text>
+                    )}
+                    <Text style={styles.historyItemCategory}>
+                      {item.category}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#666" />
+                </TouchableOpacity>
+              ))
+            )}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -617,6 +734,60 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     textAlign: "center",
     marginBottom: 16,
+  },
+  headerControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  historyButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: "#f0f0f0",
+  },
+  historyContainer: {
+    flex: 1,
+    padding: 16,
+  },
+  emptyHistoryContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingTop: 100,
+  },
+  emptyHistoryText: {
+    fontSize: 16,
+    color: "#666",
+    marginTop: 16,
+    textAlign: "center",
+  },
+  historyItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    backgroundColor: "#f8f9fa",
+    borderRadius: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#eee",
+  },
+  historyItemContent: {
+    flex: 1,
+  },
+  historyItemName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 4,
+  },
+  historyItemBrand: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 2,
+  },
+  historyItemCategory: {
+    fontSize: 12,
+    color: "#999",
   },
   modeSelector: {
     flexDirection: "row",

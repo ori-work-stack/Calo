@@ -25,6 +25,7 @@ import { Meal } from "../../src/types";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { useRTLStyles } from "../../hooks/useRTLStyle";
+import { TooltipBubble } from "@/components/TooltipBubble";
 
 interface MealWithFeedback extends Meal {
   userRating?: number;
@@ -59,7 +60,7 @@ export default function HistoryScreen() {
   const [filters, setFilters] = useState<FilterOptions>({});
   const [smartInsight, setSmartInsight] = useState<string>("");
   const [updateText, setUpdateText] = useState("");
-
+  const [showSearchTooltip, setShowSearchTooltip] = useState(false);
   // Feedback ratings
   const [tasteRating, setTasteRating] = useState(0);
   const [satietyRating, setSatietyRating] = useState(0);
@@ -527,14 +528,25 @@ export default function HistoryScreen() {
     <View style={styles.container}>
       {/* Search and Filter Header */}
       <View style={styles.header}>
-        <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color="#666" />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search meals..."
-            value={searchText}
-            onChangeText={setSearchText}
-          />
+        <Ionicons name="search" size={20} color="#666" />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search meals..."
+          value={searchText}
+          onChangeText={setSearchText}
+        />
+
+        <View style={{ position: "relative", marginLeft: 8 }}>
+          <TouchableOpacity onPress={() => setShowSearchTooltip(true)}>
+            <Ionicons name="help-circle-outline" size={20} color="#888" />
+          </TouchableOpacity>
+          {showSearchTooltip && (
+            <TooltipBubble
+              text="Here you can search and filter meals you've logged, based on name or nutrition info."
+              onHide={() => setShowSearchTooltip(false)}
+              style={{ top: -60, left: -100 }}
+            />
+          )}
         </View>
         <TouchableOpacity
           style={styles.filterButton}
@@ -543,7 +555,6 @@ export default function HistoryScreen() {
           <Ionicons name="filter" size={20} color="#007AFF" />
         </TouchableOpacity>
       </View>
-
       {/* Smart Insight */}
       {smartInsight ? (
         <View style={styles.insightContainer}>

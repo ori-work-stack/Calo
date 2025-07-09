@@ -588,21 +588,20 @@ export const nutritionAPI = {
   getRangeStatistics: async (startDate: string, endDate: string) => {
     try {
       console.log("📊 Getting range statistics:", { startDate, endDate });
-      console.log("✅ Raw startDate:", startDate, "Raw endDate:", endDate);
-      console.log("✅ Type of startDate:", typeof startDate);
 
-      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-      if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
-        throw new Error(
-          `Invalid date format. Expected YYYY-MM-DD, got: ${startDate}, ${endDate}`
-        );
-      }
-      console.log("📊 startDate:", startDate, "endDate:", endDate);
+      // Ensure dates are in YYYY-MM-DD format
+      const formatDate = (dateStr: string) => {
+        const date = new Date(dateStr);
+        return date.toISOString().split("T")[0];
+      };
+
+      const formattedStartDate = formatDate(startDate);
+      const formattedEndDate = formatDate(endDate);
 
       const response = await api.get("/nutrition/stats/range", {
         params: {
-          startDate,
-          endDate,
+          start_date: formattedStartDate,
+          end_date: formattedEndDate,
         },
       });
 
@@ -610,9 +609,6 @@ export const nutritionAPI = {
       return response.data;
     } catch (error: any) {
       console.error("💥 Range statistics API error:", error);
-      if (error.response?.data?.error) {
-        throw new Error(error.response.data.error);
-      }
       throw error;
     }
   },
@@ -1080,10 +1076,10 @@ export const foodScannerAPI = {
   addToMealLog: async (
     productData: any,
     quantity: number,
-    mealTiming: string = "SNACK"
+    mealTiming: string
   ) => {
     try {
-      console.log("📝 Adding product to meal log...");
+      console.log("📝 Adding to meal log...");
 
       const response = await api.post("/food-scanner/add-to-meal", {
         productData,
@@ -1091,10 +1087,24 @@ export const foodScannerAPI = {
         mealTiming,
       });
 
-      console.log("✅ Add to meal response:", response.data);
+      console.log("✅ Added to meal log:", response.data);
       return response.data;
     } catch (error: any) {
       console.error("💥 Add to meal API error:", error);
+      throw error;
+    }
+  },
+
+  getScannedHistory: async () => {
+    try {
+      console.log("📋 Getting scanned history...");
+
+      const response = await api.get("/food-scanner/history");
+
+      console.log("✅ Scanned history:", response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error("💥 Get scanned history API error:", error);
       throw error;
     }
   },

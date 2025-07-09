@@ -33,7 +33,8 @@
     "devices": "Devices",
     "food_scanner": "Food Scanner",
     "ai_chat": "AI Chat",
-    "recommended_menus": "Recommended Menus"
+    "recommended_menus": "Recommended Menus",
+    "meal_plans": "Meal Plans"
   },
   "home": {
     "welcome": "Welcome",
@@ -98,7 +99,15 @@
     "confidence": "Confidence",
     "serving_size": "Serving Size",
     "add_details": "Add Details",
-    "update_analysis": "Update Analysis"
+    "update_analysis": "Update Analysis",
+    "barcode": "Barcode",
+    "image": "Image",
+    "scan_history": "Scan History",
+    "no_history": "No scan history",
+    "product_not_found": "Product Not Found",
+    "product_not_found_message": "We couldn't find this product in our database",
+    "scan_failed": "Scan Failed",
+    "scan_failed_message": "We couldn't identify the product in the image"
   },
   "profile": {
     "title": "Profile",
@@ -120,7 +129,7 @@
     "support": "Support",
     "about": "About",
     "signout": "Logout",
-    "editProfile": "Edit Profile",
+    "edit_profile": "Edit Profile",
     "signout_confirmation": "Are you sure you want to sign out?"
   },
   "statistics": {

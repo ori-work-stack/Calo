@@ -50,7 +50,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: t("home"),
+          title: t("tabs.home"),
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="house.fill" color={color} />
           ),
@@ -59,7 +59,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="meal-plans"
         options={{
-          title: t("mealPlans"),
+          title: t("tabs.meal_plans"),
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="house.fill" color={color} />
           ),
@@ -68,7 +68,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="meals"
         options={{
-          title: t("meals"),
+          title: t("tabs.meals"),
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="fork.knife" color={color} />
           ),
@@ -77,7 +77,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="camera"
         options={{
-          title: t("camera"),
+          title: t("tabs.camera"),
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="camera.fill" color={color} />
           ),
@@ -86,7 +86,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="statistics"
         options={{
-          title: t("statistics"),
+          title: t("tabs.statistics"),
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="chart.bar.fill" color={color} />
           ),
@@ -95,7 +95,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="calendar"
         options={{
-          title: t("calendar"),
+          title: t("tabs.calendar"),
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="calendar" color={color} />
           ),
@@ -104,7 +104,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="devices"
         options={{
-          title: t("devices"),
+          title: t("tabs.devices"),
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="watch.digital" color={color} />
           ),
@@ -113,7 +113,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="history"
         options={{
-          title: t("history"),
+          title: t("tabs.history"),
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="clock.fill" color={color} />
           ),
@@ -122,7 +122,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="recommended-menus"
         options={{
-          title: t("menus"),
+          title: t("tabs.recommended_menus"),
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="dining" color={color} />
           ),
@@ -131,7 +131,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="ai-chat"
         options={{
-          title: t("aiChat"),
+          title: t("tabs.ai_chat"),
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="message.fill" color={color} />
           ),
@@ -140,7 +140,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="food-scanner"
         options={{
-          title: t("foodScanner"),
+          title: t("tabs.food_scanner"),
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="barcode.viewfinder" color={color} />
           ),
@@ -149,7 +149,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: t("profile"),
+          title: t("tabs.profile"),
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="person.fill" color={color} />
           ),

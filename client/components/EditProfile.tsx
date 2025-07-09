@@ -54,7 +54,7 @@ export default function EditProfile({ onClose }: EditProfileProps) {
           <Ionicons name="close" size={24} color="#666" />
         </TouchableOpacity>
         <Text style={[styles.title, isRTL && styles.titleRTL]}>
-          {t("profile.editProfile")}
+          {t("profile.edit_profile")}
         </Text>
         <TouchableOpacity onPress={handleSave}>
           <Text style={styles.saveButton}>{t("common.save")}</Text>

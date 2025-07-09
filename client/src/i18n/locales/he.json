@@ -33,7 +33,8 @@
     "devices": "מכשירים",
     "food_scanner": "סורק מזון",
     "ai_chat": "צ'אט AI",
-    "recommended_menus": "תפריטים מומלצים"
+    "recommended_menus": "תפריטים מומלצים",
+    "meal_plans": "תוכניות ארוחות"
   },
   "home": {
     "welcome": "ברוכים הבאים",
@@ -87,6 +88,11 @@
   "food_scanner": {
     "title": "סורק מזון",
     "scan_food": "סריקת מזון",
+    "photo_food": "צלם את המזון",
+    "start_scan": "התחל סריקה",
+    "take_photo":"צילום תמונה",
+    "barcode_instructions": "כוון את המצלמה לברקוד של המוצר",
+    "image_instructions": "צלם את התווית התזונתית של המוצר",
     "upload_image": "העלאת תמונה",
     "take_picture": "צילום תמונה",
     "analyzing_image": "מנתח תמונה...",
@@ -98,7 +104,15 @@
     "confidence": "רמת ביטחון",
     "serving_size": "גודל מנה",
     "add_details": "הוספת פרטים",
-    "update_analysis": "עדכון ניתוח"
+    "update_analysis": "עדכון ניתוח",
+    "barcode": "ברקוד",
+    "image": "תמונה",
+    "scan_history": "היסטוריית סריקות",
+    "no_history": "אין היסטוריית סריקות",
+    "product_not_found": "מוצר לא נמצא",
+    "product_not_found_message": "לא הצלחנו למצוא את המוצר במסד הנתונים שלנו",
+    "scan_failed": "סריקה נכשלה",
+    "scan_failed_message": "לא הצלחנו לזהות את המוצר בתמונה"
   },
   "profile": {
     "title": "פרופיל",
@@ -120,7 +134,8 @@
     "privacy": "פרטיות",
     "about": "לגבינו",
     "signout": "התנתקות",
-    "editProfile": "עריכת פרופיל"
+    "edit_profile": "עריכת פרופיל",
+    "signout_confirmation":"בטוח שברצונך להתנתק מהחשבון ?"
   },
   "statistics": {
     "title": "סטטיסטיקות",

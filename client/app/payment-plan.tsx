@@ -96,14 +96,14 @@ export default function PaymentPlan() {
       if (planId === "FREE") {
         // Reset state BEFORE navigation for FREE plan
         setIsLoading(false);
-        router.replace("/(tabs)");
         setSelectedPlan(null);
+        router.push("/(tabs)");
         return; // Exit early to avoid finally block
       } else {
         // Reset state BEFORE navigation for premium plans too
         setIsLoading(false);
         setSelectedPlan(null);
-        router.replace("/questionnaire");
+        router.push("/questionnaire");
         return; // Exit early to avoid finally block
       }
     } catch (error: any) {

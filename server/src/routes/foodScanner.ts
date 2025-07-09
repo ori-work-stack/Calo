@@ -28,23 +28,31 @@ router.post("/barcode", async (req, res) => {
 
     const result = await FoodScannerService.scanBarcode(barcode, userId);
 
-    // Save scanned product to database
-    await prisma.foodProduct.create({
-      data: {
-        health_score: Number(result.user_analysis.health_assessment),
-        image_url: result.product.image_url,
-        user_id: userId,
-        barcode: result.product.barcode || "",
-        product_name: result.product.name,
-        brand: result.product.brand || "",
-        ingredients: result.product.ingredients,
-        category: result.product.category || "Uncategorized",
-        nutrition_per_100g: result.product.nutrition_per_100g || {},
-        allergens: result.product.allergens || [],
-        labels: result.product.labels || [],
-        created_at: new Date(),
-      },
+    const existing = await prisma.foodProduct.findUnique({
+      where: { barcode: result.product.barcode },
     });
+
+    if (!existing) {
+      // Save scanned product to database
+      await prisma.foodProduct.create({
+        data: {
+          health_score: Number(result.user_analysis.health_assessment),
+          image_url: result.product.image_url,
+          user_id: userId,
+          barcode: result.product.barcode || "",
+          product_name: result.product.name,
+          brand: result.product.brand || "",
+          ingredients: result.product.ingredients,
+          category: result.product.category || "Uncategorized",
+          nutrition_per_100g: result.product.nutrition_per_100g || {},
+          allergens: result.product.allergens || [],
+          labels: result.product.labels || [],
+          created_at: new Date(),
+        },
+      });
+    } else {
+      console.log("ℹ️ Product already exists, skipping insert");
+    }
 
     res.json({
       success: true,
@@ -110,6 +118,41 @@ router.post("/image", async (req, res) => {
     res.status(500).json({
       success: false,
       error: "Failed to scan product image",
+    });
+  }
+});
+
+// Get scanned products history
+router.get("/history", async (req, res) => {
+  try {
+    const userId = req.user?.user_id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: "User not authenticated or user ID missing.",
+      });
+    }
+
+    const scannedProducts = await prisma.foodProduct.findMany({
+      where: {
+        user_id: userId,
+      },
+      orderBy: {
+        created_at: "desc",
+      },
+      take: 50, // Limit to last 50 scanned products
+    });
+
+    res.json({
+      success: true,
+      data: scannedProducts,
+    });
+  } catch (error) {
+    console.error("Get history API error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to get scanned products history",
     });
   }
 });
