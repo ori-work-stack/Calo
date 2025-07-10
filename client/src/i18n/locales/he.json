@@ -20,7 +20,8 @@
     "ok": "אישור",
     "retry": "ניסיון נוסף",
     "refresh": "רענון",
-    "view_all": "צפייה בהכל"
+    "view_all": "צפייה בהכל",
+    "done": "לסגירה"
   },
   "tabs": {
     "home": "בית",
@@ -90,7 +91,7 @@
     "scan_food": "סריקת מזון",
     "photo_food": "צלם את המזון",
     "start_scan": "התחל סריקה",
-    "take_photo":"צילום תמונה",
+    "take_photo": "צילום תמונה",
     "barcode_instructions": "כוון את המצלמה לברקוד של המוצר",
     "image_instructions": "צלם את התווית התזונתית של המוצר",
     "upload_image": "העלאת תמונה",
@@ -135,7 +136,8 @@
     "about": "לגבינו",
     "signout": "התנתקות",
     "edit_profile": "עריכת פרופיל",
-    "signout_confirmation":"בטוח שברצונך להתנתק מהחשבון ?"
+    "signout_confirmation": "בטוח שברצונך להתנתק מהחשבון ?",
+    "save_success": "שמירה בוצעה בהצלחה"
   },
   "statistics": {
     "title": "סטטיסטיקות",
@@ -217,7 +219,8 @@
     "welcome": "ברוכים הבאים",
     "welcome_back": "ברוכים השבים",
     "email_validation_error": "נא להזין כתובת אימייל תקינה",
-    "language_preference": "שפה מועדפת"
+    "language_preference": "שפה מועדפת",
+    "birth_date": "תאריך לידה"
   },
   "questionnaire": {
     "title": "שאלון בריאות",

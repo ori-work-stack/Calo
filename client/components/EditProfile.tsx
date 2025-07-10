@@ -8,12 +8,15 @@ import {
   ScrollView,
   Alert,
   Image,
+  Platform,
 } from "react-native";
 import { useTranslation } from "react-i18next";
 import { useLanguage } from "@/src/i18n/context/LanguageContext";
 import { useSelector } from "react-redux";
 import { RootState } from "@/src/store";
 import { Ionicons } from "@expo/vector-icons";
+import { userAPI } from "@/src/services/api";
+import DateTimePicker from "@react-native-community/datetimepicker";
 
 interface EditProfileProps {
   onClose: () => void;
@@ -23,15 +26,30 @@ export default function EditProfile({ onClose }: EditProfileProps) {
   const { t } = useTranslation();
   const { isRTL } = useLanguage();
   const { user } = useSelector((state: RootState) => state.auth);
-
   const [profile, setProfile] = useState({
     name: user?.name || "",
     email: user?.email || "",
+    birth_date: user?.birth_date || "",
   });
+  const [date, setDate] = useState(
+    profile.birth_date ? new Date(profile.birth_date) : new Date()
+  );
+  const [showPicker, setShowPicker] = useState(false);
+
+  const onChangeDate = (event: any, selectedDate?: Date) => {
+    setShowPicker(Platform.OS === "ios"); // for iOS keep picker open
+    if (selectedDate) {
+      setDate(selectedDate);
+      setProfile({
+        ...profile,
+        birth_date: selectedDate.toISOString().split("T")[0],
+      }); // yyyy-mm-dd format
+    }
+  };
 
   const handleSave = () => {
-    // TODO: Implement API call to update profile
-    Alert.alert(t("common.save"), t("profile.saveSuccess"), [
+    userAPI.updateProfile(profile);
+    Alert.alert(t("common.save"), t("profile.save_success"), [
       { text: t("common.done"), onPress: onClose },
     ]);
   };
@@ -103,11 +121,27 @@ export default function EditProfile({ onClose }: EditProfileProps) {
               keyboardType="email-address"
             />
           </View>
-
           <View style={styles.inputGroup}>
             <Text style={[styles.label, isRTL && styles.labelRTL]}>
-              {t("profile.phone")}
+              {t("auth.birth_date")}
             </Text>
+
+            <TouchableOpacity
+              style={[styles.input, { justifyContent: "center" }]}
+              onPress={() => setShowPicker(true)}
+            >
+              <Text>{date.toISOString().split("T")[0]}</Text>
+            </TouchableOpacity>
+
+            {showPicker && (
+              <DateTimePicker
+                value={date}
+                mode="date"
+                display="default"
+                onChange={onChangeDate}
+                maximumDate={new Date()}
+              />
+            )}
           </View>
         </View>
       </View>

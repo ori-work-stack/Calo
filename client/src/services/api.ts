@@ -587,7 +587,10 @@ export const nutritionAPI = {
 
   getRangeStatistics: async (startDate: string, endDate: string) => {
     try {
-      console.log("📊 Getting range statistics:", { startDate, endDate });
+      console.log("📊 Getting range statistics:", {
+        start: startDate,
+        end: endDate,
+      });
 
       // Ensure dates are in YYYY-MM-DD format
       const formatDate = (dateStr: string) => {
@@ -616,21 +619,37 @@ export const nutritionAPI = {
         formattedEndDate,
       });
 
-      const response = await api.get("/nutrition/stats/range", {
-        params: {
-          startDate: formattedStartDate,
-          endDate: formattedEndDate,
-        },
+      // 🔧 EXPLICIT URL BUILDING - Build the URL manually to be 100% sure
+      const baseUrl = "/nutrition/stats/range";
+      const queryParams = new URLSearchParams({
+        startDate: formattedStartDate,
+        endDate: formattedEndDate,
       });
+      const fullUrl = `${baseUrl}?${queryParams.toString()}`;
+
+      console.log("🔍 Full URL being called:", fullUrl);
+      console.log("🔍 Query params object:", Object.fromEntries(queryParams));
+
+      // Make the request with the explicit URL
+      const response = await api.get(fullUrl);
 
       console.log("✅ Range statistics response:", response.data);
       return response.data;
     } catch (error: any) {
       console.error("💥 Range statistics API error:", error);
+
+      // Enhanced error logging
+      if (error.response) {
+        console.error("🔍 Error response data:", error.response.data);
+        console.error("🔍 Error response status:", error.response.status);
+        console.error("🔍 Error response headers:", error.response.headers);
+        console.error("🔍 Request URL:", error.config?.url);
+        console.error("🔍 Request params:", error.config?.params);
+      }
+
       throw error;
     }
   },
-
   // NEW API METHODS FOR HISTORY FEATURES
   saveMealFeedback: async (
     mealId: string,

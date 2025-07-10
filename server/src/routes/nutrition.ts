@@ -169,50 +169,34 @@ router.get("/meals", async (req: AuthRequest, res) => {
 });
 
 // Get daily stats
-router.get("/stats/:date", async (req: AuthRequest, res) => {
-  try {
-    const { date } = req.params;
-
-    if (!date.match(/^\d{4}-\d{2}-\d{2}$/)) {
-      return res.status(400).json({
-        success: false,
-        error: "Date must be in YYYY-MM-DD format",
-      });
-    }
-
-    console.log("Get stats request for user:", req.user.user_id, "date:", date);
-
-    const stats = await NutritionService.getDailyStats(req.user.user_id, date);
-
-    res.json({
-      success: true,
-      data: stats,
-    });
-  } catch (error) {
-    console.error("Get stats error:", error);
-    const message =
-      error instanceof Error ? error.message : "Failed to fetch stats";
-    res.status(500).json({
-      success: false,
-      error: message,
-    });
-  }
-});
-// Add this endpoint to your existing nutrition routes file
-
 // Get range statistics
 router.get("/stats/range", async (req: AuthRequest, res) => {
   try {
-    const { startDate, endDate } = req.query;
+    // 🔍 ENHANCED DEBUGGING - Log everything we receive
+    console.log("📊 === RANGE STATS DEBUG START ===");
+    console.log(
+      "📊 Full req.query object:",
+      JSON.stringify(req.query, null, 2)
+    );
+    console.log("📊 req.query keys:", Object.keys(req.query));
+    console.log("📊 req.query values:", Object.values(req.query));
 
-    console.log("📊 Getting range statistics - Raw query params:", req.query);
-    console.log("📊 Getting range statistics - Parsed params:", {
-      startDate,
-      endDate,
-    });
+    // Log each possible parameter variation
+    console.log("📊 req.query.startDate:", req.query.startDate);
+    console.log("📊 req.query.endDate:", req.query.endDate);
+    console.log("📊 req.query.start:", req.query.start);
+    console.log("📊 req.query.end:", req.query.end);
+    console.log("📊 === RANGE STATS DEBUG END ===");
+
+    // Try both parameter name variations
+    const startDate = req.query.startDate || req.query.start;
+    const endDate = req.query.endDate || req.query.end;
+
+    console.log("📊 Extracted parameters:", { startDate, endDate });
 
     // Validate required parameters
     if (!startDate || !endDate) {
+      console.error("❌ Missing parameters:", { startDate, endDate });
       return res.status(400).json({
         success: false,
         error: "Both startDate and endDate are required",
@@ -231,7 +215,7 @@ router.get("/stats/range", async (req: AuthRequest, res) => {
       console.error("❌ Invalid startDate format:", startDateStr);
       return res.status(400).json({
         success: false,
-        error: "Date must be in YYYY-MM-DD format",
+        error: `Date must be in YYYY-MM-DD format. Received startDate: '${startDateStr}'`,
       });
     }
 
@@ -239,7 +223,7 @@ router.get("/stats/range", async (req: AuthRequest, res) => {
       console.error("❌ Invalid endDate format:", endDateStr);
       return res.status(400).json({
         success: false,
-        error: "Date must be in YYYY-MM-DD format",
+        error: `Date must be in YYYY-MM-DD format. Received endDate: '${endDateStr}'`,
       });
     }
 
