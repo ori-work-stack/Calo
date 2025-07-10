@@ -57,20 +57,20 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="history"
+        options={{
+          title: t("tabs.history"),
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="clock.fill" color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="meal-plans"
         options={{
           title: t("tabs.meal_plans"),
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="house.fill" color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="meals"
-        options={{
-          title: t("tabs.meals"),
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="fork.knife" color={color} />
           ),
         }}
       />
@@ -107,15 +107,6 @@ export default function TabLayout() {
           title: t("tabs.devices"),
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="watch.digital" color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="history"
-        options={{
-          title: t("tabs.history"),
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="clock.fill" color={color} />
           ),
         }}
       />

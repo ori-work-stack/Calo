@@ -1,138 +1,144 @@
-// components/TooltipBubble.tsx
-import React, { useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
-  Animated,
-  Text,
-  StyleSheet,
   View,
-  I18nManager,
-  ViewStyle,
-  useWindowDimensions,
+  Text,
+  TouchableOpacity,
+  Animated,
+  StyleSheet,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 interface TooltipBubbleProps {
-  text?: string;
-  onHide: () => void;
-  duration?: number;
-  style?: ViewStyle;
-  currentRoute?: string;
+  message: string;
+  pageKey: string;
+  position?: "top" | "bottom" | "center";
+  persistent?: boolean;
+  showDelay?: number;
 }
 
-const getTooltipText = (route: string): string => {
-  switch (route) {
-    case "/(tabs)/index":
-      return "Welcome! This is your dashboard where you can see your daily nutrition overview and quick stats.";
-    case "/(tabs)/meals":
-      return "View and manage all your logged meals. Tap on any meal to see detailed nutrition information.";
-    case "/(tabs)/camera":
-      return "Take photos of your food to automatically analyze nutrition content using AI.";
-    case "/(tabs)/statistics":
-      return "Track your nutrition progress with detailed charts and statistics over time.";
-    case "/(tabs)/calendar":
-      return "View your meal history by date and plan your future meals.";
-    case "/(tabs)/history":
-      return "Browse your complete meal history, rate meals, and save favorites.";
-    case "/(tabs)/food-scanner":
-      return "Scan barcodes or search for packaged foods to get instant nutrition information.";
-    case "/(tabs)/ai-chat":
-      return "Chat with our AI nutritionist for personalized advice and answers to your questions.";
-    case "/(tabs)/profile":
-      return "Manage your account settings, preferences, and view your nutrition goals.";
-    case "/(tabs)/devices":
-      return "Connect fitness trackers and health devices to sync your activity data.";
-    default:
-      return "Swipe left or right to navigate between tabs, or use the tab bar below.";
-  }
-};
-
 export const TooltipBubble: React.FC<TooltipBubbleProps> = ({
-  text,
-  onHide,
-  duration = 5000,
-  style = {},
-  currentRoute = "",
+  message,
+  pageKey,
+  position = "top",
+  persistent = false,
+  showDelay = 1000,
 }) => {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const { width } = useWindowDimensions();
-
-  const displayText = text || getTooltipText(currentRoute);
+  const [isVisible, setIsVisible] = useState(false);
+  const [isDismissed, setIsDismissed] = useState(false);
+  const fadeAnim = new Animated.Value(0);
 
   useEffect(() => {
+    const checkDismissalStatus = async () => {
+      if (!persistent) {
+        try {
+          const dismissed = await AsyncStorage.getItem(
+            `tooltip_dismissed_${pageKey}`
+          );
+          if (dismissed === "true") {
+            setIsDismissed(true);
+            return;
+          }
+        } catch (error) {
+          console.log("Error checking tooltip dismissal:", error);
+        }
+      }
+
+      // Show tooltip after delay
+      const timer = setTimeout(() => {
+        setIsVisible(true);
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+      }, showDelay);
+
+      return () => clearTimeout(timer);
+    };
+
+    checkDismissalStatus();
+  }, [pageKey, persistent, showDelay]);
+
+  const handleDismiss = async () => {
     Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 200,
+      toValue: 0,
+      duration: 300,
       useNativeDriver: true,
-    }).start();
+    }).start(() => {
+      setIsVisible(false);
+    });
 
-    const timer = setTimeout(() => {
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start(() => onHide());
-    }, duration);
+    if (!persistent) {
+      try {
+        await AsyncStorage.setItem(`tooltip_dismissed_${pageKey}`, "true");
+      } catch (error) {
+        console.log("Error saving tooltip dismissal:", error);
+      }
+    }
+  };
 
-    return () => clearTimeout(timer);
-  }, []);
+  if (!isVisible || isDismissed) {
+    return null;
+  }
+
+  const getPositionStyle = () => {
+    switch (position) {
+      case "top":
+        return { top: 50 };
+      case "bottom":
+        return { bottom: 50 };
+      case "center":
+        return { top: "50%", marginTop: -25 };
+      default:
+        return { top: 50 };
+    }
+  };
 
   return (
     <Animated.View
-      style={[
-        styles.bubble,
-        style,
-        {
-          opacity: fadeAnim,
-          alignSelf: I18nManager.isRTL ? "flex-end" : "flex-start",
-          maxWidth: width * 0.9,
-        },
-      ]}
+      style={[styles.container, getPositionStyle(), { opacity: fadeAnim }]}
     >
-      <Text style={styles.text}>{displayText}</Text>
-      <View
-        style={[
-          styles.arrow,
-          I18nManager.isRTL ? styles.arrowRTL : styles.arrowLTR,
-        ]}
-      />
+      <View style={styles.tooltip}>
+        <Text style={styles.text}>{message}</Text>
+        <TouchableOpacity onPress={handleDismiss} style={styles.closeButton}>
+          <Text style={styles.closeText}>×</Text>
+        </TouchableOpacity>
+      </View>
     </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
-  bubble: {
-    backgroundColor: "#222",
-    padding: 12,
-    borderRadius: 10,
+  container: {
     position: "absolute",
-    top: -70,
+    left: 20,
+    right: 20,
+    zIndex: 1000,
+  },
+  tooltip: {
+    backgroundColor: "#333",
+    padding: 12,
+    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
-    elevation: 6,
+    elevation: 5,
   },
   text: {
     color: "#fff",
     fontSize: 14,
-    lineHeight: 20,
-    textAlign: I18nManager.isRTL ? "right" : "left",
+    flex: 1,
   },
-  arrow: {
-    position: "absolute",
-    bottom: -10,
-    width: 0,
-    height: 0,
-    borderLeftWidth: 10,
-    borderRightWidth: 10,
-    borderTopWidth: 10,
-    borderLeftColor: "transparent",
-    borderRightColor: "transparent",
-    borderTopColor: "#222",
+  closeButton: {
+    marginLeft: 10,
+    padding: 5,
   },
-  arrowLTR: {
-    left: 16,
-  },
-  arrowRTL: {
-    right: 16,
+  closeText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
   },
 });

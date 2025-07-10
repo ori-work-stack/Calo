@@ -80,7 +80,7 @@ router.post("/", authenticateToken, async (req: AuthRequest, res) => {
     );
     questionnaireData.age = sanitizeInt(questionnaireData.age);
 
-    // Sanitize array fields
+    // Sanitize array fields - ensure all array fields are properly handled
     questionnaireData.sport_types = sanitizeArray(
       questionnaireData.sport_types
     );
@@ -93,6 +93,66 @@ router.post("/", authenticateToken, async (req: AuthRequest, res) => {
     );
     questionnaireData.regular_drinks = sanitizeArray(
       questionnaireData.regular_drinks
+    );
+
+    // Additional array fields from schema
+    questionnaireData.additional_personal_info = sanitizeArray(
+      questionnaireData.additional_personal_info
+    );
+    questionnaireData.main_goal_text = sanitizeArray(
+      questionnaireData.main_goal_text
+    );
+    questionnaireData.specific_goal = sanitizeArray(
+      questionnaireData.specific_goal
+    );
+    questionnaireData.most_important_outcome = sanitizeArray(
+      questionnaireData.most_important_outcome
+    );
+    questionnaireData.special_personal_goal = sanitizeArray(
+      questionnaireData.special_personal_goal
+    );
+    questionnaireData.workout_times = sanitizeArray(
+      questionnaireData.workout_times
+    );
+    questionnaireData.fitness_device_type = sanitizeArray(
+      questionnaireData.fitness_device_type
+    );
+    questionnaireData.additional_activity_info = sanitizeArray(
+      questionnaireData.additional_activity_info
+    );
+    questionnaireData.medical_conditions_text = sanitizeArray(
+      questionnaireData.medical_conditions_text
+    );
+    questionnaireData.medications = sanitizeArray(
+      questionnaireData.medications
+    );
+    questionnaireData.health_goals = sanitizeArray(
+      questionnaireData.health_goals
+    );
+    questionnaireData.functional_issues = sanitizeArray(
+      questionnaireData.functional_issues
+    );
+    questionnaireData.food_related_medical_issues = sanitizeArray(
+      questionnaireData.food_related_medical_issues
+    );
+    questionnaireData.meal_times = sanitizeArray(questionnaireData.meal_times);
+    questionnaireData.shopping_method = sanitizeArray(
+      questionnaireData.shopping_method
+    );
+    questionnaireData.allergies_text = sanitizeArray(
+      questionnaireData.allergies_text
+    );
+    questionnaireData.meal_texture_preference = sanitizeArray(
+      questionnaireData.meal_texture_preference
+    );
+    questionnaireData.disliked_foods = sanitizeArray(
+      questionnaireData.disliked_foods
+    );
+    questionnaireData.liked_foods = sanitizeArray(
+      questionnaireData.liked_foods
+    );
+    questionnaireData.past_diet_difficulties = sanitizeArray(
+      questionnaireData.past_diet_difficulties
     );
 
     // Sanitize boolean fields
@@ -191,7 +251,9 @@ router.post("/", authenticateToken, async (req: AuthRequest, res) => {
           // Means and conditions
           meals_per_day: questionnaireData.meals_per_day,
           snacks_between_meals: questionnaireData.snacks_between_meals,
-          meal_times: questionnaireData.meal_times,
+          meal_times: Array.isArray(questionnaireData.meal_times)
+            ? questionnaireData.meal_times.join(", ")
+            : questionnaireData.meal_times,
           cooking_preference: questionnaireData.cooking_preference,
           available_cooking_methods:
             questionnaireData.available_cooking_methods,
@@ -264,7 +326,9 @@ router.post("/", authenticateToken, async (req: AuthRequest, res) => {
           // Means and conditions
           meals_per_day: questionnaireData.meals_per_day,
           snacks_between_meals: questionnaireData.snacks_between_meals,
-          meal_times: questionnaireData.meal_times,
+          meal_times: Array.isArray(questionnaireData.meal_times)
+            ? questionnaireData.meal_times.join(", ")
+            : questionnaireData.meal_times,
           cooking_preference: questionnaireData.cooking_preference,
           available_cooking_methods:
             questionnaireData.available_cooking_methods,
