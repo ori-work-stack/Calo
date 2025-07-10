@@ -12,6 +12,7 @@ import { useRouter } from "expo-router";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "@/src/store";
 import { userAPI } from "@/src/services/api";
+import { Ionicons } from "@expo/vector-icons";
 
 type PlanType = "FREE" | "PREMIUM" | "GOLD";
 
@@ -114,6 +115,11 @@ export default function PaymentPlan() {
     }
     // Remove the finally block entirely since we handle state reset above
   };
+
+  const handleGoBack = () => {
+    router.push("/signup");
+  };
+  
   const renderPlan = (plan: Plan) => (
     <View
       key={plan.id}
@@ -163,6 +169,11 @@ export default function PaymentPlan() {
       contentContainerStyle={styles.contentContainer}
       keyboardShouldPersistTaps="handled"
     >
+      <View>
+        <TouchableOpacity onPress={handleGoBack}>
+          <Ionicons name="arrow-back" size={24} color="#007AFF" />
+        </TouchableOpacity>
+      </View>
       <View style={styles.header}>
         <Text style={styles.title}>בחר את התוכנית שלך</Text>
         <Text style={styles.subtitle}>

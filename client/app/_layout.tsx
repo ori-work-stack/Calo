@@ -66,11 +66,6 @@ function AppContent() {
       return;
     }
 
-    if (user.subscription_type === "FREE" && !onPaymentPlan) {
-      router.replace("/payment-plan");
-      return;
-    }
-
     if (
       user.subscription_type &&
       ["PREMIUM", "GOLD"].includes(user.subscription_type) &&
