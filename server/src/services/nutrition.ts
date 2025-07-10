@@ -319,11 +319,9 @@ export class NutritionService {
       console.log("📊 Getting range statistics for user:", userId);
       console.log("📅 Date range:", { startDate, endDate });
 
-      // Convert date strings to DateTime objects for proper comparison
       const startDateTime = new Date(startDate + "T00:00:00.000Z");
       const endDateTime = new Date(endDate + "T23:59:59.999Z");
 
-      // Query meals within the date range using created_at
       const meals = await prisma.meal.findMany({
         where: {
           user_id: userId,
@@ -341,84 +339,157 @@ export class NutritionService {
         return {
           totalDays: 0,
           totalMeals: 0,
-          averageCalories: 0,
-          totalCalories: 0,
-          averageProtein: 0,
-          averageCarbs: 0,
-          averageFats: 0,
           dailyBreakdown: [],
+          ...Object.fromEntries(
+            [
+              "calories",
+              "protein_g",
+              "carbs_g",
+              "fats_g",
+              "saturated_fats_g",
+              "polyunsaturated_fats_g",
+              "monounsaturated_fats_g",
+              "omega_3_g",
+              "omega_6_g",
+              "fiber_g",
+              "soluble_fiber_g",
+              "insoluble_fiber_g",
+              "sugar_g",
+              "cholesterol_mg",
+              "sodium_mg",
+              "alcohol_g",
+              "caffeine_mg",
+              "liquids_ml",
+              "serving_size_g",
+              "glycemic_index",
+              "insulin_index",
+              "confidence",
+            ].flatMap((field) => [
+              [`total_${field}`, 0],
+              [`average_${field}`, 0],
+            ])
+          ),
         };
       }
 
-      // Calculate total statistics
       const totalMeals = meals.length;
-      const totalCalories = meals.reduce(
-        (sum, meal) => sum + (meal.calories || 0),
-        0
+
+      const numericFields = [
+        "calories",
+        "protein_g",
+        "carbs_g",
+        "fats_g",
+        "saturated_fats_g",
+        "polyunsaturated_fats_g",
+        "monounsaturated_fats_g",
+        "omega_3_g",
+        "omega_6_g",
+        "fiber_g",
+        "soluble_fiber_g",
+        "insoluble_fiber_g",
+        "sugar_g",
+        "cholesterol_mg",
+        "sodium_mg",
+        "alcohol_g",
+        "caffeine_mg",
+        "liquids_ml",
+        "serving_size_g",
+        "glycemic_index",
+        "insulin_index",
+        "confidence",
+      ];
+
+      const totals: Record<string, number> = {};
+      for (const field of numericFields) totals[field] = 0;
+
+      for (const meal of meals) {
+        for (const field of numericFields) {
+          totals[field] += (meal[field as keyof typeof meal] as number) || 0;
+        }
+      }
+
+      const uniqueDates = new Set(
+        meals.map((meal) => meal.created_at.toISOString().split("T")[0])
       );
-      const totalProtein = meals.reduce(
-        (sum, meal) => sum + (meal.protein_g || 0),
-        0
-      );
-      const totalCarbs = meals.reduce(
-        (sum, meal) => sum + (meal.carbs_g || 0),
-        0
-      );
-      const totalFats = meals.reduce(
-        (sum, meal) => sum + (meal.fats_g || 0),
-        0
+      const totalDays = uniqueDates.size;
+
+      const averages = Object.fromEntries(
+        Object.entries(totals).map(([key, val]) => [
+          `average_${key}`,
+          totalDays > 0 ? val / totalDays : 0,
+        ])
       );
 
-      // Group meals by date for daily breakdown (using created_at)
+      // Group meals by day
       const dailyData = meals.reduce((acc, meal) => {
-        const date = meal.created_at.toISOString().split("T")[0]; // Extract YYYY-MM-DD
+        const date = meal.created_at.toISOString().split("T")[0];
         if (!acc[date]) {
           acc[date] = {
             date,
             meals: [],
-            totalCalories: 0,
-            totalProtein: 0,
-            totalCarbs: 0,
-            totalFats: 0,
-            mealCount: 0,
           };
         }
 
         acc[date].meals.push({
           meal_id: meal.meal_id,
+          user_id: meal.user_id,
+          image_url: meal.image_url,
+          upload_time: meal.upload_time,
+          analysis_status: meal.analysis_status,
           meal_name: meal.meal_name,
           calories: meal.calories,
           protein_g: meal.protein_g,
           carbs_g: meal.carbs_g,
           fats_g: meal.fats_g,
+          saturated_fats_g: meal.saturated_fats_g,
+          polyunsaturated_fats_g: meal.polyunsaturated_fats_g,
+          monounsaturated_fats_g: meal.monounsaturated_fats_g,
+          omega_3_g: meal.omega_3_g,
+          omega_6_g: meal.omega_6_g,
+          fiber_g: meal.fiber_g,
+          soluble_fiber_g: meal.soluble_fiber_g,
+          insoluble_fiber_g: meal.insoluble_fiber_g,
+          sugar_g: meal.sugar_g,
+          cholesterol_mg: meal.cholesterol_mg,
+          sodium_mg: meal.sodium_mg,
+          alcohol_g: meal.alcohol_g,
+          caffeine_mg: meal.caffeine_mg,
+          liquids_ml: meal.liquids_ml,
+          serving_size_g: meal.serving_size_g,
+          glycemic_index: meal.glycemic_index,
+          insulin_index: meal.insulin_index,
+          food_category: meal.food_category,
+          processing_level: meal.processing_level,
+          confidence: meal.confidence,
+          cooking_method: meal.cooking_method,
+          allergens_json: meal.allergens_json,
+          vitamins_json: meal.vitamins_json,
+          micronutrients_json: meal.micronutrients_json,
+          additives_json: meal.additives_json,
+          health_risk_notes: meal.health_risk_notes,
+          ingredients: meal.ingredients,
           created_at: meal.created_at,
+          updated_at: meal.updated_at,
         });
-        acc[date].totalCalories += meal.calories || 0;
-        acc[date].totalProtein += meal.protein_g || 0;
-        acc[date].totalCarbs += meal.carbs_g || 0;
-        acc[date].totalFats += meal.fats_g || 0;
-        acc[date].mealCount += 1;
 
         return acc;
       }, {} as Record<string, any>);
 
       const dailyBreakdown = Object.values(dailyData);
-      const totalDays = dailyBreakdown.length;
-
-      // Calculate averages per day
-      const averageCalories = totalDays > 0 ? totalCalories / totalDays : 0;
-      const averageProtein = totalDays > 0 ? totalProtein / totalDays : 0;
-      const averageCarbs = totalDays > 0 ? totalCarbs / totalDays : 0;
-      const averageFats = totalDays > 0 ? totalFats / totalDays : 0;
 
       const statistics = {
         totalDays,
         totalMeals,
-        totalCalories: Math.round(totalCalories * 100) / 100,
-        averageCalories: Math.round(averageCalories * 100) / 100,
-        averageProtein: Math.round(averageProtein * 100) / 100,
-        averageCarbs: Math.round(averageCarbs * 100) / 100,
-        averageFats: Math.round(averageFats * 100) / 100,
+        ...Object.fromEntries(
+          Object.entries(totals).map(([key, val]) => [
+            `total_${key}`,
+            Math.round(val * 100) / 100,
+          ])
+        ),
+        ...Object.entries(averages).reduce((acc, [key, val]) => {
+          acc[key] = Math.round(val * 100) / 100;
+          return acc;
+        }, {} as Record<string, number>),
         dailyBreakdown: dailyBreakdown.sort((a, b) =>
           a.date.localeCompare(b.date)
         ),

@@ -20,17 +20,62 @@ import { nutritionAPI } from "@/src/services/api";
 const { width } = Dimensions.get("window");
 
 interface StatisticsData {
-  calories: number;
-  protein: number;
-  carbs: number;
-  fat: number;
-  fiber: number;
-  sugar: number;
-  water_ml: number;
-  alcohol_g: number;
-  caffeine_mg: number;
-  meal_count: number;
-  health_deviation_rate: number;
+  averageAlcoholG: number;
+  averageCaffeineMg: number;
+  averageCalories: number;
+  averageCarbsG: number;
+  averageCholesterolMg: number;
+  averageConfidence: number;
+  averageFatsG: number;
+  averageFiberG: number;
+  averageGlycemicIndex: number;
+  averageInsolubleFiberG: number;
+  averageInsulinIndex: number;
+  averageLiquidsMl: number;
+  averageMonounsaturatedFatsG: number;
+  averageOmega3G: number;
+  averageOmega6G: number;
+  averagePolyunsaturatedFatsG: number;
+  averageProteinG: number;
+  averageSaturatedFatsG: number;
+  averageServingSizeG: number;
+  averageSodiumMg: number;
+  averageSolubleFiberG: number;
+  averageSugarG: number;
+
+  totalAlcoholG: number;
+  totalCaffeineMg: number;
+  totalCalories: number;
+  totalCarbsG: number;
+  totalCholesterolMg: number;
+  totalConfidence: number;
+  totalFatsG: number;
+  totalFiberG: number;
+  totalGlycemicIndex: number;
+  totalInsolubleFiberG: number;
+  totalInsulinIndex: number;
+  totalLiquidsMl: number;
+  totalMonounsaturatedFatsG: number;
+  totalOmega3G: number;
+  totalOmega6G: number;
+  totalPolyunsaturatedFatsG: number;
+  totalProteinG: number;
+  totalSaturatedFatsG: number;
+  totalServingSizeG: number;
+  totalSodiumMg: number;
+  totalSolubleFiberG: number;
+  totalSugarG: number;
+
+  totalDays: number;
+  totalMeals: number;
+
+  dateRange: {
+    startDate: string;
+    endDate: string;
+  };
+
+  // You can add dailyBreakdown here too, depending on your data structure
+  dailyBreakdown?: any[]; // Or type it properly if known
 }
 
 interface DateRange {
@@ -281,7 +326,67 @@ export default function StatisticsScreen() {
       console.log("📊 API Response:", response);
 
       if (response?.success && response?.data) {
-        setStatisticsData(response.data);
+        const d = response.data;
+
+        // Map snake_case to camelCase
+        setStatisticsData({
+          averageAlcoholG: d.average_alcohol_g,
+          averageCaffeineMg: d.average_caffeine_mg,
+          averageCalories: d.average_calories,
+          averageCarbsG: d.average_carbs_g,
+          averageCholesterolMg: d.average_cholesterol_mg,
+          averageConfidence: d.average_confidence,
+          averageFatsG: d.average_fats_g,
+          averageFiberG: d.average_fiber_g,
+          averageGlycemicIndex: d.average_glycemic_index,
+          averageInsolubleFiberG: d.average_insoluble_fiber_g,
+          averageInsulinIndex: d.average_insulin_index,
+          averageLiquidsMl: d.average_liquids_ml,
+          averageMonounsaturatedFatsG: d.average_monounsaturated_fats_g,
+          averageOmega3G: d.average_omega_3_g,
+          averageOmega6G: d.average_omega_6_g,
+          averagePolyunsaturatedFatsG: d.average_polyunsaturated_fats_g,
+          averageProteinG: d.average_protein_g,
+          averageSaturatedFatsG: d.average_saturated_fats_g,
+          averageServingSizeG: d.average_serving_size_g,
+          averageSodiumMg: d.average_sodium_mg,
+          averageSolubleFiberG: d.average_soluble_fiber_g,
+          averageSugarG: d.average_sugar_g,
+
+          totalAlcoholG: d.total_alcohol_g,
+          totalCaffeineMg: d.total_caffeine_mg,
+          totalCalories: d.total_calories,
+          totalCarbsG: d.total_carbs_g,
+          totalCholesterolMg: d.total_cholesterol_mg,
+          totalConfidence: d.total_confidence,
+          totalFatsG: d.total_fats_g,
+          totalFiberG: d.total_fiber_g,
+          totalGlycemicIndex: d.total_glycemic_index,
+          totalInsolubleFiberG: d.total_insoluble_fiber_g,
+          totalInsulinIndex: d.total_insulin_index,
+          totalLiquidsMl: d.total_liquids_ml,
+          totalMonounsaturatedFatsG: d.total_monounsaturated_fats_g,
+          totalOmega3G: d.total_omega_3_g,
+          totalOmega6G: d.total_omega_6_g,
+          totalPolyunsaturatedFatsG: d.total_polyunsaturated_fats_g,
+          totalProteinG: d.total_protein_g,
+          totalSaturatedFatsG: d.total_saturated_fats_g,
+          totalServingSizeG: d.total_serving_size_g,
+          totalSodiumMg: d.total_sodium_mg,
+          totalSolubleFiberG: d.total_soluble_fiber_g,
+          totalSugarG: d.total_sugar_g,
+
+          totalDays: d.totalDays,
+          totalMeals: d.totalMeals,
+
+          dateRange: {
+            startDate: d.dateRange.startDate,
+            endDate: d.dateRange.endDate,
+          },
+
+          dailyBreakdown: d.dailyBreakdown, // optional, keep as is or type properly
+        });
+
         console.log("✅ Statistics loaded successfully");
       } else {
         console.error("❌ API returned unsuccessful response:", response);
@@ -552,28 +657,28 @@ export default function StatisticsScreen() {
               <View style={styles.statsGrid}>
                 <StatCard
                   title={t("statistics.calories")}
-                  value={statisticsData.calories}
+                  value={statisticsData.averageCalories}
                   unit=" kcal"
                   icon="flame"
                   color="#FF6B35"
                 />
                 <StatCard
                   title={t("statistics.protein")}
-                  value={statisticsData.protein}
+                  value={statisticsData.averageProteinG}
                   unit="g"
                   icon="fitness"
                   color="#4CAF50"
                 />
                 <StatCard
                   title={t("statistics.carbs")}
-                  value={statisticsData.carbs}
+                  value={statisticsData.averageCarbsG}
                   unit="g"
                   icon="leaf"
                   color="#FF9800"
                 />
                 <StatCard
                   title={t("statistics.fat")}
-                  value={statisticsData.fat}
+                  value={statisticsData.averageFatsG}
                   unit="g"
                   icon="water"
                   color="#9C27B0"
@@ -589,14 +694,50 @@ export default function StatisticsScreen() {
               <View style={styles.statsGrid}>
                 <StatCard
                   title={t("statistics.fiber")}
-                  value={statisticsData.fiber}
+                  value={statisticsData.averageFiberG}
                   unit="g"
                   icon="leaf-outline"
                   color="#8BC34A"
                 />
                 <StatCard
                   title={t("statistics.sugar")}
-                  value={statisticsData.sugar}
+                  value={statisticsData.averageSugarG}
+                  unit="g"
+                  icon="ice-cream"
+                  color="#E91E63"
+                />
+              </View>
+            </View>
+
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>
+                {t("statistics.vitamins")}
+              </Text>
+              <View style={styles.statsGrid}>
+                <StatCard
+                  title={t("statistics.fiber")}
+                  value={statisticsData.averageOmega3G}
+                  unit="g"
+                  icon="leaf-outline"
+                  color="#8BC34A"
+                />
+                <StatCard
+                  title={t("statistics.sugar")}
+                  value={statisticsData.totalOmega6G}
+                  unit="g"
+                  icon="ice-cream"
+                  color="#E91E63"
+                />
+                <StatCard
+                  title={t("statistics.sugar")}
+                  value={statisticsData.averageOmega3G}
+                  unit="g"
+                  icon="ice-cream"
+                  color="#E91E63"
+                />
+                <StatCard
+                  title={t("statistics.sugar")}
+                  value={statisticsData.averageOmega6G}
                   unit="g"
                   icon="ice-cream"
                   color="#E91E63"
@@ -612,58 +753,25 @@ export default function StatisticsScreen() {
               <View style={styles.statsGrid}>
                 <StatCard
                   title={t("statistics.water")}
-                  value={statisticsData.water_ml}
+                  value={statisticsData.averageLiquidsMl}
                   unit="ml"
                   icon="water"
                   color="#2196F3"
                 />
                 <StatCard
                   title={t("statistics.alcohol")}
-                  value={statisticsData.alcohol_g}
+                  value={statisticsData.averageAlcoholG}
                   unit="g"
                   icon="wine"
                   color="#F44336"
                 />
                 <StatCard
                   title={t("statistics.caffeine")}
-                  value={statisticsData.caffeine_mg}
+                  value={statisticsData.averageCaffeineMg}
                   unit="mg"
                   icon="cafe"
                   color="#795548"
                 />
-              </View>
-            </View>
-
-            {/* Health Status */}
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>
-                {t("statistics.health_status")}
-              </Text>
-              <View style={styles.healthStatusContainer}>
-                <View
-                  style={[
-                    styles.healthIndicator,
-                    {
-                      backgroundColor: getHealthStatusColor(
-                        statisticsData.health_deviation_rate
-                      ),
-                    },
-                  ]}
-                >
-                  <Text style={styles.healthPercentage}>
-                    {Math.round(statisticsData.health_deviation_rate)}%
-                  </Text>
-                </View>
-                <View style={styles.healthInfo}>
-                  <Text style={[styles.healthTitle, isRTL && styles.textRTL]}>
-                    {t("statistics.deviation_rate")}
-                  </Text>
-                  <Text
-                    style={[styles.healthDescription, isRTL && styles.textRTL]}
-                  >
-                    {getHealthStatusText(statisticsData.health_deviation_rate)}
-                  </Text>
-                </View>
               </View>
             </View>
 
@@ -674,7 +782,7 @@ export default function StatisticsScreen() {
               </Text>
               <StatCard
                 title={t("statistics.total_meals")}
-                value={statisticsData.meal_count}
+                value={statisticsData.totalMeals}
                 unit=" meals"
                 icon="restaurant"
                 color="#607D8B"
