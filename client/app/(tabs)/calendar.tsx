@@ -10,6 +10,7 @@ import {
   Alert,
   ActivityIndicator,
   Dimensions,
+  FlatList,
 } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState, AppDispatch } from "../../src/store";
@@ -52,6 +53,8 @@ export default function CalendarScreen() {
   const [selectedDay, setSelectedDay] = useState<DayData | null>(null);
   const [showDayModal, setShowDayModal] = useState(false);
   const [showEventModal, setShowEventModal] = useState(false);
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
+  const [showYearPicker, setShowYearPicker] = useState(false);
   const [eventTitle, setEventTitle] = useState("");
   const [eventType, setEventType] = useState("general");
   const [selectedDate, setSelectedDate] = useState("");
@@ -129,6 +132,46 @@ export default function CalendarScreen() {
     newDate.setMonth(newDate.getMonth() + direction);
     setCurrentDate(newDate);
   };
+
+  const handleMonthSelect = (monthIndex: number) => {
+    const newDate = new Date(currentDate);
+    newDate.setMonth(monthIndex);
+    setCurrentDate(newDate);
+    setShowMonthPicker(false);
+    loadCalendarData();
+  };
+
+  const handleYearSelect = (year: number) => {
+    const newDate = new Date(currentDate);
+    newDate.setFullYear(year);
+    setCurrentDate(newDate);
+    setShowYearPicker(false);
+    loadCalendarData();
+  };
+
+  const generateYearRange = () => {
+    const currentYear = new Date().getFullYear();
+    const years = [];
+    for (let i = currentYear - 5; i <= currentYear + 5; i++) {
+      years.push(i);
+    }
+    return years;
+  };
+
+  const months = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
 
   const handleDayPress = (dayData: DayData) => {
     setSelectedDay(dayData);
@@ -289,12 +332,25 @@ export default function CalendarScreen() {
           <Ionicons name="chevron-back" size={24} color="#007AFF" />
         </TouchableOpacity>
 
-        <Text style={styles.monthTitle}>
-          {currentDate.toLocaleDateString("en-US", {
-            month: "long",
-            year: "numeric",
-          })}
-        </Text>
+        <View style={styles.dateNavigationContainer}>
+          <TouchableOpacity
+            style={styles.monthButton}
+            onPress={() => setShowMonthPicker(true)}
+          >
+            <Text style={styles.monthTitle}>
+              {currentDate.toLocaleDateString("en-US", { month: "long" })}
+            </Text>
+            <Ionicons name="chevron-down" size={16} color="#007AFF" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.yearButton}
+            onPress={() => setShowYearPicker(true)}
+          >
+            <Text style={styles.yearTitle}>{currentDate.getFullYear()}</Text>
+            <Ionicons name="chevron-down" size={16} color="#007AFF" />
+          </TouchableOpacity>
+        </View>
 
         <TouchableOpacity onPress={() => navigateMonth(1)}>
           <Ionicons name="chevron-forward" size={24} color="#007AFF" />
@@ -537,6 +593,104 @@ export default function CalendarScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Month Picker Modal */}
+      <Modal
+        visible={showMonthPicker}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowMonthPicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.pickerModalContent}>
+            <View style={styles.pickerHeader}>
+              <Text style={styles.pickerTitle}>Select Month</Text>
+              <TouchableOpacity onPress={() => setShowMonthPicker(false)}>
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <FlatList
+              data={months}
+              keyExtractor={(item, index) => index.toString()}
+              renderItem={({ item, index }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.pickerItem,
+                    currentDate.getMonth() === index &&
+                      styles.selectedPickerItem,
+                  ]}
+                  onPress={() => handleMonthSelect(index)}
+                >
+                  <Text
+                    style={[
+                      styles.pickerItemText,
+                      currentDate.getMonth() === index &&
+                        styles.selectedPickerItemText,
+                    ]}
+                  >
+                    {item}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              showsVerticalScrollIndicator={false}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Year Picker Modal */}
+      <Modal
+        visible={showYearPicker}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowYearPicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.pickerModalContent}>
+            <View style={styles.pickerHeader}>
+              <Text style={styles.pickerTitle}>Select Year</Text>
+              <TouchableOpacity onPress={() => setShowYearPicker(false)}>
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <FlatList
+              data={generateYearRange()}
+              keyExtractor={(item) => item.toString()}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.pickerItem,
+                    currentDate.getFullYear() === item &&
+                      styles.selectedPickerItem,
+                  ]}
+                  onPress={() => handleYearSelect(item)}
+                >
+                  <Text
+                    style={[
+                      styles.pickerItemText,
+                      currentDate.getFullYear() === item &&
+                        styles.selectedPickerItemText,
+                    ]}
+                  >
+                    {item}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              showsVerticalScrollIndicator={false}
+              getItemLayout={(data, index) => ({
+                length: 50,
+                offset: 50 * index,
+                index,
+              })}
+              initialScrollIndex={generateYearRange().findIndex(
+                (year) => year === currentDate.getFullYear()
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -563,10 +717,81 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: "white",
   },
+  dateNavigationContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  monthButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "#f8f9fa",
+    borderRadius: 8,
+    gap: 4,
+  },
+  yearButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "#f8f9fa",
+    borderRadius: 8,
+    gap: 4,
+  },
   monthTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+  },
+  yearTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+  },
+  pickerModalContent: {
+    backgroundColor: "white",
+    marginHorizontal: 30,
+    marginVertical: 100,
+    borderRadius: 16,
+    maxHeight: "70%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  pickerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e0e0e0",
+  },
+  pickerTitle: {
     fontSize: 20,
     fontWeight: "bold",
     color: "#333",
+  },
+  pickerItem: {
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  selectedPickerItem: {
+    backgroundColor: "#007AFF",
+  },
+  pickerItemText: {
+    fontSize: 16,
+    color: "#333",
+    textAlign: "center",
+  },
+  selectedPickerItemText: {
+    color: "#fff",
+    fontWeight: "600",
   },
   statisticsContainer: {
     backgroundColor: "white",

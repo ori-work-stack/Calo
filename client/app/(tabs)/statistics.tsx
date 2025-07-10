@@ -16,6 +16,7 @@ import { useTranslation } from "react-i18next";
 import { useLanguage } from "@/src/i18n/context/LanguageContext";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { nutritionAPI } from "@/src/services/api";
+import { LineChart, BarChart, PieChart } from "react-native-chart-kit";
 
 const { width } = Dimensions.get("window");
 
@@ -74,8 +75,16 @@ interface StatisticsData {
     endDate: string;
   };
 
-  // You can add dailyBreakdown here too, depending on your data structure
-  dailyBreakdown?: any[]; // Or type it properly if known
+  dailyBreakdown?: Array<{
+    date: string;
+    calories: number;
+    fats_g: number;
+    sugar_g: number;
+    protein_g: number;
+    carbs_g: number;
+    fiber_g: number;
+    sodium_mg: number;
+  }>;
 }
 
 interface DateRange {
@@ -114,311 +123,151 @@ export default function StatisticsScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedChart, setSelectedChart] = useState<"line" | "bar">("line");
 
   // Helper function to format date as YYYY-MM-DD with extensive validation
   const formatDateString = useCallback((date: Date): string => {
     try {
-      // Multiple validation checks
-      if (!date) {
-        console.warn("Date is null/undefined, using current date");
+      if (!date || !(date instanceof Date) || isNaN(date.getTime())) {
         date = new Date();
       }
 
-      if (!(date instanceof Date)) {
-        console.warn("Invalid date object, creating new Date");
-        date = new Date(date);
-      }
-
-      if (isNaN(date.getTime())) {
-        console.warn("Date is NaN, using current date");
-        date = new Date();
-      }
-
-      // Use multiple formatting methods as fallbacks
-      let formattedDate: string;
-
-      // Method 1: Manual formatting
-      try {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, "0");
-        const day = String(date.getDate()).padStart(2, "0");
-        formattedDate = `${year}-${month}-${day}`;
-      } catch (error) {
-        console.error("Manual formatting failed:", error);
-        // Method 2: ISO string splitting
-        formattedDate = date.toISOString().split("T")[0];
-      }
-
-      // Final validation of the formatted string
-      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-      if (!dateRegex.test(formattedDate)) {
-        console.error("Invalid date format produced:", formattedDate);
-        // Emergency fallback
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, "0");
-        const day = String(now.getDate()).padStart(2, "0");
-        formattedDate = `${year}-${month}-${day}`;
-      }
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      const formattedDate = `${year}-${month}-${day}`;
 
       console.log("📅 Final formatted date:", formattedDate);
       return formattedDate;
     } catch (error) {
       console.error("Complete date formatting failure:", error);
-      // Ultimate fallback - hardcoded current date
-      const now = new Date();
-      return now.toISOString().split("T")[0];
+      return new Date().toISOString().split("T")[0];
     }
   }, []);
 
-  // Get date range based on selected time range with better error handling
+  // Get date range based on selected time range
   const getDateRange = useCallback((): DateRange => {
     try {
       const now = new Date();
-
-      // Ensure we have a valid current date
-      if (isNaN(now.getTime())) {
-        console.error("Current date is invalid");
-        throw new Error("System date is invalid");
-      }
-
       const today = formatDateString(now);
-      console.log("📅 Today formatted as:", today);
 
       switch (activeTimeRange) {
         case TIME_RANGES.today:
           return { start: today, end: today };
-
         case TIME_RANGES.week:
           const weekStart = new Date(now);
           weekStart.setDate(now.getDate() - 6);
-          const weekStartStr = formatDateString(weekStart);
-          console.log("📅 Week range:", weekStartStr, "to", today);
-          return { start: weekStartStr, end: today };
-
+          return { start: formatDateString(weekStart), end: today };
         case TIME_RANGES.month:
           const monthStart = new Date(now);
           monthStart.setDate(now.getDate() - 29);
-          const monthStartStr = formatDateString(monthStart);
-          console.log("📅 Month range:", monthStartStr, "to", today);
-          return { start: monthStartStr, end: today };
-
+          return { start: formatDateString(monthStart), end: today };
         case TIME_RANGES.custom:
-          const customStart = formatDateString(customStartDate);
-          const customEnd = formatDateString(customEndDate);
-          console.log("📅 Custom range:", customStart, "to", customEnd);
-          return { start: customStart, end: customEnd };
-
+          return {
+            start: formatDateString(customStartDate),
+            end: formatDateString(customEndDate),
+          };
         default:
-          console.warn("Unknown time range, defaulting to today");
           return { start: today, end: today };
       }
     } catch (error) {
       console.error("Error in getDateRange:", error);
-      // Emergency fallback
       const fallbackDate = new Date().toISOString().split("T")[0];
       return { start: fallbackDate, end: fallbackDate };
     }
   }, [activeTimeRange, customStartDate, customEndDate, formatDateString]);
 
-  // Test function to debug date issues
-  const testDateFormatting = useCallback(() => {
-    console.log("🧪 Testing date formatting:");
-
-    const testDates = [
-      new Date(),
-      new Date("2024-01-01"),
-      customStartDate,
-      customEndDate,
-      new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-    ];
-
-    testDates.forEach((date, index) => {
-      try {
-        const formatted = formatDateString(date);
-        console.log(`Test ${index + 1}: ${date} -> ${formatted}`);
-      } catch (error) {
-        console.error(`Test ${index + 1} failed:`, error);
-      }
-    });
-
-    const { start, end } = getDateRange();
-    console.log("Current range:", { start, end });
-
-    // Test API URL construction
-    console.log(
-      "API URL would be:",
-      `/nutrition/stats/range?start=${start}&end=${end}`
-    );
-  }, [formatDateString, getDateRange, customStartDate, customEndDate]);
-
-  // Load statistics data with enhanced debugging
+  // Load statistics data
   const loadStatistics = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
     try {
       const { start, end } = getDateRange();
-
-      // Extensive debugging
-      console.log("🔍 Debug Info:");
-      console.log("- Active Time Range:", activeTimeRange);
-      console.log("- Custom Start Date:", customStartDate);
-      console.log("- Custom End Date:", customEndDate);
-      console.log("- Calculated Start:", start);
-      console.log("- Calculated End:", end);
-
-      // Validate date format before API call
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-      if (!dateRegex.test(start)) {
-        console.error("❌ Invalid start date format:", start);
-        throw new Error(
-          `Invalid start date format: ${start}. Expected YYYY-MM-DD.`
-        );
-      }
-      if (!dateRegex.test(end)) {
-        console.error("❌ Invalid end date format:", end);
-        throw new Error(
-          `Invalid end date format: ${end}. Expected YYYY-MM-DD.`
-        );
+
+      if (!dateRegex.test(start) || !dateRegex.test(end)) {
+        throw new Error("Invalid date format");
       }
 
-      // Additional validation - check if dates are logical
       const startDate = new Date(start + "T00:00:00");
       const endDate = new Date(end + "T00:00:00");
 
       if (startDate > endDate) {
-        console.error("❌ Start date is after end date");
         throw new Error("Start date cannot be after end date");
       }
 
-      console.log("✅ Date validation passed");
-      console.log("📊 Making API call with:", { start, end });
-
-      // Make API call with proper error handling
-      let response;
-      try {
-        response = await nutritionAPI.getRangeStatistics(start, end);
-      } catch (apiError: any) {
-        console.error("❌ API call failed:", apiError);
-        console.error("- Error message:", apiError.message);
-        console.error("- Error response:", apiError.response?.data);
-        console.error("- Error status:", apiError.response?.status);
-
-        // Provide more specific error messages
-        if (apiError.response?.status === 400) {
-          throw new Error(
-            "Date format error. Please try selecting different dates."
-          );
-        } else if (apiError.response?.status === 404) {
-          throw new Error(
-            "Statistics endpoint not found. Please check your API configuration."
-          );
-        } else if (apiError.response?.status === 500) {
-          throw new Error("Server error. Please try again later.");
-        } else {
-          throw new Error(
-            `API Error: ${apiError.message || "Unknown error occurred"}`
-          );
-        }
-      }
-
-      console.log("📊 API Response:", response);
+      const response = await nutritionAPI.getRangeStatistics(start, end);
 
       if (response?.success && response?.data) {
         const d = response.data;
-
-        // Map snake_case to camelCase
         setStatisticsData({
-          averageAlcoholG: d.average_alcohol_g,
-          averageCaffeineMg: d.average_caffeine_mg,
-          averageCalories: d.average_calories,
-          averageCarbsG: d.average_carbs_g,
-          averageCholesterolMg: d.average_cholesterol_mg,
-          averageConfidence: d.average_confidence,
-          averageFatsG: d.average_fats_g,
-          averageFiberG: d.average_fiber_g,
-          averageGlycemicIndex: d.average_glycemic_index,
-          averageInsolubleFiberG: d.average_insoluble_fiber_g,
-          averageInsulinIndex: d.average_insulin_index,
-          averageLiquidsMl: d.average_liquids_ml,
-          averageMonounsaturatedFatsG: d.average_monounsaturated_fats_g,
-          averageOmega3G: d.average_omega_3_g,
-          averageOmega6G: d.average_omega_6_g,
-          averagePolyunsaturatedFatsG: d.average_polyunsaturated_fats_g,
-          averageProteinG: d.average_protein_g,
-          averageSaturatedFatsG: d.average_saturated_fats_g,
-          averageServingSizeG: d.average_serving_size_g,
-          averageSodiumMg: d.average_sodium_mg,
-          averageSolubleFiberG: d.average_soluble_fiber_g,
-          averageSugarG: d.average_sugar_g,
+          averageAlcoholG: d.average_alcohol_g || 0,
+          averageCaffeineMg: d.average_caffeine_mg || 0,
+          averageCalories: d.average_calories || 0,
+          averageCarbsG: d.average_carbs_g || 0,
+          averageCholesterolMg: d.average_cholesterol_mg || 0,
+          averageConfidence: d.average_confidence || 0,
+          averageFatsG: d.average_fats_g || 0,
+          averageFiberG: d.average_fiber_g || 0,
+          averageGlycemicIndex: d.average_glycemic_index || 0,
+          averageInsolubleFiberG: d.average_insoluble_fiber_g || 0,
+          averageInsulinIndex: d.average_insulin_index || 0,
+          averageLiquidsMl: d.average_liquids_ml || 0,
+          averageMonounsaturatedFatsG: d.average_monounsaturated_fats_g || 0,
+          averageOmega3G: d.average_omega_3_g || 0,
+          averageOmega6G: d.average_omega_6_g || 0,
+          averagePolyunsaturatedFatsG: d.average_polyunsaturated_fats_g || 0,
+          averageProteinG: d.average_protein_g || 0,
+          averageSaturatedFatsG: d.average_saturated_fats_g || 0,
+          averageServingSizeG: d.average_serving_size_g || 0,
+          averageSodiumMg: d.average_sodium_mg || 0,
+          averageSolubleFiberG: d.average_soluble_fiber_g || 0,
+          averageSugarG: d.average_sugar_g || 0,
 
-          totalAlcoholG: d.total_alcohol_g,
-          totalCaffeineMg: d.total_caffeine_mg,
-          totalCalories: d.total_calories,
-          totalCarbsG: d.total_carbs_g,
-          totalCholesterolMg: d.total_cholesterol_mg,
-          totalConfidence: d.total_confidence,
-          totalFatsG: d.total_fats_g,
-          totalFiberG: d.total_fiber_g,
-          totalGlycemicIndex: d.total_glycemic_index,
-          totalInsolubleFiberG: d.total_insoluble_fiber_g,
-          totalInsulinIndex: d.total_insulin_index,
-          totalLiquidsMl: d.total_liquids_ml,
-          totalMonounsaturatedFatsG: d.total_monounsaturated_fats_g,
-          totalOmega3G: d.total_omega_3_g,
-          totalOmega6G: d.total_omega_6_g,
-          totalPolyunsaturatedFatsG: d.total_polyunsaturated_fats_g,
-          totalProteinG: d.total_protein_g,
-          totalSaturatedFatsG: d.total_saturated_fats_g,
-          totalServingSizeG: d.total_serving_size_g,
-          totalSodiumMg: d.total_sodium_mg,
-          totalSolubleFiberG: d.total_soluble_fiber_g,
-          totalSugarG: d.total_sugar_g,
+          totalAlcoholG: d.total_alcohol_g || 0,
+          totalCaffeineMg: d.total_caffeine_mg || 0,
+          totalCalories: d.total_calories || 0,
+          totalCarbsG: d.total_carbs_g || 0,
+          totalCholesterolMg: d.total_cholesterol_mg || 0,
+          totalConfidence: d.total_confidence || 0,
+          totalFatsG: d.total_fats_g || 0,
+          totalFiberG: d.total_fiber_g || 0,
+          totalGlycemicIndex: d.total_glycemic_index || 0,
+          totalInsolubleFiberG: d.total_insoluble_fiber_g || 0,
+          totalInsulinIndex: d.total_insulin_index || 0,
+          totalLiquidsMl: d.total_liquids_ml || 0,
+          totalMonounsaturatedFatsG: d.total_monounsaturated_fats_g || 0,
+          totalOmega3G: d.total_omega_3_g || 0,
+          totalOmega6G: d.total_omega_6_g || 0,
+          totalPolyunsaturatedFatsG: d.total_polyunsaturated_fats_g || 0,
+          totalProteinG: d.total_protein_g || 0,
+          totalSaturatedFatsG: d.total_saturated_fats_g || 0,
+          totalServingSizeG: d.total_serving_size_g || 0,
+          totalSodiumMg: d.total_sodium_mg || 0,
+          totalSolubleFiberG: d.total_soluble_fiber_g || 0,
+          totalSugarG: d.total_sugar_g || 0,
 
-          totalDays: d.totalDays,
-          totalMeals: d.totalMeals,
+          totalDays: d.totalDays || 0,
+          totalMeals: d.totalMeals || 0,
 
           dateRange: {
-            startDate: d.dateRange.startDate,
-            endDate: d.dateRange.endDate,
+            startDate: d.dateRange?.startDate || start,
+            endDate: d.dateRange?.endDate || end,
           },
 
-          dailyBreakdown: d.dailyBreakdown, // optional, keep as is or type properly
+          dailyBreakdown: d.dailyBreakdown || [],
         });
-
-        console.log("✅ Statistics loaded successfully");
       } else {
-        console.error("❌ API returned unsuccessful response:", response);
         throw new Error(response?.error || "Failed to load statistics data");
       }
     } catch (error: any) {
       console.error("❌ Statistics loading failed:", error);
       setError(error.message || "Unable to load statistics");
-
-      // Show detailed error to user
-      Alert.alert(
-        t("common.error"),
-        error.message || t("statistics.load_error"),
-        [
-          { text: t("common.ok"), style: "default" },
-          {
-            text: "Debug Info",
-            style: "default",
-            onPress: () => {
-              const { start, end } = getDateRange();
-              Alert.alert(
-                "Debug Info",
-                `Start: ${start}\nEnd: ${end}\nRange: ${activeTimeRange}`
-              );
-            },
-          },
-        ]
-      );
     } finally {
       setIsLoading(false);
     }
-  }, [getDateRange, t, activeTimeRange, customStartDate, customEndDate]);
+  }, [getDateRange]);
 
   // Refresh handler
   const handleRefresh = useCallback(async () => {
@@ -440,7 +289,6 @@ export default function StatisticsScreen() {
 
   const handleDatePickerChange = (event: any, selectedDate?: Date) => {
     setShowDatePicker(false);
-
     if (selectedDate) {
       if (datePickerType === "start") {
         setCustomStartDate(selectedDate);
@@ -459,18 +307,142 @@ export default function StatisticsScreen() {
     });
   };
 
-  // Get health status color
-  const getHealthStatusColor = (deviationRate: number): string => {
-    if (deviationRate <= 10) return "#4CAF50"; // Green
-    if (deviationRate <= 25) return "#FF9800"; // Orange
-    return "#F44336"; // Red
+  // Chart configuration
+  const chartConfig = {
+    backgroundColor: "#ffffff",
+    backgroundGradientFrom: "#ffffff",
+    backgroundGradientTo: "#ffffff",
+    decimalPlaces: 0,
+    color: (opacity = 1) => `rgba(0, 122, 255, ${opacity})`,
+    labelColor: (opacity = 1) => `rgba(51, 51, 51, ${opacity})`,
+    style: {
+      borderRadius: 16,
+    },
+    propsForDots: {
+      r: "4",
+      strokeWidth: "2",
+      stroke: "#007AFF",
+    },
   };
 
-  // Get health status text
-  const getHealthStatusText = (deviationRate: number): string => {
-    if (deviationRate <= 10) return t("statistics.excellent_health");
-    if (deviationRate <= 25) return t("statistics.good_health");
-    return t("statistics.needs_improvement");
+  // Calculate chart width dynamically
+  const getChartWidth = () => {
+    return Math.max(280, width - 80);
+  };
+
+  // Prepare chart data
+  const prepareChartData = (nutrient: string) => {
+    console.log(nutrient);
+    if (
+      !statisticsData?.dailyBreakdown ||
+      statisticsData.dailyBreakdown.length === 0
+    ) {
+      return {
+        labels: ["No Data"],
+        datasets: [{ data: [0] }],
+      };
+    }
+
+    const breakdown = statisticsData.dailyBreakdown;
+
+    // Sort by date to ensure proper chronological order
+    const sortedBreakdown = [...breakdown].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+
+    const labels = sortedBreakdown.map((item) => {
+      const date = new Date(item.date);
+      return `${date.getDate()}/${date.getMonth() + 1}`;
+    });
+
+    const data = sortedBreakdown.map((item) => {
+      let value = 0;
+      switch (nutrient) {
+        case "calories":
+          value = Number(item.calories) || 0;
+          break;
+        case "fats":
+          value = Number(item.fats_g) || 0;
+          break;
+        case "sugar":
+          value = Number(item.sugar_g) || 0;
+          break;
+        case "protein":
+          value = Number(item.protein_g) || 0;
+          break;
+        case "carbs":
+          value = Number(item.carbs_g) || 0;
+          break;
+        case "fiber":
+          value = Number(item.fiber_g) || 0;
+          break;
+        case "sodium":
+          value = Number(item.sodium_mg) || 0;
+          break;
+        default:
+          value = 0;
+      }
+      return Math.round(value * 100) / 100; // Round to 2 decimal places
+    });
+
+    // Ensure we have at least one data point
+    if (data.length === 0 || data.every((val) => val === 0)) {
+      return {
+        labels: ["No Data"],
+        datasets: [{ data: [0] }],
+      };
+    }
+
+    return {
+      labels,
+      datasets: [
+        {
+          data,
+          color: (opacity = 1) => `rgba(0, 122, 255, ${opacity})`,
+          strokeWidth: 2,
+        },
+      ],
+    };
+  };
+
+  // Prepare pie chart data
+  const preparePieChartData = () => {
+    if (!statisticsData) {
+      return [];
+    }
+
+    const pieData = [
+      {
+        name: "Protein",
+        population: statisticsData.averageProteinG || 0,
+        color: "#4CAF50",
+        legendFontColor: "#333",
+        legendFontSize: 12,
+      },
+      {
+        name: "Carbs",
+        population: statisticsData.averageCarbsG || 0,
+        color: "#FF9800",
+        legendFontColor: "#333",
+        legendFontSize: 12,
+      },
+      {
+        name: "Fats",
+        population: statisticsData.averageFatsG || 0,
+        color: "#9C27B0",
+        legendFontColor: "#333",
+        legendFontSize: 12,
+      },
+      {
+        name: "Fiber",
+        population: statisticsData.averageFiberG || 0,
+        color: "#8BC34A",
+        legendFontColor: "#333",
+        legendFontSize: 12,
+      },
+    ];
+
+    return pieData.filter((item) => item.population > 0);
   };
 
   // Stat Card Component
@@ -546,6 +518,100 @@ export default function StatisticsScreen() {
     )
   );
 
+  // Additional Statistics Component
+  const AdditionalStats = React.memo(() => {
+    if (!statisticsData) return null;
+
+    const additionalStats = [
+      {
+        key: "cholesterol",
+        value: statisticsData.averageCholesterolMg,
+        unit: "mg",
+        icon: "heart",
+      },
+      {
+        key: "glycemic_index",
+        value: statisticsData.averageGlycemicIndex,
+        unit: "",
+        icon: "pulse",
+      },
+      {
+        key: "insulin_index",
+        value: statisticsData.averageInsulinIndex,
+        unit: "",
+        icon: "medical",
+      },
+      {
+        key: "omega_3",
+        value: statisticsData.averageOmega3G,
+        unit: "g",
+        icon: "fish",
+      },
+      {
+        key: "omega_6",
+        value: statisticsData.averageOmega6G,
+        unit: "g",
+        icon: "fish",
+      },
+      {
+        key: "saturated_fats",
+        value: statisticsData.averageSaturatedFatsG,
+        unit: "g",
+        icon: "warning",
+      },
+      {
+        key: "monounsaturated_fats",
+        value: statisticsData.averageMonounsaturatedFatsG,
+        unit: "g",
+        icon: "leaf",
+      },
+      {
+        key: "polyunsaturated_fats",
+        value: statisticsData.averagePolyunsaturatedFatsG,
+        unit: "g",
+        icon: "leaf",
+      },
+      {
+        key: "soluble_fiber",
+        value: statisticsData.averageSolubleFiberG,
+        unit: "g",
+        icon: "leaf-outline",
+      },
+      {
+        key: "insoluble_fiber",
+        value: statisticsData.averageInsolubleFiberG,
+        unit: "g",
+        icon: "leaf-outline",
+      },
+      {
+        key: "confidence",
+        value: statisticsData.averageConfidence,
+        unit: "%",
+        icon: "checkmark-circle",
+      },
+    ];
+
+    return (
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>
+          {t("statistics.additional_metrics")}
+        </Text>
+        <View style={styles.statsGrid}>
+          {additionalStats.map((stat, index) => (
+            <StatCard
+              key={index}
+              title={t(`statistics.${stat.key}`)}
+              value={stat.value}
+              unit={stat.unit}
+              icon={stat.icon}
+              color="#607D8B"
+            />
+          ))}
+        </View>
+      </View>
+    );
+  });
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -553,13 +619,6 @@ export default function StatisticsScreen() {
         <Text style={[styles.headerTitle, isRTL && styles.textRTL]}>
           {t("statistics.title")}
         </Text>
-        {/* Debug button for testing */}
-        <TouchableOpacity
-          style={styles.debugButton}
-          onPress={testDateFormatting}
-        >
-          <Text style={styles.debugButtonText}>Debug</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Time Range Selector */}
@@ -649,6 +708,329 @@ export default function StatisticsScreen() {
           </View>
         ) : statisticsData ? (
           <>
+            {/* Chart Section */}
+            {statisticsData.dailyBreakdown &&
+              statisticsData.dailyBreakdown.length > 0 && (
+                <View style={styles.section}>
+                  <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>
+                    {t("statistics.daily_trends")}
+                  </Text>
+
+                  {/* Chart Type Toggle */}
+                  <View style={styles.chartToggle}>
+                    <TouchableOpacity
+                      style={[
+                        styles.toggleButton,
+                        selectedChart === "line" && styles.activeToggleButton,
+                      ]}
+                      onPress={() => setSelectedChart("line")}
+                    >
+                      <Text
+                        style={[
+                          styles.toggleButtonText,
+                          selectedChart === "line" &&
+                            styles.activeToggleButtonText,
+                        ]}
+                      >
+                        {t("statistics.line_chart")}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.toggleButton,
+                        selectedChart === "bar" && styles.activeToggleButton,
+                      ]}
+                      onPress={() => setSelectedChart("bar")}
+                    >
+                      <Text
+                        style={[
+                          styles.toggleButtonText,
+                          selectedChart === "bar" &&
+                            styles.activeToggleButtonText,
+                        ]}
+                      >
+                        {t("statistics.bar_chart")}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Calories Chart */}
+                  <View style={styles.chartContainer}>
+                    <Text style={styles.chartTitle}>
+                      {t("statistics.calories")}
+                    </Text>
+                    <View style={styles.chartWrapper}>
+                      {selectedChart === "line" ? (
+                        <LineChart
+                          data={prepareChartData("calories")}
+                          width={getChartWidth()}
+                          height={220}
+                          chartConfig={chartConfig}
+                          bezier
+                          style={styles.chart}
+                          withHorizontalLabels={true}
+                          withVerticalLabels={true}
+                          withDots={true}
+                          withShadow={false}
+                        />
+                      ) : (
+                        <BarChart
+                          data={prepareChartData("calories")}
+                          width={getChartWidth()}
+                          height={220}
+                          chartConfig={chartConfig}
+                          style={styles.chart}
+                          withHorizontalLabels={true}
+                          withVerticalLabels={true}
+                          showValuesOnTopOfBars={true}
+                          yAxisLabel={""}
+                          yAxisSuffix={""}
+                        />
+                      )}
+                    </View>
+                  </View>
+
+                  {/* Fats Chart */}
+                  <View style={styles.chartContainer}>
+                    <Text style={styles.chartTitle}>
+                      {t("statistics.fats")}
+                    </Text>
+                    <View style={styles.chartWrapper}>
+                      {selectedChart === "line" ? (
+                        <LineChart
+                          data={prepareChartData("fats")}
+                          width={getChartWidth()}
+                          height={220}
+                          chartConfig={chartConfig}
+                          bezier
+                          style={styles.chart}
+                          withHorizontalLabels={true}
+                          withVerticalLabels={true}
+                          withDots={true}
+                          withShadow={false}
+                        />
+                      ) : (
+                        <BarChart
+                          data={prepareChartData("fats")}
+                          width={getChartWidth()}
+                          height={220}
+                          chartConfig={chartConfig}
+                          style={styles.chart}
+                          withHorizontalLabels={true}
+                          withVerticalLabels={true}
+                          showValuesOnTopOfBars={true}
+                          yAxisLabel={""}
+                          yAxisSuffix={""}
+                        />
+                      )}
+                    </View>
+                  </View>
+
+                  {/* Sugar Chart */}
+                  <View style={styles.chartContainer}>
+                    <Text style={styles.chartTitle}>
+                      {t("statistics.sugar")}
+                    </Text>
+                    <View style={styles.chartWrapper}>
+                      {selectedChart === "line" ? (
+                        <LineChart
+                          data={prepareChartData("sugar")}
+                          width={getChartWidth()}
+                          height={220}
+                          chartConfig={chartConfig}
+                          bezier
+                          style={styles.chart}
+                          withHorizontalLabels={true}
+                          withVerticalLabels={true}
+                          withDots={true}
+                          withShadow={false}
+                        />
+                      ) : (
+                        <BarChart
+                          data={prepareChartData("sugar")}
+                          width={getChartWidth()}
+                          height={220}
+                          chartConfig={chartConfig}
+                          style={styles.chart}
+                          withHorizontalLabels={true}
+                          withVerticalLabels={true}
+                          showValuesOnTopOfBars={true}
+                          yAxisLabel={""}
+                          yAxisSuffix={""}
+                        />
+                      )}
+                    </View>
+                  </View>
+
+                  {/* Protein Chart */}
+                  <View style={styles.chartContainer}>
+                    <Text style={styles.chartTitle}>
+                      {t("statistics.protein")}
+                    </Text>
+                    <View style={styles.chartWrapper}>
+                      {selectedChart === "line" ? (
+                        <LineChart
+                          data={prepareChartData("protein")}
+                          width={getChartWidth()}
+                          height={220}
+                          chartConfig={chartConfig}
+                          bezier
+                          style={styles.chart}
+                          withHorizontalLabels={true}
+                          withVerticalLabels={true}
+                          withDots={true}
+                          withShadow={false}
+                        />
+                      ) : (
+                        <BarChart
+                          data={prepareChartData("protein")}
+                          width={getChartWidth()}
+                          height={220}
+                          chartConfig={chartConfig}
+                          style={styles.chart}
+                          withHorizontalLabels={true}
+                          withVerticalLabels={true}
+                          showValuesOnTopOfBars={true}
+                          yAxisLabel={""}
+                          yAxisSuffix={""}
+                        />
+                      )}
+                    </View>
+                  </View>
+
+                  {/* Carbs Chart */}
+                  <View style={styles.chartContainer}>
+                    <Text style={styles.chartTitle}>
+                      {t("statistics.carbs")}
+                    </Text>
+                    <View style={styles.chartWrapper}>
+                      {selectedChart === "line" ? (
+                        <LineChart
+                          data={prepareChartData("carbs")}
+                          width={getChartWidth()}
+                          height={220}
+                          chartConfig={chartConfig}
+                          bezier
+                          style={styles.chart}
+                          withHorizontalLabels={true}
+                          withVerticalLabels={true}
+                          withDots={true}
+                          withShadow={false}
+                        />
+                      ) : (
+                        <BarChart
+                          data={prepareChartData("carbs")}
+                          width={getChartWidth()}
+                          height={220}
+                          chartConfig={chartConfig}
+                          style={styles.chart}
+                          withHorizontalLabels={true}
+                          withVerticalLabels={true}
+                          showValuesOnTopOfBars={true}
+                          yAxisLabel={""}
+                          yAxisSuffix={""}
+                        />
+                      )}
+                    </View>
+                  </View>
+
+                  {/* Fiber Chart */}
+                  <View style={styles.chartContainer}>
+                    <Text style={styles.chartTitle}>
+                      {t("statistics.fiber")}
+                    </Text>
+                    <View style={styles.chartWrapper}>
+                      {selectedChart === "line" ? (
+                        <LineChart
+                          data={prepareChartData("fiber")}
+                          width={getChartWidth()}
+                          height={220}
+                          chartConfig={chartConfig}
+                          bezier
+                          style={styles.chart}
+                          withHorizontalLabels={true}
+                          withVerticalLabels={true}
+                          withDots={true}
+                          withShadow={false}
+                        />
+                      ) : (
+                        <BarChart
+                          data={prepareChartData("fiber")}
+                          width={getChartWidth()}
+                          height={220}
+                          chartConfig={chartConfig}
+                          style={styles.chart}
+                          withHorizontalLabels={true}
+                          withVerticalLabels={true}
+                          showValuesOnTopOfBars={true}
+                          yAxisLabel={""}
+                          yAxisSuffix={""}
+                        />
+                      )}
+                    </View>
+                  </View>
+
+                  {/* Sodium Chart */}
+                  <View style={styles.chartContainer}>
+                    <Text style={styles.chartTitle}>
+                      {t("statistics.sodium")}
+                    </Text>
+                    <View style={styles.chartWrapper}>
+                      {selectedChart === "line" ? (
+                        <LineChart
+                          data={prepareChartData("sodium")}
+                          width={getChartWidth()}
+                          height={220}
+                          chartConfig={chartConfig}
+                          bezier
+                          style={styles.chart}
+                          withHorizontalLabels={true}
+                          withVerticalLabels={true}
+                          withDots={true}
+                          withShadow={false}
+                        />
+                      ) : (
+                        <BarChart
+                          data={prepareChartData("sodium")}
+                          width={getChartWidth()}
+                          height={220}
+                          chartConfig={chartConfig}
+                          style={styles.chart}
+                          withHorizontalLabels={true}
+                          withVerticalLabels={true}
+                          showValuesOnTopOfBars={true}
+                          yAxisLabel={""}
+                          yAxisSuffix={""}
+                        />
+                      )}
+                    </View>
+                  </View>
+                </View>
+              )}
+
+            {/* Pie Chart Section */}
+            {preparePieChartData().length > 0 && (
+              <View style={styles.section}>
+                <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>
+                  {t("statistics.macronutrient_distribution")}
+                </Text>
+                <View style={styles.pieChartWrapper}>
+                  <PieChart
+                    data={preparePieChartData()}
+                    width={getChartWidth()}
+                    chartConfig={chartConfig}
+                    height={250} // Increased height to prevent cutting
+                    accessor="population"
+                    backgroundColor="transparent"
+                    paddingLeft="32" // Slightly more padding for balance
+                    center={[0, 0]} // Centered correctly
+                    absolute
+                    hasLegend={true}
+                  />
+                </View>
+              </View>
+            )}
+
             {/* Nutrition Overview */}
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>
@@ -706,41 +1088,12 @@ export default function StatisticsScreen() {
                   icon="ice-cream"
                   color="#E91E63"
                 />
-              </View>
-            </View>
-
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>
-                {t("statistics.vitamins")}
-              </Text>
-              <View style={styles.statsGrid}>
                 <StatCard
-                  title={t("statistics.fiber")}
-                  value={statisticsData.averageOmega3G}
-                  unit="g"
-                  icon="leaf-outline"
-                  color="#8BC34A"
-                />
-                <StatCard
-                  title={t("statistics.sugar")}
-                  value={statisticsData.totalOmega6G}
-                  unit="g"
-                  icon="ice-cream"
-                  color="#E91E63"
-                />
-                <StatCard
-                  title={t("statistics.sugar")}
-                  value={statisticsData.averageOmega3G}
-                  unit="g"
-                  icon="ice-cream"
-                  color="#E91E63"
-                />
-                <StatCard
-                  title={t("statistics.sugar")}
-                  value={statisticsData.averageOmega6G}
-                  unit="g"
-                  icon="ice-cream"
-                  color="#E91E63"
+                  title={t("statistics.sodium")}
+                  value={statisticsData.averageSodiumMg}
+                  unit="mg"
+                  icon="warning"
+                  color="#F44336"
                 />
               </View>
             </View>
@@ -775,22 +1128,40 @@ export default function StatisticsScreen() {
               </View>
             </View>
 
+            {/* Additional Statistics */}
+            <AdditionalStats />
+
             {/* Meal Summary */}
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>
                 {t("statistics.meal_summary")}
               </Text>
-              <StatCard
-                title={t("statistics.total_meals")}
-                value={statisticsData.totalMeals}
-                unit=" meals"
-                icon="restaurant"
-                color="#607D8B"
-                isLarge={true}
-              />
+              <View style={styles.statsGrid}>
+                <StatCard
+                  title={t("statistics.total_meals")}
+                  value={statisticsData.totalMeals}
+                  unit=" meals"
+                  icon="restaurant"
+                  color="#607D8B"
+                />
+                <StatCard
+                  title={t("statistics.total_days")}
+                  value={statisticsData.totalDays}
+                  unit=" days"
+                  icon="calendar"
+                  color="#607D8B"
+                />
+              </View>
             </View>
           </>
-        ) : null}
+        ) : (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="stats-chart-outline" size={64} color="#ccc" />
+            <Text style={[styles.emptyText, isRTL && styles.textRTL]}>
+              {t("statistics.no_data")}
+            </Text>
+          </View>
+        )}
       </ScrollView>
 
       {/* Date Picker Modal */}
@@ -827,17 +1198,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-  },
-  debugButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: "#FF6B35",
-    borderRadius: 6,
-  },
-  debugButtonText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "600",
   },
   headerRTL: {
     alignItems: "flex-end",
@@ -957,6 +1317,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 60,
+  },
+  emptyText: {
+    marginTop: 16,
+    color: "#666",
+    fontSize: 16,
+    textAlign: "center",
+  },
   section: {
     backgroundColor: "#fff",
     marginHorizontal: 20,
@@ -974,6 +1346,59 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#333",
     marginBottom: 16,
+  },
+  chartToggle: {
+    flexDirection: "row",
+    marginBottom: 16,
+    backgroundColor: "#f0f0f0",
+    borderRadius: 8,
+    padding: 4,
+  },
+  toggleButton: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: "center",
+    borderRadius: 6,
+  },
+  activeToggleButton: {
+    backgroundColor: "#007AFF",
+  },
+  toggleButtonText: {
+    fontSize: 14,
+    color: "#666",
+    fontWeight: "600",
+  },
+  activeToggleButtonText: {
+    color: "#fff",
+  },
+  chartContainer: {
+    marginBottom: 20,
+  },
+  chartTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  chartWrapper: {
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  chart: {
+    borderRadius: 16,
+    marginVertical: 8,
+  },
+  pieChartWrapper: {
+    alignItems: "center", // Horizontally center the chart
+    justifyContent: "center", // Vertically center if needed
+    paddingVertical: 10,
+    backgroundColor: "transparent",
+    overflow: "visible", // Ensure it’s not clipping
+  },
+  textRTL: {
+    textAlign: "right",
   },
   statsGrid: {
     gap: 12,
@@ -1024,44 +1449,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
     color: "#666",
-  },
-  healthStatusContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#f8f9fa",
-    padding: 20,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
-  },
-  healthIndicator: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 20,
-  },
-  healthPercentage: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#fff",
-  },
-  healthInfo: {
-    flex: 1,
-  },
-  healthTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 4,
-  },
-  healthDescription: {
-    fontSize: 14,
-    color: "#666",
-    lineHeight: 20,
-  },
-  textRTL: {
-    textAlign: "right",
   },
 });
