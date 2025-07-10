@@ -5,16 +5,16 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Modal,
   Alert,
   ActivityIndicator,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { useLanguage } from "@/src/i18n/context/LanguageContext";
+import { format, subDays, startOfWeek, endOfWeek } from "date-fns";
+import { api } from "@/src/services/api";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { nutritionAPI, statisticsAPI } from "@/src/services/api";
+import { PageWrapper } from "@/components/PageWrapper";
 
 interface StatisticsData {
   calories: number;
@@ -90,10 +90,7 @@ export default function StatisticsScreen() {
 
       console.log("📅 Formatted dates for API:", { startDate, endDate });
 
-      const response = await nutritionAPI.getRangeStatistics(
-        startDate,
-        endDate
-      );
+      const response = await api.getRangeStatistics(startDate, endDate);
 
       if (response.success) {
         setStatistics(response.data);
@@ -164,231 +161,250 @@ export default function StatisticsScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={[styles.header, isRTL && styles.headerRTL]}>
-        <Text style={[styles.headerTitle, isRTL && styles.headerTitleRTL]}>
-          {t("statistics.title")}
-        </Text>
-      </View>
-
-      {/* Time Range Selector */}
-      <View
-        style={[
-          styles.timeRangeContainer,
-          isRTL && styles.timeRangeContainerRTL,
-        ]}
-      >
+    <PageWrapper>
+      <View style={styles.container}>
         <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.timeRangeScroll}
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
         >
-          {["daily", "weekly", "monthly", "custom"].map((range) => (
-            <TouchableOpacity
-              key={range}
-              style={[
-                styles.timeRangeButton,
-                timeRange === range && styles.activeTimeRangeButton,
-                isRTL && styles.timeRangeButtonRTL,
-              ]}
-              onPress={() => setTimeRange(range as any)}
+          <View style={[styles.header, isRTL && styles.headerRTL]}>
+            <Text style={[styles.headerTitle, isRTL && styles.headerTitleRTL]}>
+              {t("statistics.title")}
+            </Text>
+          </View>
+
+          {/* Time Range Selector */}
+          <View
+            style={[
+              styles.timeRangeContainer,
+              isRTL && styles.timeRangeContainerRTL,
+            ]}
+          >
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.timeRangeScroll}
             >
-              <Text
-                style={[
-                  styles.timeRangeButtonText,
-                  timeRange === range && styles.activeTimeRangeButtonText,
-                  isRTL && styles.timeRangeButtonTextRTL,
-                ]}
-              >
-                {t(
-                  `statistics.${
-                    range === "daily"
-                      ? "daily_average"
-                      : range === "weekly"
-                      ? "weekly_overview"
-                      : range === "monthly"
-                      ? "monthly_overview"
-                      : "custom_date_range"
-                  }`
-                )}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-
-      {/* Custom Date Range */}
-      {timeRange === "custom" && (
-        <View
-          style={[
-            styles.customDateContainer,
-            isRTL && styles.customDateContainerRTL,
-          ]}
-        >
-          <TouchableOpacity
-            style={[styles.dateButton, isRTL && styles.dateButtonRTL]}
-            onPress={() => openDatePicker("from")}
-          >
-            <Text style={[styles.dateLabel, isRTL && styles.dateLabelRTL]}>
-              {t("statistics.from")}
-            </Text>
-            <Text style={[styles.dateValue, isRTL && styles.dateValueRTL]}>
-              {formatDate(fromDate)}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.dateButton, isRTL && styles.dateButtonRTL]}
-            onPress={() => openDatePicker("to")}
-          >
-            <Text style={[styles.dateLabel, isRTL && styles.dateLabelRTL]}>
-              {t("statistics.to")}
-            </Text>
-            <Text style={[styles.dateValue, isRTL && styles.dateValueRTL]}>
-              {formatDate(toDate)}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>{t("common.loading")}</Text>
-        </View>
-      ) : (
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {statistics && (
-            <>
-              {/* Nutrition Stats */}
-              <View style={styles.section}>
-                <Text
-                  style={[styles.sectionTitle, isRTL && styles.sectionTitleRTL]}
-                >
-                  {t("statistics.nutrition_stats")}
-                </Text>
-                <View style={styles.statsGrid}>
-                  <StatCard
-                    title={t("statistics.calories_consumed")}
-                    value={statistics.calories}
-                    unit=""
-                    icon="flame"
-                    color="#FF6B35"
-                  />
-                  <StatCard
-                    title={t("statistics.protein_intake")}
-                    value={statistics.protein}
-                    unit="g"
-                    icon="fitness"
-                    color="#4CAF50"
-                  />
-                  <StatCard
-                    title={t("statistics.carbs_intake")}
-                    value={statistics.carbs}
-                    unit="g"
-                    icon="leaf"
-                    color="#FF9800"
-                  />
-                  <StatCard
-                    title={t("statistics.fat_intake")}
-                    value={statistics.fat}
-                    unit="g"
-                    icon="water"
-                    color="#9C27B0"
-                  />
-                </View>
-              </View>
-
-              {/* Hydration & Substances */}
-              <View style={styles.section}>
-                <Text
-                  style={[styles.sectionTitle, isRTL && styles.sectionTitleRTL]}
-                >
-                  {t("statistics.water_intake")} &{" "}
-                  {t("statistics.alcohol_consumption")}
-                </Text>
-                <View style={styles.statsGrid}>
-                  <StatCard
-                    title={t("statistics.water_intake")}
-                    value={statistics.water_ml}
-                    unit="ml"
-                    icon="water"
-                    color="#2196F3"
-                  />
-                  <StatCard
-                    title={t("statistics.alcohol_consumption")}
-                    value={statistics.alcohol_g}
-                    unit="g"
-                    icon="wine"
-                    color="#F44336"
-                  />
-                  <StatCard
-                    title={t("statistics.caffeine_consumption")}
-                    value={statistics.caffeine_mg}
-                    unit="mg"
-                    icon="cafe"
-                    color="#795548"
-                  />
-                </View>
-              </View>
-
-              {/* Health Deviation Rate */}
-              <View style={styles.section}>
-                <Text
-                  style={[styles.sectionTitle, isRTL && styles.sectionTitleRTL]}
-                >
-                  {t("statistics.health_deviation_rate")}
-                </Text>
-                <View
+              {["daily", "weekly", "monthly", "custom"].map((range) => (
+                <TouchableOpacity
+                  key={range}
                   style={[
-                    styles.deviationCard,
-                    isRTL && styles.deviationCardRTL,
+                    styles.timeRangeButton,
+                    timeRange === range && styles.activeTimeRangeButton,
+                    isRTL && styles.timeRangeButtonRTL,
                   ]}
+                  onPress={() => setTimeRange(range as any)}
                 >
-                  <View
-                    style={[
-                      styles.deviationIndicator,
-                      {
-                        backgroundColor: getHealthDeviationColor(
-                          statistics.health_deviation_rate
-                        ),
-                      },
-                    ]}
-                  >
-                    <Text style={styles.deviationValue}>
-                      {Math.round(statistics.health_deviation_rate)}%
-                    </Text>
-                  </View>
                   <Text
                     style={[
-                      styles.deviationText,
-                      isRTL && styles.deviationTextRTL,
+                      styles.timeRangeButtonText,
+                      timeRange === range && styles.activeTimeRangeButtonText,
+                      isRTL && styles.timeRangeButtonTextRTL,
                     ]}
                   >
-                    {statistics.health_deviation_rate <= 10
-                      ? "Excellent adherence to health goals"
-                      : statistics.health_deviation_rate <= 25
-                      ? "Good adherence with minor deviations"
-                      : "Consider adjusting your nutrition plan"}
+                    {t(
+                      `statistics.${
+                        range === "daily"
+                          ? "daily_average"
+                          : range === "weekly"
+                          ? "weekly_overview"
+                          : range === "monthly"
+                          ? "monthly_overview"
+                          : "custom_date_range"
+                      }`
+                    )}
                   </Text>
-                </View>
-              </View>
-            </>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+
+          {/* Custom Date Range */}
+          {timeRange === "custom" && (
+            <View
+              style={[
+                styles.customDateContainer,
+                isRTL && styles.customDateContainerRTL,
+              ]}
+            >
+              <TouchableOpacity
+                style={[styles.dateButton, isRTL && styles.dateButtonRTL]}
+                onPress={() => openDatePicker("from")}
+              >
+                <Text style={[styles.dateLabel, isRTL && styles.dateLabelRTL]}>
+                  {t("statistics.from")}
+                </Text>
+                <Text style={[styles.dateValue, isRTL && styles.dateValueRTL]}>
+                  {formatDate(fromDate)}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.dateButton, isRTL && styles.dateButtonRTL]}
+                onPress={() => openDatePicker("to")}
+              >
+                <Text style={[styles.dateLabel, isRTL && styles.dateLabelRTL]}>
+                  {t("statistics.to")}
+                </Text>
+                <Text style={[styles.dateValue, isRTL && styles.dateValueRTL]}>
+                  {formatDate(toDate)}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#007AFF" />
+              <Text style={styles.loadingText}>{t("common.loading")}</Text>
+            </View>
+          ) : (
+            <ScrollView
+              style={styles.content}
+              showsVerticalScrollIndicator={false}
+            >
+              {statistics && (
+                <>
+                  {/* Nutrition Stats */}
+                  <View style={styles.section}>
+                    <Text
+                      style={[
+                        styles.sectionTitle,
+                        isRTL && styles.sectionTitleRTL,
+                      ]}
+                    >
+                      {t("statistics.nutrition_stats")}
+                    </Text>
+                    <View style={styles.statsGrid}>
+                      <StatCard
+                        title={t("statistics.calories_consumed")}
+                        value={statistics.calories}
+                        unit=""
+                        icon="flame"
+                        color="#FF6B35"
+                      />
+                      <StatCard
+                        title={t("statistics.protein_intake")}
+                        value={statistics.protein}
+                        unit="g"
+                        icon="fitness"
+                        color="#4CAF50"
+                      />
+                      <StatCard
+                        title={t("statistics.carbs_intake")}
+                        value={statistics.carbs}
+                        unit="g"
+                        icon="leaf"
+                        color="#FF9800"
+                      />
+                      <StatCard
+                        title={t("statistics.fat_intake")}
+                        value={statistics.fat}
+                        unit="g"
+                        icon="water"
+                        color="#9C27B0"
+                      />
+                    </View>
+                  </View>
+
+                  {/* Hydration & Substances */}
+                  <View style={styles.section}>
+                    <Text
+                      style={[
+                        styles.sectionTitle,
+                        isRTL && styles.sectionTitleRTL,
+                      ]}
+                    >
+                      {t("statistics.water_intake")} &{" "}
+                      {t("statistics.alcohol_consumption")}
+                    </Text>
+                    <View style={styles.statsGrid}>
+                      <StatCard
+                        title={t("statistics.water_intake")}
+                        value={statistics.water_ml}
+                        unit="ml"
+                        icon="water"
+                        color="#2196F3"
+                      />
+                      <StatCard
+                        title={t("statistics.alcohol_consumption")}
+                        value={statistics.alcohol_g}
+                        unit="g"
+                        icon="wine"
+                        color="#F44336"
+                      />
+                      <StatCard
+                        title={t("statistics.caffeine_consumption")}
+                        value={statistics.caffeine_mg}
+                        unit="mg"
+                        icon="cafe"
+                        color="#795548"
+                      />
+                    </View>
+                  </View>
+
+                  {/* Health Deviation Rate */}
+                  <View style={styles.section}>
+                    <Text
+                      style={[
+                        styles.sectionTitle,
+                        isRTL && styles.sectionTitleRTL,
+                      ]}
+                    >
+                      {t("statistics.health_deviation_rate")}
+                    </Text>
+                    <View
+                      style={[
+                        styles.deviationCard,
+                        isRTL && styles.deviationCardRTL,
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.deviationIndicator,
+                          {
+                            backgroundColor: getHealthDeviationColor(
+                              statistics.health_deviation_rate
+                            ),
+                          },
+                        ]}
+                      >
+                        <Text style={styles.deviationValue}>
+                          {Math.round(statistics.health_deviation_rate)}%
+                        </Text>
+                      </View>
+                      <Text
+                        style={[
+                          styles.deviationText,
+                          isRTL && styles.deviationTextRTL,
+                        ]}
+                      >
+                        {statistics.health_deviation_rate <= 10
+                          ? "Excellent adherence to health goals"
+                          : statistics.health_deviation_rate <= 25
+                          ? "Good adherence with minor deviations"
+                          : "Consider adjusting your nutrition plan"}
+                      </Text>
+                    </View>
+                  </View>
+                </>
+              )}
+            </ScrollView>
+          )}
+
+          {/* Date Picker Modal */}
+          {showDatePicker && (
+            <DateTimePicker
+              value={datePickerMode === "from" ? fromDate : toDate}
+              mode="date"
+              display="default"
+              onChange={handleDateChange}
+              maximumDate={new Date()}
+            />
           )}
         </ScrollView>
-      )}
-
-      {/* Date Picker Modal */}
-      {showDatePicker && (
-        <DateTimePicker
-          value={datePickerMode === "from" ? fromDate : toDate}
-          mode="date"
-          display="default"
-          onChange={handleDateChange}
-          maximumDate={new Date()}
-        />
-      )}
-    </SafeAreaView>
+      </View>
+    </PageWrapper>
   );
 }
 

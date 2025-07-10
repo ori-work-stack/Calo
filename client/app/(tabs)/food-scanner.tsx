@@ -24,6 +24,7 @@ import { useRTLStyles } from "../../hooks/useRTLStyle";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { foodScannerAPI } from "@/src/services/api";
 import { t } from "i18next";
+import { api } from "../../src/services/api";
 
 interface ProductData {
   barcode?: string;
@@ -71,8 +72,12 @@ export default function FoodScannerScreen() {
   const [showAddToMeal, setShowAddToMeal] = useState(false);
   const [mealRating, setMealRating] = useState(0);
   const [hasRated, setHasRated] = useState(false);
+  const [scannedFood, setScannedFood] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [showMealSelector, setShowMealSelector] = useState(false);
+  const [selectedMealType, setSelectedMealType] = useState("breakfast");
+  const [scannedHistory, setScannedHistory] = useState<any[]>([]);
   const [showHistory, setShowHistory] = useState(false);
-  const [scannedHistory, setScannedHistory] = useState<ProductData[]>([]);
 
   const getHealthDeviationColor = (rate: number) => {
     if (rate <= 10) return "#4CAF50"; // Green - Good
@@ -143,7 +148,7 @@ export default function FoodScannerScreen() {
   const loadScannedHistory = async () => {
     try {
       const response = await foodScannerAPI.getScannedHistory();
-      console.log(response)
+      console.log(response);
       if (response.success) {
         const historyData = response.data.map((item: any) => ({
           name: item.product_name,
@@ -159,7 +164,7 @@ export default function FoodScannerScreen() {
         }));
         setScannedHistory(historyData);
       }
-      console.log(scannedHistory,"hello world")
+      console.log(scannedHistory, "hello world");
     } catch (error) {
       console.error("Error loading scanned history:", error);
       // Fallback to localStorage
@@ -379,6 +384,83 @@ export default function FoodScannerScreen() {
         )}
       </View>
     );
+  };
+
+  const handleScanResult = async (result: any) => {
+    try {
+      setLoading(true);
+
+      // Process the scanned result
+      //const processedData = await processScanResult(result);
+      //setScannedFood(processedData);
+
+      // Show meal selection instead of auto-saving
+      setShowMealSelector(true);
+    } catch (error) {
+      console.error("Scan processing error:", error);
+      alert("Error processing scan result");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveMeal = async (
+    foodData: any,
+    mealType: string = "breakfast",
+    quantity: number = 100
+  ) => {
+    try {
+      const now = new Date();
+      const mealData = {
+        name: foodData.name,
+        description: foodData.description,
+        calories: Math.round((foodData.calories * quantity) / 100),
+        protein: Math.round((foodData.protein * quantity) / 100),
+        carbs: Math.round((foodData.carbs * quantity) / 100),
+        fat: Math.round((foodData.fat * quantity) / 100),
+        fiber: Math.round((foodData.fiber * quantity) / 100) || 0,
+        sugar: Math.round((foodData.sugar * quantity) / 100) || 0,
+        sodium: Math.round((foodData.sodium * quantity) / 100) || 0,
+        quantity: quantity,
+        meal_type: mealType,
+        date: formatDateForAPI(now),
+        time: now.toLocaleTimeString("en-US", {
+          hour12: false,
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        ingredients: foodData.ingredients || "",
+        allergens: foodData.allergens || [],
+        barcode: foodData.barcode || null,
+        source: foodData.source || "scanner",
+      };
+
+      console.log("💾 Saving meal data:", mealData);
+      const response = await api.post("/nutrition/meals", mealData);
+      console.log("✅ Meal saved:", response.data);
+
+      // Add to scan history
+      const historyItem = {
+        ...foodData,
+        scannedAt: now.toISOString(),
+        savedAs: mealType,
+        quantity: quantity,
+      };
+      setScannedHistory((prev) => [historyItem, ...prev.slice(0, 49)]); // Keep last 50 items
+
+      alert(`Meal saved to ${mealType}!`);
+      setShowMealSelector(false);
+    } catch (error) {
+      console.error("💥 Error saving meal:", error);
+      alert("Error saving meal");
+    }
+  };
+
+  const formatDateForAPI = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
   };
 
   if (hasPermission === null) {

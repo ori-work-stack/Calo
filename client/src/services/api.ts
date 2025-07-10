@@ -591,17 +591,35 @@ export const nutritionAPI = {
 
       // Ensure dates are in YYYY-MM-DD format
       const formatDate = (dateStr: string) => {
+        // Check if already in YYYY-MM-DD format
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+          return dateStr;
+        }
+
+        // Parse and format the date
         const date = new Date(dateStr);
-        return date.toISOString().split("T")[0];
+        if (isNaN(date.getTime())) {
+          throw new Error(`Invalid date: ${dateStr}`);
+        }
+
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
       };
 
       const formattedStartDate = formatDate(startDate);
       const formattedEndDate = formatDate(endDate);
 
+      console.log("📊 Formatted dates for API:", {
+        formattedStartDate,
+        formattedEndDate,
+      });
+
       const response = await api.get("/nutrition/stats/range", {
         params: {
-          start_date: formattedStartDate,
-          end_date: formattedEndDate,
+          startDate: formattedStartDate,
+          endDate: formattedEndDate,
         },
       });
 

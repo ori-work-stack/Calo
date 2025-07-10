@@ -219,43 +219,31 @@ router.get("/stats/range", async (req: AuthRequest, res) => {
       });
     }
 
-    // Convert to string and trim whitespace
+    // Ensure dates are strings and trim whitespace
     const startDateStr = String(startDate).trim();
     const endDateStr = String(endDate).trim();
 
-    console.log("🔍 Validating dates after string conversion:", {
-      startDateStr,
-      endDateStr,
-    });
+    console.log("📊 Received dates:", { startDateStr, endDateStr });
 
-    // Validate date format (YYYY-MM-DD)
+    // Validate date format (YYYY-MM-DD) - more strict validation
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-
     if (!dateRegex.test(startDateStr)) {
-      console.log("❌ Start date validation failed:", {
-        startDateStr,
-        length: startDateStr.length,
-        regexTest: dateRegex.test(startDateStr),
-      });
+      console.error("❌ Invalid startDate format:", startDateStr);
       return res.status(400).json({
         success: false,
-        error: `Start date must be in YYYY-MM-DD format. Received: '${startDateStr}'`,
+        error: "Date must be in YYYY-MM-DD format",
       });
     }
 
     if (!dateRegex.test(endDateStr)) {
-      console.log("❌ End date validation failed:", {
-        endDateStr,
-        length: endDateStr.length,
-        regexTest: dateRegex.test(endDateStr),
-      });
+      console.error("❌ Invalid endDate format:", endDateStr);
       return res.status(400).json({
         success: false,
-        error: `End date must be in YYYY-MM-DD format. Received: '${endDateStr}'`,
+        error: "Date must be in YYYY-MM-DD format",
       });
     }
 
-    // Additional validation: Check if dates are valid Date objects
+    // Parse dates to verify they are valid - use local time instead of UTC
     const startDateObj = new Date(startDateStr);
     const endDateObj = new Date(endDateStr);
 

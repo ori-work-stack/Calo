@@ -11,6 +11,8 @@ import {
   Alert,
   RefreshControl,
   ActivityIndicator,
+  Animated,
+  ScrollView,
 } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState, AppDispatch } from "../../src/store";
@@ -29,6 +31,7 @@ import { TooltipBubble } from "@/components/TooltipBubble";
 
 interface MealWithFeedback extends Meal {
   userRating?: number;
+  expanded?: boolean;
 }
 
 interface FilterOptions {
@@ -38,7 +41,12 @@ interface FilterOptions {
   category?: string;
 }
 
+interface ExpandedMealData {
+  [key: string]: boolean;
+}
+
 export default function HistoryScreen() {
+  const { t } = useTranslation();
   const dispatch = useDispatch<AppDispatch>();
   const {
     meals,
@@ -50,17 +58,17 @@ export default function HistoryScreen() {
   } = useSelector((state: RootState) => state.meal);
 
   const [filteredMeals, setFilteredMeals] = useState<MealWithFeedback[]>([]);
+  const [expandedMeals, setExpandedMeals] = useState<ExpandedMealData>({});
   const [showFilters, setShowFilters] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null);
-  const [mealDetails, setMealDetails] = useState<any>(null);
-  const [loadingDetails, setLoadingDetails] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [filters, setFilters] = useState<FilterOptions>({});
   const [smartInsight, setSmartInsight] = useState<string>("");
   const [updateText, setUpdateText] = useState("");
   const [showSearchTooltip, setShowSearchTooltip] = useState(false);
+
   // Feedback ratings
   const [tasteRating, setTasteRating] = useState(0);
   const [satietyRating, setSatietyRating] = useState(0);
@@ -81,8 +89,13 @@ export default function HistoryScreen() {
 
     // Search filter
     if (searchText) {
-      filtered = filtered.filter((meal) =>
-        meal.name.toLowerCase().includes(searchText.toLowerCase())
+      filtered = filtered.filter(
+        (meal) =>
+          meal.name?.toLowerCase().includes(searchText.toLowerCase()) ||
+          meal.description?.toLowerCase().includes(searchText.toLowerCase()) ||
+          meal.ingredients?.some((ing) =>
+            ing.name?.toLowerCase().includes(searchText.toLowerCase())
+          )
       );
     }
 
@@ -107,13 +120,19 @@ export default function HistoryScreen() {
       });
     }
 
+    // Sort by date (newest first)
+    filtered.sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+
     setFilteredMeals(filtered);
   };
 
   const getMealCategory = (meal: Meal): string => {
-    const protein = meal.protein || 0;
-    const carbs = meal.carbs || 0;
-    const fat = meal.fat || 0;
+    const protein = meal.protein || meal.protein_g || 0;
+    const carbs = meal.carbs || meal.carbs_g || 0;
+    const fat = meal.fat || meal.fats_g || 0;
     const total = protein + carbs + fat;
 
     if (total === 0) return "unknown";
@@ -131,11 +150,11 @@ export default function HistoryScreen() {
   const getMealScore = (meal: Meal): { score: number; color: string } => {
     let score = 5; // Start with base score
 
-    const calories = meal.calories || 0;
-    const protein = meal.protein || 0;
-    const carbs = meal.carbs || 0;
-    const fat = meal.fat || 0;
-    const fiber = meal.fiber || 0;
+    const calories = meal.calories || meal.totalCalories || 0;
+    const protein = meal.protein || meal.protein_g || meal.totalProtein || 0;
+    const carbs = meal.carbs || meal.carbs_g || meal.totalCarbs || 0;
+    const fat = meal.fat || meal.fats_g || meal.totalFat || 0;
+    const fiber = meal.fiber || meal.fiber_g || 0;
 
     // Protein adequacy (good if 15-30% of calories)
     const proteinCalories = protein * 4;
@@ -153,6 +172,14 @@ export default function HistoryScreen() {
     if (calories > 800) score -= 1; // Very high calorie meal
     if (calories < 100) score -= 1; // Very low calorie meal
 
+    // Processing level penalty
+    if (
+      meal.processing_level === "Ultra-processed" ||
+      meal.processing_level === "ULTRA_PROCESSED"
+    ) {
+      score -= 1;
+    }
+
     // Ensure score is between 1-10
     score = Math.max(1, Math.min(10, score));
 
@@ -164,7 +191,12 @@ export default function HistoryScreen() {
   };
 
   const generateSmartInsight = () => {
-    if (meals.length === 0) return;
+    if (meals.length === 0) {
+      setSmartInsight(
+        t("history.no_meals_insight", "Start logging meals to see insights")
+      );
+      return;
+    }
 
     const lastWeekMeals = meals.filter((meal) => {
       const mealDate = new Date(meal.created_at);
@@ -174,22 +206,39 @@ export default function HistoryScreen() {
     });
 
     const thisWeekCalories = lastWeekMeals.reduce(
-      (sum, meal) => sum + (meal.calories || 0),
+      (sum, meal) => sum + (meal.calories || meal.totalCalories || 0),
       0
     );
     const avgDailyCalories = thisWeekCalories / 7;
 
     const insights = [
-      `This week you consumed an average of ${Math.round(
-        avgDailyCalories
-      )} calories per day`,
-      `You logged ${lastWeekMeals.length} meals this week`,
-      `Your healthiest meal this week scored ${Math.max(
-        ...lastWeekMeals.map((m) => getMealScore(m).score)
-      )}`,
+      t(
+        "history.insight_calories",
+        "This week you consumed an average of {{calories}} calories per day",
+        {
+          calories: Math.round(avgDailyCalories),
+        }
+      ),
+      t("history.insight_meals", "You logged {{count}} meals this week", {
+        count: lastWeekMeals.length,
+      }),
+      t(
+        "history.insight_score",
+        "Your healthiest meal this week scored {{score}}",
+        {
+          score: Math.max(...lastWeekMeals.map((m) => getMealScore(m).score)),
+        }
+      ),
     ];
 
     setSmartInsight(insights[Math.floor(Math.random() * insights.length)]);
+  };
+
+  const toggleMealExpansion = (mealId: string) => {
+    setExpandedMeals((prev) => ({
+      ...prev,
+      [mealId]: !prev[mealId],
+    }));
   };
 
   const handleFeedbackSubmit = async () => {
@@ -210,17 +259,26 @@ export default function HistoryScreen() {
         })
       ).unwrap();
 
-      Alert.alert("Thank you!", "Your feedback has been saved successfully");
+      Alert.alert(
+        t("common.success", "Success"),
+        t("history.feedback_saved", "Your feedback has been saved successfully")
+      );
       setShowFeedbackModal(false);
       resetFeedbackRatings();
     } catch (error) {
-      Alert.alert("Error", "Failed to save feedback");
+      Alert.alert(
+        t("common.error", "Error"),
+        t("history.feedback_error", "Failed to save feedback")
+      );
     }
   };
 
   const handleUpdateSubmit = async () => {
     if (!selectedMeal || !updateText.trim()) {
-      Alert.alert("Error", "Please enter update text");
+      Alert.alert(
+        t("common.error", "Error"),
+        t("history.update_text_required", "Please enter update text")
+      );
       return;
     }
 
@@ -232,14 +290,20 @@ export default function HistoryScreen() {
         })
       ).unwrap();
 
-      Alert.alert("Success", "Meal updated successfully!");
+      Alert.alert(
+        t("common.success", "Success"),
+        t("history.meal_updated", "Meal updated successfully!")
+      );
       setShowUpdateModal(false);
       setUpdateText("");
       setSelectedMeal(null);
       // Refresh meals
       dispatch(fetchMeals());
     } catch (error) {
-      Alert.alert("Error", "Failed to update meal");
+      Alert.alert(
+        t("common.error", "Error"),
+        t("history.update_error", "Failed to update meal")
+      );
     }
   };
 
@@ -253,20 +317,29 @@ export default function HistoryScreen() {
   const handleToggleFavorite = async (mealId: string) => {
     try {
       await dispatch(toggleMealFavorite(mealId)).unwrap();
-      Alert.alert("Success", "Favorite status updated");
+      Alert.alert(
+        t("common.success", "Success"),
+        t("history.favorite_updated", "Favorite status updated")
+      );
     } catch (error) {
-      Alert.alert("Error", "Failed to update favorite status");
+      Alert.alert(
+        t("common.error", "Error"),
+        t("history.favorite_error", "Failed to update favorite status")
+      );
     }
   };
 
   const handleDuplicateMeal = async (meal: Meal) => {
     Alert.alert(
-      "Duplicate Meal",
-      "Would you like to duplicate this meal to today?",
+      t("history.duplicate_meal", "Duplicate Meal"),
+      t(
+        "history.duplicate_confirmation",
+        "Would you like to duplicate this meal to today?"
+      ),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("common.cancel", "Cancel"), style: "cancel" },
         {
-          text: "Yes",
+          text: t("common.yes", "Yes"),
           onPress: async () => {
             try {
               console.log("🔄 Starting duplicate process for meal:", meal.id);
@@ -280,16 +353,21 @@ export default function HistoryScreen() {
               ).unwrap();
 
               console.log("✅ Duplicate result:", result);
-              Alert.alert("Success", "Meal duplicated successfully!");
+              Alert.alert(
+                t("common.success", "Success"),
+                t("history.meal_duplicated", "Meal duplicated successfully!")
+              );
 
               // Refresh meals to show the new duplicate
               dispatch(fetchMeals());
             } catch (error) {
               console.error("💥 Duplicate error:", error);
               Alert.alert(
-                "Error",
-                "Failed to duplicate meal: " +
-                  (error instanceof Error ? error.message : "Unknown error")
+                t("common.error", "Error"),
+                t("history.duplicate_error", "Failed to duplicate meal: ") +
+                  (error instanceof Error
+                    ? error.message
+                    : t("common.unknown_error", "Unknown error"))
               );
             }
           },
@@ -323,19 +401,263 @@ export default function HistoryScreen() {
     );
   };
 
+  const renderNutritionDetails = (meal: MealWithFeedback) => {
+    return (
+      <View style={styles.nutritionDetails}>
+        <Text style={styles.nutritionDetailsTitle}>
+          {t("nutrition.detailed_info", "Detailed Nutrition Information")}
+        </Text>
+
+        {/* Basic Macros */}
+        <View style={styles.macroSection}>
+          <Text style={styles.sectionTitle}>
+            {t("nutrition.macronutrients", "Macronutrients")}
+          </Text>
+          <View style={styles.nutritionGrid}>
+            <View style={styles.nutritionDetailItem}>
+              <Text style={styles.nutritionDetailLabel}>
+                {t("nutrition.calories", "Calories")}
+              </Text>
+              <Text style={styles.nutritionDetailValue}>
+                {Math.round(meal.calories || meal.totalCalories || 0)}
+              </Text>
+            </View>
+            <View style={styles.nutritionDetailItem}>
+              <Text style={styles.nutritionDetailLabel}>
+                {t("nutrition.protein", "Protein")}
+              </Text>
+              <Text style={styles.nutritionDetailValue}>
+                {Math.round(
+                  meal.protein || meal.protein_g || meal.totalProtein || 0
+                )}
+                g
+              </Text>
+            </View>
+            <View style={styles.nutritionDetailItem}>
+              <Text style={styles.nutritionDetailLabel}>
+                {t("nutrition.carbs", "Carbs")}
+              </Text>
+              <Text style={styles.nutritionDetailValue}>
+                {Math.round(meal.carbs || meal.carbs_g || meal.totalCarbs || 0)}
+                g
+              </Text>
+            </View>
+            <View style={styles.nutritionDetailItem}>
+              <Text style={styles.nutritionDetailLabel}>
+                {t("nutrition.fat", "Fat")}
+              </Text>
+              <Text style={styles.nutritionDetailValue}>
+                {Math.round(meal.fat || meal.fats_g || meal.totalFat || 0)}g
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Extended Nutrition */}
+        {(meal.fiber ||
+          meal.fiber_g ||
+          meal.sugar ||
+          meal.sugar_g ||
+          meal.sodium ||
+          meal.sodium_mg) && (
+          <View style={styles.macroSection}>
+            <Text style={styles.sectionTitle}>
+              {t("nutrition.additional", "Additional Nutrients")}
+            </Text>
+            <View style={styles.nutritionGrid}>
+              {(meal.fiber || meal.fiber_g) && (
+                <View style={styles.nutritionDetailItem}>
+                  <Text style={styles.nutritionDetailLabel}>
+                    {t("nutrition.fiber", "Fiber")}
+                  </Text>
+                  <Text style={styles.nutritionDetailValue}>
+                    {Math.round(meal.fiber || meal.fiber_g || 0)}g
+                  </Text>
+                </View>
+              )}
+              {(meal.sugar || meal.sugar_g) && (
+                <View style={styles.nutritionDetailItem}>
+                  <Text style={styles.nutritionDetailLabel}>
+                    {t("nutrition.sugar", "Sugar")}
+                  </Text>
+                  <Text style={styles.nutritionDetailValue}>
+                    {Math.round(meal.sugar || meal.sugar_g || 0)}g
+                  </Text>
+                </View>
+              )}
+              {(meal.sodium || meal.sodium_mg) && (
+                <View style={styles.nutritionDetailItem}>
+                  <Text style={styles.nutritionDetailLabel}>
+                    {t("nutrition.sodium", "Sodium")}
+                  </Text>
+                  <Text style={styles.nutritionDetailValue}>
+                    {Math.round(meal.sodium || meal.sodium_mg || 0)}mg
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* Vitamins and Minerals */}
+        {meal.vitamins_json && (
+          <View style={styles.macroSection}>
+            <Text style={styles.sectionTitle}>
+              {t("nutrition.vitamins", "Vitamins")}
+            </Text>
+            <View style={styles.nutritionGrid}>
+              {Object.entries(meal.vitamins_json).map(([key, value]) => {
+                if (!value || value === 0) return null;
+                const vitaminName = key
+                  .replace(/_/g, " ")
+                  .replace(/\b\w/g, (l) => l.toUpperCase());
+                return (
+                  <View key={key} style={styles.nutritionDetailItem}>
+                    <Text style={styles.nutritionDetailLabel}>
+                      {vitaminName}
+                    </Text>
+                    <Text style={styles.nutritionDetailValue}>
+                      {typeof value === "number"
+                        ? Math.round(value * 100) / 100
+                        : value}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
+        {meal.micronutrients_json && (
+          <View style={styles.macroSection}>
+            <Text style={styles.sectionTitle}>
+              {t("nutrition.minerals", "Minerals")}
+            </Text>
+            <View style={styles.nutritionGrid}>
+              {Object.entries(meal.micronutrients_json).map(([key, value]) => {
+                if (!value || value === 0) return null;
+                const mineralName = key
+                  .replace(/_/g, " ")
+                  .replace(/\b\w/g, (l) => l.toUpperCase());
+                return (
+                  <View key={key} style={styles.nutritionDetailItem}>
+                    <Text style={styles.nutritionDetailLabel}>
+                      {mineralName}
+                    </Text>
+                    <Text style={styles.nutritionDetailValue}>
+                      {typeof value === "number"
+                        ? Math.round(value * 100) / 100
+                        : value}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
+        {/* Food Analysis */}
+        {(meal.processing_level ||
+          meal.food_category ||
+          meal.cooking_method) && (
+          <View style={styles.macroSection}>
+            <Text style={styles.sectionTitle}>
+              {t("nutrition.food_analysis", "Food Analysis")}
+            </Text>
+            {meal.processing_level && (
+              <View style={styles.analysisItem}>
+                <Text style={styles.analysisLabel}>
+                  {t("nutrition.processing_level", "Processing Level")}
+                </Text>
+                <Text style={styles.analysisValue}>
+                  {meal.processing_level}
+                </Text>
+              </View>
+            )}
+            {meal.food_category && (
+              <View style={styles.analysisItem}>
+                <Text style={styles.analysisLabel}>
+                  {t("nutrition.food_category", "Food Category")}
+                </Text>
+                <Text style={styles.analysisValue}>{meal.food_category}</Text>
+              </View>
+            )}
+            {meal.cooking_method && (
+              <View style={styles.analysisItem}>
+                <Text style={styles.analysisLabel}>
+                  {t("nutrition.cooking_method", "Cooking Method")}
+                </Text>
+                <Text style={styles.analysisValue}>{meal.cooking_method}</Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Allergens */}
+        {meal.allergens_json &&
+          meal.allergens_json.possible_allergens &&
+          meal.allergens_json.possible_allergens.length > 0 && (
+            <View style={styles.macroSection}>
+              <Text style={styles.sectionTitle}>
+                {t("nutrition.allergens", "Possible Allergens")}
+              </Text>
+              <View style={styles.allergensContainer}>
+                {meal.allergens_json.possible_allergens.map(
+                  (allergen, index) => (
+                    <View key={index} style={styles.allergenTag}>
+                      <Text style={styles.allergenText}>{allergen}</Text>
+                    </View>
+                  )
+                )}
+              </View>
+            </View>
+          )}
+
+        {/* Health Warnings */}
+        {meal.health_warnings && meal.health_warnings.length > 0 && (
+          <View style={styles.macroSection}>
+            <Text style={styles.sectionTitle}>
+              {t("nutrition.health_warnings", "Health Warnings")}
+            </Text>
+            {meal.health_warnings.map((warning, index) => (
+              <View key={index} style={styles.warningItem}>
+                <Ionicons name="warning" size={16} color="#FF9800" />
+                <Text style={styles.warningText}>{warning}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    );
+  };
+
   const renderMealItem = ({ item }: { item: MealWithFeedback }) => {
     const mealScore = getMealScore(item);
     const mealDate = new Date(item.created_at);
+    const isExpanded = expandedMeals[item.id];
 
     return (
       <View style={styles.mealCard}>
-        <View style={styles.mealHeader}>
+        <TouchableOpacity
+          style={styles.mealHeader}
+          onPress={() => toggleMealExpansion(item.id)}
+          activeOpacity={0.7}
+        >
           <View style={styles.mealInfo}>
             <View style={styles.mealTitleRow}>
-              <Text style={styles.mealName}>{item.name}</Text>
+              <Text style={styles.mealName}>
+                {item.name ||
+                  item.meal_name ||
+                  t("meals.unnamed_meal", "Unnamed Meal")}
+              </Text>
               {item.is_favorite && (
                 <Ionicons name="heart" size={16} color="#FF6B6B" />
               )}
+              <Ionicons
+                name={isExpanded ? "chevron-up" : "chevron-down"}
+                size={20}
+                color="#666"
+              />
             </View>
             <Text style={styles.mealTime}>
               {mealDate.toLocaleDateString()} •{" "}
@@ -344,6 +666,14 @@ export default function HistoryScreen() {
                 minute: "2-digit",
               })}
             </Text>
+            {item.description && (
+              <Text
+                style={styles.mealDescription}
+                numberOfLines={isExpanded ? undefined : 2}
+              >
+                {item.description}
+              </Text>
+            )}
           </View>
           <View
             style={[
@@ -353,7 +683,7 @@ export default function HistoryScreen() {
           >
             <Text style={styles.scoreText}>{mealScore.score}</Text>
           </View>
-        </View>
+        </TouchableOpacity>
 
         {item.image_url && (
           <Image source={{ uri: item.image_url }} style={styles.mealImage} />
@@ -362,52 +692,89 @@ export default function HistoryScreen() {
         <View style={styles.nutritionSummary}>
           <View style={styles.nutritionItem}>
             <Text style={styles.nutritionValue}>
-              {Math.round(item.calories || 0)}
+              {Math.round(item.calories || item.totalCalories || 0)}
             </Text>
-            <Text style={styles.nutritionLabel}>Calories</Text>
+            <Text style={styles.nutritionLabel}>
+              {t("nutrition.calories", "Calories")}
+            </Text>
           </View>
           <View style={styles.nutritionItem}>
             <Text style={styles.nutritionValue}>
-              {Math.round(item.protein || 0)}g
+              {Math.round(
+                item.protein || item.protein_g || item.totalProtein || 0
+              )}
+              g
             </Text>
-            <Text style={styles.nutritionLabel}>Protein</Text>
+            <Text style={styles.nutritionLabel}>
+              {t("nutrition.protein", "Protein")}
+            </Text>
           </View>
           <View style={styles.nutritionItem}>
             <Text style={styles.nutritionValue}>
-              {Math.round(item.carbs || 0)}g
+              {Math.round(item.carbs || item.carbs_g || item.totalCarbs || 0)}g
             </Text>
-            <Text style={styles.nutritionLabel}>Carbs</Text>
+            <Text style={styles.nutritionLabel}>
+              {t("nutrition.carbs", "Carbs")}
+            </Text>
           </View>
           <View style={styles.nutritionItem}>
             <Text style={styles.nutritionValue}>
-              {Math.round(item.fat || 0)}g
+              {Math.round(item.fat || item.fats_g || item.totalFat || 0)}g
             </Text>
-            <Text style={styles.nutritionLabel}>Fat</Text>
+            <Text style={styles.nutritionLabel}>
+              {t("nutrition.fat", "Fat")}
+            </Text>
           </View>
         </View>
 
-        {item.ingredients && item.ingredients.length > 0 && (
-          <View style={styles.ingredientsPreview}>
-            <Text style={styles.ingredientsPreviewTitle}>
-              Ingredients ({item.ingredients.length}):
-            </Text>
-            <Text style={styles.ingredientsPreviewText} numberOfLines={2}>
-              {item.ingredients.map((ing) => ing.name).join(", ")}
-            </Text>
+        {/* Expanded Content */}
+        {isExpanded && (
+          <View style={styles.expandedContent}>
+            {/* Ingredients */}
+            {item.ingredients && item.ingredients.length > 0 && (
+              <View style={styles.ingredientsSection}>
+                <Text style={styles.ingredientsTitle}>
+                  {t("nutrition.ingredients", "Ingredients")} (
+                  {item.ingredients.length}):
+                </Text>
+                {item.ingredients.map((ingredient, index) => (
+                  <View key={index} style={styles.ingredientItem}>
+                    <Text style={styles.ingredientName}>{ingredient.name}</Text>
+                    {ingredient.quantity && (
+                      <Text style={styles.ingredientQuantity}>
+                        {ingredient.quantity} {ingredient.unit || ""}
+                      </Text>
+                    )}
+                    {ingredient.calories && (
+                      <Text style={styles.ingredientCalories}>
+                        {Math.round(ingredient.calories)} cal
+                      </Text>
+                    )}
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Detailed Nutrition */}
+            {renderNutritionDetails(item)}
           </View>
         )}
 
         {/* User Ratings Display */}
-        {item.taste_rating ||
-        item.satiety_rating ||
-        item.energy_rating ||
-        item.heaviness_rating ? (
+        {(item.taste_rating ||
+          item.satiety_rating ||
+          item.energy_rating ||
+          item.heaviness_rating) && (
           <View style={styles.ratingsDisplay}>
-            <Text style={styles.ratingsTitle}>Your Ratings:</Text>
+            <Text style={styles.ratingsTitle}>
+              {t("history.your_ratings", "Your Ratings")}:
+            </Text>
             <View style={styles.ratingsRow}>
-              {item.taste_rating ? (
+              {item.taste_rating && (
                 <View style={styles.ratingItem}>
-                  <Text style={styles.ratingLabel}>Taste</Text>
+                  <Text style={styles.ratingLabel}>
+                    {t("history.taste", "Taste")}
+                  </Text>
                   <View style={styles.miniStars}>
                     {[1, 2, 3, 4, 5].map((star) => (
                       <Ionicons
@@ -425,10 +792,12 @@ export default function HistoryScreen() {
                     ))}
                   </View>
                 </View>
-              ) : null}
-              {item.satiety_rating ? (
+              )}
+              {item.satiety_rating && (
                 <View style={styles.ratingItem}>
-                  <Text style={styles.ratingLabel}>Satiety</Text>
+                  <Text style={styles.ratingLabel}>
+                    {t("history.satiety", "Satiety")}
+                  </Text>
                   <View style={styles.miniStars}>
                     {[1, 2, 3, 4, 5].map((star) => (
                       <Ionicons
@@ -448,10 +817,10 @@ export default function HistoryScreen() {
                     ))}
                   </View>
                 </View>
-              ) : null}
+              )}
             </View>
           </View>
-        ) : null}
+        )}
 
         <View style={styles.mealActions}>
           <TouchableOpacity
@@ -468,7 +837,7 @@ export default function HistoryScreen() {
             disabled={isSavingFeedback}
           >
             <Ionicons name="chatbubble-outline" size={20} color="#007AFF" />
-            <Text style={styles.actionText}>Rate</Text>
+            <Text style={styles.actionText}>{t("history.rate", "Rate")}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -482,7 +851,9 @@ export default function HistoryScreen() {
               color="#FF6B6B"
             />
             <Text style={styles.actionText}>
-              {item.is_favorite ? "Unfavorite" : "Favorite"}
+              {item.is_favorite
+                ? t("history.unfavorite", "Unfavorite")
+                : t("history.favorite", "Favorite")}
             </Text>
           </TouchableOpacity>
 
@@ -496,7 +867,9 @@ export default function HistoryScreen() {
             ) : (
               <Ionicons name="copy-outline" size={20} color="#4CAF50" />
             )}
-            <Text style={styles.actionText}>Duplicate</Text>
+            <Text style={styles.actionText}>
+              {t("history.duplicate", "Duplicate")}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -505,7 +878,9 @@ export default function HistoryScreen() {
             disabled={isUpdating}
           >
             <Ionicons name="create-outline" size={20} color="#FF9800" />
-            <Text style={styles.actionText}>Update</Text>
+            <Text style={styles.actionText}>
+              {t("history.update", "Update")}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -520,6 +895,9 @@ export default function HistoryScreen() {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>
+          {t("common.loading", "Loading")}...
+        </Text>
       </View>
     );
   }
@@ -531,7 +909,7 @@ export default function HistoryScreen() {
         <Ionicons name="search" size={20} color="#666" />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search meals..."
+          placeholder={t("history.search_meals", "Search meals...")}
           value={searchText}
           onChangeText={setSearchText}
         />
@@ -542,7 +920,10 @@ export default function HistoryScreen() {
           </TouchableOpacity>
           {showSearchTooltip && (
             <TooltipBubble
-              text="Here you can search and filter meals you've logged, based on name or nutrition info."
+              text={t(
+                "history.search_tooltip",
+                "Here you can search and filter meals you've logged, based on name or nutrition info."
+              )}
               onHide={() => setShowSearchTooltip(false)}
               style={{ top: -60, left: -100 }}
             />
@@ -555,6 +936,7 @@ export default function HistoryScreen() {
           <Ionicons name="filter" size={20} color="#007AFF" />
         </TouchableOpacity>
       </View>
+
       {/* Smart Insight */}
       {smartInsight ? (
         <View style={styles.insightContainer}>
@@ -579,9 +961,14 @@ export default function HistoryScreen() {
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Ionicons name="restaurant-outline" size={64} color="#DDD" />
-            <Text style={styles.emptyTitle}>No meals to display</Text>
+            <Text style={styles.emptyTitle}>
+              {t("history.no_meals", "No meals to display")}
+            </Text>
             <Text style={styles.emptyText}>
-              Start logging your meals to see your history here
+              {t(
+                "history.start_logging",
+                "Start logging your meals to see your history here"
+              )}
             </Text>
           </View>
         }
@@ -596,26 +983,36 @@ export default function HistoryScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Rate Meal</Text>
+            <Text style={styles.modalTitle}>
+              {t("history.rate_meal", "Rate Meal")}
+            </Text>
             <Text style={styles.modalSubtitle}>{selectedMeal?.name}</Text>
 
             <View style={styles.ratingSection}>
-              <Text style={styles.ratingLabel}>Taste</Text>
+              <Text style={styles.ratingLabel}>
+                {t("history.taste", "Taste")}
+              </Text>
               {renderStarRating(tasteRating, setTasteRating)}
             </View>
 
             <View style={styles.ratingSection}>
-              <Text style={styles.ratingLabel}>Satiety</Text>
+              <Text style={styles.ratingLabel}>
+                {t("history.satiety", "Satiety")}
+              </Text>
               {renderStarRating(satietyRating, setSatietyRating)}
             </View>
 
             <View style={styles.ratingSection}>
-              <Text style={styles.ratingLabel}>Energy</Text>
+              <Text style={styles.ratingLabel}>
+                {t("history.energy", "Energy")}
+              </Text>
               {renderStarRating(energyRating, setEnergyRating)}
             </View>
 
             <View style={styles.ratingSection}>
-              <Text style={styles.ratingLabel}>Heaviness</Text>
+              <Text style={styles.ratingLabel}>
+                {t("history.heaviness", "Heaviness")}
+              </Text>
               {renderStarRating(heavinessRating, setHeavinessRating)}
             </View>
 
@@ -628,7 +1025,9 @@ export default function HistoryScreen() {
                 }}
                 disabled={isSavingFeedback}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={styles.cancelButtonText}>
+                  {t("common.cancel", "Cancel")}
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -639,7 +1038,9 @@ export default function HistoryScreen() {
                 {isSavingFeedback ? (
                   <ActivityIndicator color="white" size="small" />
                 ) : (
-                  <Text style={styles.submitButtonText}>Save</Text>
+                  <Text style={styles.submitButtonText}>
+                    {t("common.save", "Save")}
+                  </Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -656,14 +1057,23 @@ export default function HistoryScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Update Meal</Text>
+            <Text style={styles.modalTitle}>
+              {t("history.update_meal", "Update Meal")}
+            </Text>
             <Text style={styles.modalSubtitle}>
-              Add additional information about "{selectedMeal?.name}"
+              {t(
+                "history.add_additional_info",
+                "Add additional information about"
+              )}{" "}
+              "{selectedMeal?.name}"
             </Text>
 
             <TextInput
               style={styles.updateInput}
-              placeholder="Enter additional meal information..."
+              placeholder={t(
+                "history.enter_additional_info",
+                "Enter additional meal information..."
+              )}
               value={updateText}
               onChangeText={setUpdateText}
               multiline
@@ -682,7 +1092,9 @@ export default function HistoryScreen() {
                 }}
                 disabled={isUpdating}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={styles.cancelButtonText}>
+                  {t("common.cancel", "Cancel")}
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -693,7 +1105,9 @@ export default function HistoryScreen() {
                 {isUpdating ? (
                   <ActivityIndicator color="white" size="small" />
                 ) : (
-                  <Text style={styles.submitButtonText}>Update</Text>
+                  <Text style={styles.submitButtonText}>
+                    {t("common.update", "Update")}
+                  </Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -710,17 +1124,33 @@ export default function HistoryScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Filter Meals</Text>
+            <Text style={styles.modalTitle}>
+              {t("history.filter_meals", "Filter Meals")}
+            </Text>
 
             <View style={styles.filterSection}>
-              <Text style={styles.filterLabel}>Category</Text>
+              <Text style={styles.filterLabel}>
+                {t("history.category", "Category")}
+              </Text>
               <View style={styles.categoryButtons}>
                 {[
-                  { key: "", label: "All" },
-                  { key: "high-protein", label: "High Protein" },
-                  { key: "high-carb", label: "High Carb" },
-                  { key: "high-fat", label: "High Fat" },
-                  { key: "balanced", label: "Balanced" },
+                  { key: "", label: t("common.all", "All") },
+                  {
+                    key: "high-protein",
+                    label: t("nutrition.high_protein", "High Protein"),
+                  },
+                  {
+                    key: "high-carb",
+                    label: t("nutrition.high_carb", "High Carb"),
+                  },
+                  {
+                    key: "high-fat",
+                    label: t("nutrition.high_fat", "High Fat"),
+                  },
+                  {
+                    key: "balanced",
+                    label: t("nutrition.balanced", "Balanced"),
+                  },
                 ].map((category) => (
                   <TouchableOpacity
                     key={category.key}
@@ -755,14 +1185,18 @@ export default function HistoryScreen() {
                   setShowFilters(false);
                 }}
               >
-                <Text style={styles.cancelButtonText}>Reset</Text>
+                <Text style={styles.cancelButtonText}>
+                  {t("common.reset", "Reset")}
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={[styles.modalButton, styles.submitButton]}
                 onPress={() => setShowFilters(false)}
               >
-                <Text style={styles.submitButtonText}>Apply</Text>
+                <Text style={styles.submitButtonText}>
+                  {t("common.apply", "Apply")}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -782,20 +1216,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: "#666",
+  },
   header: {
     flexDirection: "row",
     padding: 15,
     backgroundColor: "white",
     alignItems: "center",
-  },
-  searchContainer: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#f8f9fa",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    marginRight: 10,
   },
   searchInput: {
     flex: 1,
@@ -858,11 +1288,18 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     color: "#333",
+    flex: 1,
   },
   mealTime: {
     fontSize: 14,
     color: "#666",
     marginTop: 4,
+  },
+  mealDescription: {
+    fontSize: 14,
+    color: "#666",
+    marginTop: 6,
+    lineHeight: 20,
   },
   scoreContainer: {
     width: 40,
@@ -870,6 +1307,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
+    marginLeft: 10,
   },
   scoreText: {
     color: "white",
@@ -898,6 +1336,126 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#666",
     marginTop: 2,
+  },
+  expandedContent: {
+    borderTopWidth: 1,
+    borderTopColor: "#eee",
+    backgroundColor: "#fafafa",
+  },
+  ingredientsSection: {
+    padding: 15,
+  },
+  ingredientsTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 8,
+  },
+  ingredientItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 4,
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#eee",
+  },
+  ingredientName: {
+    flex: 1,
+    fontSize: 13,
+    color: "#333",
+  },
+  ingredientQuantity: {
+    fontSize: 12,
+    color: "#666",
+    marginLeft: 10,
+  },
+  ingredientCalories: {
+    fontSize: 12,
+    color: "#007AFF",
+    marginLeft: 10,
+  },
+  nutritionDetails: {
+    padding: 15,
+  },
+  nutritionDetailsTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 15,
+  },
+  macroSection: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 10,
+  },
+  nutritionGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  nutritionDetailItem: {
+    backgroundColor: "white",
+    padding: 10,
+    borderRadius: 8,
+    minWidth: "45%",
+    flexGrow: 1,
+  },
+  nutritionDetailLabel: {
+    fontSize: 12,
+    color: "#666",
+    marginBottom: 4,
+  },
+  nutritionDetailValue: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#007AFF",
+  },
+  analysisItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#eee",
+  },
+  analysisLabel: {
+    fontSize: 13,
+    color: "#666",
+    flex: 1,
+  },
+  analysisValue: {
+    fontSize: 13,
+    color: "#333",
+    fontWeight: "500",
+  },
+  allergensContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  allergenTag: {
+    backgroundColor: "#FFE0E0",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  allergenText: {
+    fontSize: 12,
+    color: "#D32F2F",
+  },
+  warningItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 4,
+    gap: 8,
+  },
+  warningText: {
+    fontSize: 13,
+    color: "#FF9800",
+    flex: 1,
   },
   ratingsDisplay: {
     padding: 15,
@@ -1065,34 +1623,5 @@ const styles = StyleSheet.create({
   },
   categoryButtonTextActive: {
     color: "white",
-  },
-  editButton: {
-    backgroundColor: "#007AFF",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    marginLeft: 10,
-  },
-  editButtonText: {
-    color: "white",
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-  ingredientsPreview: {
-    marginTop: 8,
-    padding: 8,
-    backgroundColor: "#f0f0f0",
-    borderRadius: 6,
-  },
-  ingredientsPreviewTitle: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 4,
-  },
-  ingredientsPreviewText: {
-    fontSize: 11,
-    color: "#666",
-    lineHeight: 16,
   },
 });

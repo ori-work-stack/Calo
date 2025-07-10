@@ -15,6 +15,7 @@ import { router } from "expo-router";
 import { RootState, AppDispatch } from "@/src/store";
 import { saveQuestionnaire, clearError } from "@/src/store/questionnaireSlice";
 import { Ionicons } from "@expo/vector-icons";
+import { DynamicListInput } from "@/components/DynamicListInputs";
 
 interface QuestionnaireData {
   // Personal data
@@ -24,68 +25,68 @@ interface QuestionnaireData {
   weight_kg: string;
   target_weight_kg: string;
   body_fat_percentage: string;
-  additional_personal_info: string;
+  additional_personal_info: string[];
 
   // Goals
   main_goal: string;
-  main_goal_text: string;
-  specific_goal: string;
+  main_goal_text: string[];
+  specific_goal: string[];
   goal_timeframe_days: string;
   commitment_level: string;
-  most_important_outcome: string;
-  special_personal_goal: string;
+  most_important_outcome: string[];
+  special_personal_goal: string[];
 
   // Physical activity
   physical_activity_level: string;
   sport_frequency: string;
   sport_types: string[];
   sport_duration_min: string;
-  workout_times: string;
+  workout_times: string[];
   uses_fitness_devices: boolean;
-  fitness_device_type: string;
-  additional_activity_info: string;
+  fitness_device_type: string[];
+  additional_activity_info: string[];
 
   // Health
   medical_conditions: string[];
-  medical_conditions_text: string;
-  medications: string;
-  health_goals: string;
-  functional_issues: string;
-  food_related_medical_issues: string;
+  medical_conditions_text: string[];
+  medications: string[];
+  health_goals: string[];
+  functional_issues: string[];
+  food_related_medical_issues: string[];
 
   // Means and conditions
   meals_per_day: string;
   snacks_between_meals: boolean;
-  meal_times: string;
+  meal_times: string[];
   cooking_preference: string;
   available_cooking_methods: string[];
   daily_food_budget: string;
-  shopping_method: string;
+  shopping_method: string[];
   daily_cooking_time: string;
 
   // Dietary preferences and restrictions
   kosher: boolean;
   allergies: string[];
-  allergies_text: string;
+  allergies_text: string[];
   dietary_style: string;
-  meal_texture_preference: string;
-  disliked_foods: string;
-  liked_foods: string;
+  meal_texture_preference: string[];
+  disliked_foods: string[];
+  liked_foods: string[];
   regular_drinks: string[];
   intermittent_fasting: boolean;
   fasting_hours: string;
 
   // Additional
-  past_diet_difficulties: string;
+  past_diet_difficulties: string[];
 
   // Additional schema fields
   program_duration?: string;
-  meal_timing_restrictions?: string;
-  dietary_restrictions?: string;
+  meal_timing_restrictions?: string[];
+  dietary_restrictions?: string[];
   willingness_to_follow?: boolean;
-  upcoming_events?: string;
+  upcoming_events?: string[];
   upload_frequency?: string;
-  notifications_preference?: string;
+  notifications_preference?: string[];
   personalized_tips?: boolean;
   health_metrics_integration?: boolean;
   family_medical_history?: string[];
@@ -185,62 +186,62 @@ export default function QuestionnaireScreen() {
     weight_kg: "",
     target_weight_kg: "",
     body_fat_percentage: "",
-    additional_personal_info: "",
+    additional_personal_info: [],
 
     main_goal: "",
-    main_goal_text: "",
-    specific_goal: "",
+    main_goal_text: [],
+    specific_goal: [],
     goal_timeframe_days: "",
     commitment_level: "",
-    most_important_outcome: "",
-    special_personal_goal: "",
+    most_important_outcome: [],
+    special_personal_goal: [],
 
     physical_activity_level: "",
     sport_frequency: "",
     sport_types: [],
     sport_duration_min: "",
-    workout_times: "",
+    workout_times: [],
     uses_fitness_devices: false,
-    fitness_device_type: "",
-    additional_activity_info: "",
+    fitness_device_type: [],
+    additional_activity_info: [],
 
     medical_conditions: [],
-    medical_conditions_text: "",
-    medications: "",
-    health_goals: "",
-    functional_issues: "",
-    food_related_medical_issues: "",
+    medical_conditions_text: [],
+    medications: [],
+    health_goals: [],
+    functional_issues: [],
+    food_related_medical_issues: [],
 
     meals_per_day: "3",
     snacks_between_meals: false,
-    meal_times: "",
+    meal_times: [],
     cooking_preference: "",
     available_cooking_methods: [],
     daily_food_budget: "",
-    shopping_method: "",
+    shopping_method: [],
     daily_cooking_time: "",
 
     kosher: false,
     allergies: [],
-    allergies_text: "",
+    allergies_text: [],
     dietary_style: "",
-    meal_texture_preference: "",
-    disliked_foods: "",
-    liked_foods: "",
+    meal_texture_preference: [],
+    disliked_foods: [],
+    liked_foods: [],
     regular_drinks: [],
     intermittent_fasting: false,
     fasting_hours: "",
 
-    past_diet_difficulties: "",
+    past_diet_difficulties: [],
 
     // Additional schema fields
     program_duration: "",
-    meal_timing_restrictions: "",
-    dietary_restrictions: "",
+    meal_timing_restrictions: [],
+    dietary_restrictions: [],
     willingness_to_follow: true,
-    upcoming_events: "",
+    upcoming_events: [],
     upload_frequency: "",
-    notifications_preference: "",
+    notifications_preference: [],
     personalized_tips: true,
     health_metrics_integration: false,
     family_medical_history: [],
@@ -385,19 +386,22 @@ export default function QuestionnaireScreen() {
         />
       </View>
 
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>פרטים נוספים</Text>
-        <TextInput
-          style={[styles.textInput, styles.textArea]}
-          value={formData.additional_personal_info}
-          onChangeText={(text) =>
-            setFormData({ ...formData, additional_personal_info: text })
-          }
-          multiline
-          numberOfLines={3}
-          placeholder="פרטים רפואיים או אישיים נוספים שחשוב לדעת..."
-        />
-      </View>
+      <DynamicListInput
+        label="פרטים נוספים"
+        placeholder="הוסף פרט נוסף..."
+        value={
+          Array.isArray(formData.additional_personal_info)
+            ? formData.additional_personal_info
+            : []
+        }
+        onValueChange={(value) =>
+          setFormData({
+            ...formData,
+            additional_personal_info: Array.isArray(value) ? value : [value],
+          })
+        }
+        maxItems={5}
+      />
     </View>
   );
 
@@ -434,28 +438,37 @@ export default function QuestionnaireScreen() {
       </View>
 
       {formData.main_goal === "OTHER" && (
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>פרט את המטרה שלך</Text>
-          <TextInput
-            style={styles.textInput}
-            value={formData.main_goal_text}
-            onChangeText={(text) =>
-              setFormData({ ...formData, main_goal_text: text })
-            }
-            placeholder="תאר את המטרה העיקרית שלך..."
-          />
-        </View>
+        <DynamicListInput
+          label="פרט את המטרה שלך"
+          placeholder="הוסף מטרה..."
+          value={
+            Array.isArray(formData.main_goal_text)
+              ? formData.main_goal_text
+              : []
+          }
+          onValueChange={(value) =>
+            setFormData({
+              ...formData,
+              main_goal_text: Array.isArray(value) ? value : [value],
+            })
+          }
+          maxItems={3}
+        />
       )}
 
-      <TextInput
-        style={[styles.textInput, styles.textArea]}
-        value={formData.specific_goal}
-        onChangeText={(text) =>
-          setFormData({ ...formData, specific_goal: text })
+      <DynamicListInput
+        label="מטרות ספציפיות"
+        placeholder="הוסף מטרה ספציפית (לדוגמה: לרדת 5 ק״ג לקראת החתונה)..."
+        value={
+          Array.isArray(formData.specific_goal) ? formData.specific_goal : []
         }
-        multiline
-        numberOfLines={3}
-        placeholder="מה המטרה שלך? לדוגמה: לרדת 5 ק״ג לקראת החתונה, לשפר סיבולת בריצה, להרגיש חטוב יותר..."
+        onValueChange={(value) =>
+          setFormData({
+            ...formData,
+            specific_goal: Array.isArray(value) ? value : [value],
+          })
+        }
+        maxItems={5}
       />
 
       <View style={styles.inputGroup}>
@@ -584,22 +597,73 @@ export default function QuestionnaireScreen() {
             />
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>סוגי פעילות</Text>
-            <TextInput
-              style={[styles.textInput, styles.textArea]}
-              value={formData.sport_types.join(", ")}
-              onChangeText={(text) =>
-                setFormData({
-                  ...formData,
-                  sport_types: text.split(", ").filter((item) => item.trim()),
-                })
-              }
-              multiline
-              numberOfLines={2}
-              placeholder="לדוגמה: ריצה, כושר, יוגה, שחייה..."
-            />
-          </View>
+          <DynamicListInput
+            label="סוגי פעילות"
+            placeholder="הוסף סוג פעילות (לדוגמה: ריצה, כושר, יוגה)..."
+            value={
+              Array.isArray(formData.sport_types) ? formData.sport_types : []
+            }
+            onValueChange={(value: string[]) =>
+              setFormData({
+                ...formData,
+                sport_types: Array.isArray(value) ? value : [value],
+              })
+            }
+            maxItems={10}
+          />
+
+          <DynamicListInput
+            label="זמני אימונים מועדפים"
+            placeholder="הוסף זמן אימון (לדוגמה: בוקר, ערב)..."
+            value={
+              Array.isArray(formData.workout_times)
+                ? formData.workout_times
+                : []
+            }
+            onValueChange={(value: string[]) =>
+              setFormData({
+                ...formData,
+                workout_times: Array.isArray(value) ? value : [value],
+              })
+            }
+            maxItems={5}
+          />
+
+          <DynamicListInput
+            label="מכשירי כושר"
+            placeholder="הוסף מכשיר כושר (לדוגמה: שעון חכם, צמיד כושר)..."
+            value={
+              Array.isArray(formData.fitness_device_type)
+                ? formData.fitness_device_type
+                : []
+            }
+            onValueChange={(value: string[]) =>
+              setFormData({
+                ...formData,
+                fitness_device_type: Array.isArray(value) ? value : [value],
+              })
+            }
+            maxItems={5}
+          />
+
+          <DynamicListInput
+            label="מידע נוסף על פעילות"
+            placeholder="הוסף מידע נוסף..."
+            value={
+              Array.isArray(formData.additional_activity_info)
+                ? formData.additional_activity_info
+                : []
+            }
+            onValueChange={(value: string[]) =>
+              setFormData({
+                ...formData,
+                additional_activity_info: Array.isArray(value)
+                  ? value
+                  : [value],
+              })
+            }
+            maxItems={5}
+          />
         </>
       )}
     </View>
@@ -612,61 +676,84 @@ export default function QuestionnaireScreen() {
         מידע רפואי יעזור לנו להתאים את התזונה לצרכים המיוחדים שלך
       </Text>
 
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>האם קיימות בעיות רפואיות?</Text>
-        <TextInput
-          style={[styles.textInput, styles.textArea]}
-          value={formData.medical_conditions_text}
-          onChangeText={(text) =>
-            setFormData({ ...formData, medical_conditions_text: text })
-          }
-          multiline
-          numberOfLines={3}
-          placeholder="לדוגמה: סכרת, לחץ דם, כולסטרול גבוה, בעיות עיכול..."
-        />
-      </View>
+      <DynamicListInput
+        label="בעיות רפואיות"
+        placeholder="הוסף בעיה רפואית (לדוגמה: סכרת, לחץ דם)..."
+        value={
+          Array.isArray(formData.medical_conditions_text)
+            ? formData.medical_conditions_text
+            : []
+        }
+        onValueChange={(value: string[]) =>
+          setFormData({
+            ...formData,
+            medical_conditions_text: Array.isArray(value) ? value : [value],
+          })
+        }
+        maxItems={10}
+      />
 
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>האם אתה נוטל תרופות קבועות?</Text>
-        <TextInput
-          style={[styles.textInput, styles.textArea]}
-          value={formData.medications}
-          onChangeText={(text) =>
-            setFormData({ ...formData, medications: text })
-          }
-          multiline
-          numberOfLines={2}
-          placeholder="פרט את התרופות שאתה נוטל..."
-        />
-      </View>
+      <DynamicListInput
+        label="תרופות קבועות"
+        placeholder="הוסף תרופה..."
+        value={Array.isArray(formData.medications) ? formData.medications : []}
+        onValueChange={(value: string[]) =>
+          setFormData({
+            ...formData,
+            medications: Array.isArray(value) ? value : [value],
+          })
+        }
+        maxItems={10}
+      />
 
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>יעדים בריאותיים</Text>
-        <TextInput
-          style={[styles.textInput, styles.textArea]}
-          value={formData.health_goals}
-          onChangeText={(text) =>
-            setFormData({ ...formData, health_goals: text })
-          }
-          multiline
-          numberOfLines={2}
-          placeholder="לדוגמה: הורדת כולסטרול, שיפור אנרגיה, שליטה ברמת סוכר..."
-        />
-      </View>
+      <DynamicListInput
+        label="יעדים בריאותיים"
+        placeholder="הוסף יעד בריאותי (לדוגמה: הורדת כולסטרול)..."
+        value={
+          Array.isArray(formData.health_goals) ? formData.health_goals : []
+        }
+        onValueChange={(value: string[]) =>
+          setFormData({
+            ...formData,
+            health_goals: Array.isArray(value) ? value : [value],
+          })
+        }
+        maxItems={8}
+      />
 
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>בעיות תפקודיות</Text>
-        <TextInput
-          style={[styles.textInput, styles.textArea]}
-          value={formData.functional_issues}
-          onChangeText={(text) =>
-            setFormData({ ...formData, functional_issues: text })
-          }
-          multiline
-          numberOfLines={2}
-          placeholder="עייפות, חוסר ערנות, הפרעות שינה, בעיות עיכול..."
-        />
-      </View>
+      <DynamicListInput
+        label="בעיות תפקודיות"
+        placeholder="הוסף בעיה תפקודית (לדוגמה: עייפות, חוסר ערנות)..."
+        value={
+          Array.isArray(formData.functional_issues)
+            ? formData.functional_issues
+            : []
+        }
+        onValueChange={(value: string[]) =>
+          setFormData({
+            ...formData,
+            functional_issues: Array.isArray(value) ? value : [value],
+          })
+        }
+        maxItems={8}
+      />
+
+      <DynamicListInput
+        label="בעיות תזונתיות"
+        placeholder="הוסף בעיה תזונתית..."
+        value={
+          Array.isArray(formData.food_related_medical_issues)
+            ? formData.food_related_medical_issues
+            : []
+        }
+        onValueChange={(value: string[]) =>
+          setFormData({
+            ...formData,
+            food_related_medical_issues: Array.isArray(value) ? value : [value],
+          })
+        }
+        maxItems={8}
+      />
     </View>
   );
 
@@ -775,6 +862,36 @@ export default function QuestionnaireScreen() {
           placeholder="לדוגמה: 50"
         />
       </View>
+
+      <DynamicListInput
+        label="זמני ארוחות"
+        placeholder="הוסף זמן ארוחה (לדוגמה: 8:00, 13:00)..."
+        value={Array.isArray(formData.meal_times) ? formData.meal_times : []}
+        onValueChange={(value: string[]) =>
+          setFormData({
+            ...formData,
+            meal_times: Array.isArray(value) ? value : [value],
+          })
+        }
+        maxItems={6}
+      />
+
+      <DynamicListInput
+        label="שיטות קנייה"
+        placeholder="הוסף שיטת קנייה (לדוגמה: סופרמרקט, שוק)..."
+        value={
+          Array.isArray(formData.shopping_method)
+            ? formData.shopping_method
+            : []
+        }
+        onValueChange={(value: string[]) =>
+          setFormData({
+            ...formData,
+            shopping_method: Array.isArray(value) ? value : [value],
+          })
+        }
+        maxItems={5}
+      />
     </View>
   );
 
@@ -827,38 +944,39 @@ export default function QuestionnaireScreen() {
         </View>
       </View>
 
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>היסטוריה רפואית משפחתית</Text>
-        <TextInput
-          style={[styles.textInput, styles.textArea]}
-          value={formData.family_medical_history?.join(", ") || ""}
-          onChangeText={(text) =>
-            setFormData({
-              ...formData,
-              family_medical_history: text
-                .split(", ")
-                .filter((item) => item.trim()),
-            })
-          }
-          multiline
-          numberOfLines={3}
-          placeholder="סכרת, לחץ דם, מחלות לב, סרטן..."
-        />
-      </View>
+      <DynamicListInput
+        label="היסטוריה רפואית משפחתית"
+        placeholder="הוסף מחלה במשפחה (לדוגמה: סכרת, לחץ דם)..."
+        value={
+          Array.isArray(formData.family_medical_history)
+            ? formData.family_medical_history
+            : []
+        }
+        onValueChange={(value: string[]) =>
+          setFormData({
+            ...formData,
+            family_medical_history: Array.isArray(value) ? value : [value],
+          })
+        }
+        maxItems={10}
+      />
 
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>הגבלות זמן ארוחות</Text>
-        <TextInput
-          style={[styles.textInput, styles.textArea]}
-          value={formData.meal_timing_restrictions}
-          onChangeText={(text) =>
-            setFormData({ ...formData, meal_timing_restrictions: text })
-          }
-          multiline
-          numberOfLines={2}
-          placeholder="לדוגמה: לא יכול לאכול לפני 9:00, מגבלות עבודה..."
-        />
-      </View>
+      <DynamicListInput
+        label="הגבלות זמן ארוחות"
+        placeholder="הוסף הגבלת זמן (לדוגמה: לא יכול לאכול לפני 9:00)..."
+        value={
+          Array.isArray(formData.meal_timing_restrictions)
+            ? formData.meal_timing_restrictions
+            : []
+        }
+        onValueChange={(value: string[]) =>
+          setFormData({
+            ...formData,
+            meal_timing_restrictions: Array.isArray(value) ? value : [value],
+          })
+        }
+        maxItems={8}
+      />
     </View>
   );
 
@@ -981,19 +1099,73 @@ export default function QuestionnaireScreen() {
         </View>
       </View>
 
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>אירועים קרובים</Text>
-        <TextInput
-          style={[styles.textInput, styles.textArea]}
-          value={formData.upcoming_events}
-          onChangeText={(text) =>
-            setFormData({ ...formData, upcoming_events: text })
-          }
-          multiline
-          numberOfLines={2}
-          placeholder="חתונה, חופשה, אירוע חשוב..."
-        />
-      </View>
+      <DynamicListInput
+        label="הגבלות תזונתיות נוספות"
+        placeholder="הוסף הגבלה תזונתית..."
+        value={
+          Array.isArray(formData.dietary_restrictions)
+            ? formData.dietary_restrictions
+            : []
+        }
+        onValueChange={(value: string[]) =>
+          setFormData({
+            ...formData,
+            dietary_restrictions: Array.isArray(value) ? value : [value],
+          })
+        }
+        maxItems={10}
+      />
+
+      <DynamicListInput
+        label="העדפות התראות"
+        placeholder="הוסף העדפת התראה (לדוגמה: בוקר, ערב)..."
+        value={
+          Array.isArray(formData.notifications_preference)
+            ? formData.notifications_preference
+            : []
+        }
+        onValueChange={(value: string[]) =>
+          setFormData({
+            ...formData,
+            notifications_preference: Array.isArray(value) ? value : [value],
+          })
+        }
+        maxItems={5}
+      />
+
+      <DynamicListInput
+        label="אירועים קרובים"
+        placeholder="הוסף אירוע קרוב (לדוגמה: חתונה, חופשה)..."
+        value={
+          Array.isArray(formData.upcoming_events)
+            ? formData.upcoming_events
+            : []
+        }
+        onValueChange={(value: string[]) =>
+          setFormData({
+            ...formData,
+            upcoming_events: Array.isArray(value) ? value : [value],
+          })
+        }
+        maxItems={8}
+      />
+
+      <DynamicListInput
+        label="קשיים בדיאטות בעבר"
+        placeholder="הוסף קושי שחווית (לדוגמה: רעב, חוסר זמן)..."
+        value={
+          Array.isArray(formData.past_diet_difficulties)
+            ? formData.past_diet_difficulties
+            : []
+        }
+        onValueChange={(value: string[]) =>
+          setFormData({
+            ...formData,
+            past_diet_difficulties: Array.isArray(value) ? value : [value],
+          })
+        }
+        maxItems={10}
+      />
     </View>
   );
 
@@ -1076,33 +1248,65 @@ export default function QuestionnaireScreen() {
         </View>
       </View>
 
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>מזונות שאינך אוהב</Text>
-        <TextInput
-          style={[styles.textInput, styles.textArea]}
-          value={formData.disliked_foods}
-          onChangeText={(text) =>
-            setFormData({ ...formData, disliked_foods: text })
-          }
-          multiline
-          numberOfLines={3}
-          placeholder="לדוגמה: דגים, ירקות ירוקים, מזון חריף..."
-        />
-      </View>
+      <DynamicListInput
+        label="אלרגיות נוספות"
+        placeholder="הוסף אלרגיה נוספת..."
+        value={
+          Array.isArray(formData.allergies_text) ? formData.allergies_text : []
+        }
+        onValueChange={(value: string[]) =>
+          setFormData({
+            ...formData,
+            allergies_text: Array.isArray(value) ? value : [value],
+          })
+        }
+        maxItems={10}
+      />
 
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>מזונות שאתה אוהב במיוחד</Text>
-        <TextInput
-          style={[styles.textInput, styles.textArea]}
-          value={formData.liked_foods}
-          onChangeText={(text) =>
-            setFormData({ ...formData, liked_foods: text })
-          }
-          multiline
-          numberOfLines={3}
-          placeholder="לדוגמה: עוף, קינואה, אבוקדו, בטטה..."
-        />
-      </View>
+      <DynamicListInput
+        label="העדפות מרקם"
+        placeholder="הוסף העדפת מרקם (לדוגמה: רך, פריך)..."
+        value={
+          Array.isArray(formData.meal_texture_preference)
+            ? formData.meal_texture_preference
+            : []
+        }
+        onValueChange={(value: string[]) =>
+          setFormData({
+            ...formData,
+            meal_texture_preference: Array.isArray(value) ? value : [value],
+          })
+        }
+        maxItems={5}
+      />
+
+      <DynamicListInput
+        label="מזונות שאינך אוהב"
+        placeholder="הוסף מזון שאינך אוהב (לדוגמה: דגים, ירקות ירוקים)..."
+        value={
+          Array.isArray(formData.disliked_foods) ? formData.disliked_foods : []
+        }
+        onValueChange={(value: string[]) =>
+          setFormData({
+            ...formData,
+            disliked_foods: Array.isArray(value) ? value : [value],
+          })
+        }
+        maxItems={15}
+      />
+
+      <DynamicListInput
+        label="מזונות שאתה אוהב במיוחד"
+        placeholder="הוסף מזון שאתה אוהב (לדוגמה: עוף, קינואה, אבוקדו)..."
+        value={Array.isArray(formData.liked_foods) ? formData.liked_foods : []}
+        onValueChange={(value: string[]) =>
+          setFormData({
+            ...formData,
+            liked_foods: Array.isArray(value) ? value : [value],
+          })
+        }
+        maxItems={15}
+      />
 
       <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>משקאות שאתה שותה בקביעות</Text>
@@ -1218,7 +1422,7 @@ export default function QuestionnaireScreen() {
           regular_drinks: ["water", "coffee"],
           intermittent_fasting: false,
           fasting_hours: "",
-          past_diet_difficulties: "",
+          past_diet_difficulties: [],
         };
 
         // Convert numeric fields to strings for form compatibility
