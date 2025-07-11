@@ -13,10 +13,12 @@ interface DayData {
   fat_actual: number;
   meal_count: number;
   quality_score: number;
+  water_intake_ml: number;
   events: Array<{
     id: string;
     title: string;
     type: string;
+    created_at: string;
   }>;
 }
 
@@ -29,7 +31,29 @@ interface CalendarStats {
   totalGoalDays: number;
   averageCalories: number;
   averageProtein: number;
+  averageWater: number;
   motivationalMessage: string;
+  gamificationBadges: Array<{
+    id: string;
+    name: string;
+    description: string;
+    icon: string;
+    achieved_at: string;
+  }>;
+  weeklyInsights: {
+    bestWeekDetails: {
+      weekStart: string;
+      weekEnd: string;
+      averageProgress: number;
+      highlights: string[];
+    };
+    challengingWeekDetails: {
+      weekStart: string;
+      weekEnd: string;
+      averageProgress: number;
+      challenges: string[];
+    };
+  };
 }
 
 interface CalendarState {
@@ -37,7 +61,9 @@ interface CalendarState {
   statistics: CalendarStats | null;
   isLoading: boolean;
   isAddingEvent: boolean;
+  isDeletingEvent: boolean;
   error: string | null;
+  lastUpdated: string | null;
 }
 
 const initialState: CalendarState = {
@@ -45,7 +71,9 @@ const initialState: CalendarState = {
   statistics: null,
   isLoading: false,
   isAddingEvent: false,
+  isDeletingEvent: false,
   error: null,
+  lastUpdated: null,
 };
 
 export const fetchCalendarData = createAsyncThunk(
@@ -89,12 +117,22 @@ export const getStatistics = createAsyncThunk(
 export const addEvent = createAsyncThunk(
   "calendar/addEvent",
   async (
-    { date, title, type }: { date: string; title: string; type: string },
+    {
+      date,
+      title,
+      type,
+      description,
+    }: {
+      date: string;
+      title: string;
+      type: string;
+      description?: string;
+    },
     { rejectWithValue }
   ) => {
     try {
-      console.log("📝 Adding event:", { date, title, type });
-      const event = await calendarAPI.addEvent(date, title, type);
+      console.log("📝 Adding event:", { date, title, type, description });
+      const event = await calendarAPI.addEvent(date, title, type, description);
       return { date, event };
     } catch (error) {
       console.error("💥 Add event error:", error);
@@ -105,11 +143,60 @@ export const addEvent = createAsyncThunk(
   }
 );
 
+export const deleteEvent = createAsyncThunk(
+  "calendar/deleteEvent",
+  async (
+    { eventId, date }: { eventId: string; date: string },
+    { rejectWithValue }
+  ) => {
+    try {
+      console.log("🗑️ Deleting event:", eventId);
+      await calendarAPI.deleteEvent(eventId);
+      return { eventId, date };
+    } catch (error) {
+      console.error("💥 Delete event error:", error);
+      return rejectWithValue(
+        error instanceof Error ? error.message : "Failed to delete event"
+      );
+    }
+  }
+);
+
+export const getEventsForDate = createAsyncThunk(
+  "calendar/getEventsForDate",
+  async (date: string, { rejectWithValue }) => {
+    try {
+      console.log("📅 Fetching events for date:", date);
+      const events = await calendarAPI.getEventsForDate(date);
+      return { date, events };
+    } catch (error) {
+      console.error("💥 Get events error:", error);
+      return rejectWithValue(
+        error instanceof Error ? error.message : "Failed to fetch events"
+      );
+    }
+  }
+);
+
 const calendarSlice = createSlice({
   name: "calendar",
   initialState,
   reducers: {
     clearError: (state) => {
+      state.error = null;
+    },
+    updateDayData: (
+      state,
+      action: PayloadAction<{ date: string; data: Partial<DayData> }>
+    ) => {
+      const { date, data } = action.payload;
+      if (state.calendarData[date]) {
+        state.calendarData[date] = { ...state.calendarData[date], ...data };
+      }
+    },
+    resetCalendar: (state) => {
+      state.calendarData = {};
+      state.statistics = null;
       state.error = null;
     },
   },
@@ -124,6 +211,7 @@ const calendarSlice = createSlice({
         state.isLoading = false;
         state.calendarData = action.payload;
         state.error = null;
+        state.lastUpdated = new Date().toISOString();
       })
       .addCase(fetchCalendarData.rejected, (state, action) => {
         state.isLoading = false;
@@ -150,17 +238,57 @@ const calendarSlice = createSlice({
         state.isAddingEvent = false;
         const { date, event } = action.payload;
 
-        // Add event to the calendar data
+        // Update the calendar data with the new event
         if (state.calendarData[date]) {
-          state.calendarData[date].events.push(event);
+          state.calendarData[date].events.push({
+            id: event.event_id,
+            title: event.title,
+            type: event.type,
+            created_at: event.created_at,
+          });
         }
       })
       .addCase(addEvent.rejected, (state, action) => {
         state.isAddingEvent = false;
         state.error = action.payload as string;
+      })
+
+      // Delete event
+      .addCase(deleteEvent.pending, (state) => {
+        state.isDeletingEvent = true;
+        state.error = null;
+      })
+      .addCase(deleteEvent.fulfilled, (state, action) => {
+        state.isDeletingEvent = false;
+        const { eventId, date } = action.payload;
+
+        // Remove the event from calendar data
+        if (state.calendarData[date]) {
+          state.calendarData[date].events = state.calendarData[
+            date
+          ].events.filter((event) => event.id !== eventId);
+        }
+      })
+      .addCase(deleteEvent.rejected, (state, action) => {
+        state.isDeletingEvent = false;
+        state.error = action.payload as string;
+      })
+
+      // Get events for date
+      .addCase(getEventsForDate.fulfilled, (state, action) => {
+        const { date, events } = action.payload;
+        if (state.calendarData[date]) {
+          state.calendarData[date].events = events.map((event: any) => ({
+            id: event.event_id,
+            title: event.title,
+            type: event.type,
+            created_at: event.created_at,
+          }));
+        }
       });
   },
 });
 
-export const { clearError } = calendarSlice.actions;
+export const { clearError, updateDayData, resetCalendar } =
+  calendarSlice.actions;
 export default calendarSlice.reducer;

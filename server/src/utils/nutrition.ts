@@ -135,7 +135,11 @@ export function mapMealDataToPrismaFields(
     cooking_method: mealData.cooking_method ?? mealData.cookingMethod ?? null,
     health_risk_notes:
       mealData.health_risk_notes ?? mealData.healthNotes ?? null,
-    ingredients: mealData.ingredients ?? [],
+    ingredients: Array.isArray(mealData.ingredients)
+      ? mealData.ingredients
+      : typeof mealData.ingredients === "string"
+      ? [mealData.ingredients]
+      : [],
 
     // JSON fields
     vitamins_json,

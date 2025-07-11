@@ -102,19 +102,42 @@ export class NutritionService {
           typeof ingredient === "string"
             ? ingredient
             : ingredient.name || `Item ${index + 1}`,
-        calories: (ingredient.calories || 0).toString(),
-        protein: (ingredient.protein || 0).toString(),
-        carbs: (ingredient.carbs || 0).toString(),
-        fat: (ingredient.fat || 0).toString(),
-        fiber: Number(ingredient.fiber ?? 0),
-        sugar: Number(ingredient.sugar ?? 0),
+        calories:
+          typeof ingredient === "string"
+            ? "0"
+            : (ingredient.calories || 0).toString(),
+        protein:
+          typeof ingredient === "string"
+            ? "0"
+            : (ingredient.protein || 0).toString(),
+        carbs:
+          typeof ingredient === "string"
+            ? "0"
+            : (ingredient.carbs || 0).toString(),
+        fat:
+          typeof ingredient === "string"
+            ? "0"
+            : (ingredient.fat || 0).toString(),
+        fiber:
+          typeof ingredient === "string" ? 0 : Number(ingredient.fiber ?? 0),
+        sugar:
+          typeof ingredient === "string" ? 0 : Number(ingredient.sugar ?? 0),
       }));
+
+      console.log("🔍 Ingredients from analysis:", analysis.ingredients);
+      console.log("🔍 Type of ingredients:", typeof analysis.ingredients);
+      console.log(
+        "🔍 Is ingredients array?",
+        Array.isArray(analysis.ingredients)
+      );
 
       const mappedMeal = mapMealDataToPrismaFields(
         analysis,
         user_id,
         cleanBase64
       );
+
+      console.log("🔍 Mapped meal ingredients:", mappedMeal.ingredients);
       return {
         success: true,
         data: {
@@ -225,7 +248,17 @@ export class NutritionService {
           sugar_g: updatedAnalysis.sugar ?? existingMeal.sugar_g,
           sodium_mg: updatedAnalysis.sodium ?? existingMeal.sodium_mg,
           confidence: updatedAnalysis.confidence,
-          ingredients: updatedAnalysis.ingredients,
+          ingredients: updatedAnalysis.ingredients || existingMeal.ingredients,
+          // Also update any related fields
+          meal_description:
+            updatedAnalysis.description || existingMeal.meal_description,
+          serving_size_g:
+            updatedAnalysis.serving_size_g || existingMeal.serving_size_g,
+          cooking_method:
+            updatedAnalysis.cookingMethod || existingMeal.cooking_method,
+          health_risk_notes:
+            updatedAnalysis.healthNotes || existingMeal.health_risk_notes,
+          ts,
 
           // Preserve detailed nutrition fields if not provided in update
           saturated_fats_g:

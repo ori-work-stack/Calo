@@ -122,7 +122,7 @@ export default function SignUpScreen() {
 
         <TextInput
           style={[styles.input, isRTL && styles.inputRTL]}
-          placeholder="Confirm Password"
+          placeholder={t("auth.confirm_password")}
           value={confirmPassword}
           onChangeText={setConfirmPassword}
           secureTextEntry

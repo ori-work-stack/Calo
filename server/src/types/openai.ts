@@ -1,5 +1,5 @@
 type Ingredient = {
-  name: string;            // add this
+  name: string; // add this
   calories: string | number;
   protein: string | number;
   carbs: string | number;
@@ -7,7 +7,6 @@ type Ingredient = {
   fiber?: string | number;
   sugar?: string | number;
 };
-
 
 export interface MealAnalysisResult {
   // Basic identification

@@ -17,7 +17,9 @@ import { RootState, AppDispatch } from "../../src/store";
 import {
   fetchCalendarData,
   addEvent,
+  deleteEvent,
   getStatistics,
+  clearError,
 } from "../../src/store/calendarSlice";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -36,18 +38,25 @@ interface DayData {
   fat_actual: number;
   meal_count: number;
   quality_score: number;
+  water_intake_ml: number;
   events: Array<{
     id: string;
     title: string;
     type: string;
+    created_at: string;
   }>;
 }
 
 export default function CalendarScreen() {
   const dispatch = useDispatch<AppDispatch>();
-  const { calendarData, statistics, isLoading, isAddingEvent } = useSelector(
-    (state: RootState) => state.calendar
-  );
+  const {
+    calendarData,
+    statistics,
+    isLoading,
+    isAddingEvent,
+    isDeletingEvent,
+    error,
+  } = useSelector((state: RootState) => state.calendar);
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<DayData | null>(null);
@@ -55,13 +64,24 @@ export default function CalendarScreen() {
   const [showEventModal, setShowEventModal] = useState(false);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [showYearPicker, setShowYearPicker] = useState(false);
+  const [showBadgesModal, setShowBadgesModal] = useState(false);
+  const [showInsightsModal, setShowInsightsModal] = useState(false);
   const [eventTitle, setEventTitle] = useState("");
   const [eventType, setEventType] = useState("general");
+  const [eventDescription, setEventDescription] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
 
   useEffect(() => {
     loadCalendarData();
   }, [currentDate]);
+
+  useEffect(() => {
+    if (error) {
+      Alert.alert("Error", error, [
+        { text: "OK", onPress: () => dispatch(clearError()) },
+      ]);
+    }
+  }, [error, dispatch]);
 
   const loadCalendarData = () => {
     const year = currentDate.getFullYear();
@@ -102,6 +122,7 @@ export default function CalendarScreen() {
         fat_actual: 0,
         meal_count: 0,
         quality_score: 0,
+        water_intake_ml: 0,
         events: [],
       };
       days.push(dayData);
@@ -127,6 +148,18 @@ export default function CalendarScreen() {
     return "#F44336"; // Red for not achieved
   };
 
+  const getProgressLabel = (dayData: DayData) => {
+    const caloriesProgress = getProgressPercentage(
+      dayData.calories_actual,
+      dayData.calories_goal
+    );
+
+    if (caloriesProgress >= 110) return "Overeating";
+    if (caloriesProgress >= 100) return "Goal Achieved";
+    if (caloriesProgress >= 70) return "Close to Goal";
+    return "Below Goal";
+  };
+
   const navigateMonth = (direction: number) => {
     const newDate = new Date(currentDate);
     newDate.setMonth(newDate.getMonth() + direction);
@@ -138,7 +171,6 @@ export default function CalendarScreen() {
     newDate.setMonth(monthIndex);
     setCurrentDate(newDate);
     setShowMonthPicker(false);
-    loadCalendarData();
   };
 
   const handleYearSelect = (year: number) => {
@@ -146,7 +178,6 @@ export default function CalendarScreen() {
     newDate.setFullYear(year);
     setCurrentDate(newDate);
     setShowYearPicker(false);
-    loadCalendarData();
   };
 
   const generateYearRange = () => {
@@ -182,6 +213,7 @@ export default function CalendarScreen() {
     setSelectedDate(dateStr);
     setEventTitle("");
     setEventType("general");
+    setEventDescription("");
     setShowEventModal(true);
   };
 
@@ -197,15 +229,33 @@ export default function CalendarScreen() {
           date: selectedDate,
           title: eventTitle.trim(),
           type: eventType,
+          description: eventDescription.trim() || undefined,
         })
       ).unwrap();
 
       setShowEventModal(false);
-      loadCalendarData(); // Refresh data
       Alert.alert("Success", "Event added successfully!");
     } catch (error) {
       Alert.alert("Error", "Failed to add event");
     }
+  };
+
+  const handleDeleteEvent = async (eventId: string, date: string) => {
+    Alert.alert("Delete Event", "Are you sure you want to delete this event?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await dispatch(deleteEvent({ eventId, date })).unwrap();
+            Alert.alert("Success", "Event deleted successfully!");
+          } catch (error) {
+            Alert.alert("Error", "Failed to delete event");
+          }
+        },
+      },
+    ]);
   };
 
   const renderDay = (dayData: DayData | null, index: number) => {
@@ -245,11 +295,13 @@ export default function CalendarScreen() {
         {hasEvents && (
           <View style={styles.eventIndicator}>
             <Ionicons name="star" size={8} color="#FFD700" />
+            <Text style={styles.eventCount}>{dayData.events.length}</Text>
           </View>
         )}
         <Text style={styles.caloriesText}>
           {Math.round(dayData.calories_actual)}cal
         </Text>
+        <Text style={styles.qualityScore}>Q: {dayData.quality_score}/10</Text>
       </TouchableOpacity>
     );
   };
@@ -263,6 +315,29 @@ export default function CalendarScreen() {
             {day}
           </Text>
         ))}
+      </View>
+    );
+  };
+
+  const renderGamificationSection = () => {
+    if (!statistics || !statistics.gamificationBadges?.length) return null;
+
+    return (
+      <View style={styles.gamificationContainer}>
+        <View style={styles.gamificationHeader}>
+          <Text style={styles.gamificationTitle}>🏆 Recent Achievements</Text>
+          <TouchableOpacity onPress={() => setShowBadgesModal(true)}>
+            <Text style={styles.seeAllText}>See All</Text>
+          </TouchableOpacity>
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {statistics.gamificationBadges.slice(0, 5).map((badge) => (
+            <View key={badge.id} style={styles.badgeItem}>
+              <Text style={styles.badgeIcon}>{badge.icon}</Text>
+              <Text style={styles.badgeName}>{badge.name}</Text>
+            </View>
+          ))}
+        </ScrollView>
       </View>
     );
   };
@@ -283,7 +358,7 @@ export default function CalendarScreen() {
           </View>
           <View style={styles.statItem}>
             <Text style={styles.statValue}>{statistics.streakDays}</Text>
-            <Text style={styles.statLabel}>Streak Days</Text>
+            <Text style={styles.statLabel}>Current Streak</Text>
           </View>
           <View style={styles.statItem}>
             <Text style={styles.statValue}>{statistics.totalGoalDays}</Text>
@@ -298,18 +373,34 @@ export default function CalendarScreen() {
           </View>
         </View>
 
-        {statistics.bestWeek && (
-          <View style={styles.insightContainer}>
-            <Text style={styles.insightTitle}>📈 Best Week</Text>
-            <Text style={styles.insightText}>{statistics.bestWeek}</Text>
+        <View style={styles.averagesGrid}>
+          <View style={styles.averageItem}>
+            <Text style={styles.averageValue}>
+              {statistics.averageCalories}
+            </Text>
+            <Text style={styles.averageLabel}>Avg Calories</Text>
           </View>
-        )}
+          <View style={styles.averageItem}>
+            <Text style={styles.averageValue}>
+              {statistics.averageProtein}g
+            </Text>
+            <Text style={styles.averageLabel}>Avg Protein</Text>
+          </View>
+          <View style={styles.averageItem}>
+            <Text style={styles.averageValue}>{statistics.averageWater}ml</Text>
+            <Text style={styles.averageLabel}>Avg Water</Text>
+          </View>
+        </View>
 
-        {statistics.challengingWeek && (
-          <View style={styles.insightContainer}>
-            <Text style={styles.insightTitle}>📉 Most Challenging</Text>
-            <Text style={styles.insightText}>{statistics.challengingWeek}</Text>
-          </View>
+        {statistics.weeklyInsights && (
+          <TouchableOpacity
+            style={styles.insightsButton}
+            onPress={() => setShowInsightsModal(true)}
+          >
+            <Text style={styles.insightsButtonText}>
+              📊 View Weekly Insights
+            </Text>
+          </TouchableOpacity>
         )}
       </View>
     );
@@ -360,6 +451,9 @@ export default function CalendarScreen() {
       {/* Statistics */}
       {renderStatistics()}
 
+      {/* Gamification Section */}
+      {renderGamificationSection()}
+
       {/* Calendar */}
       <View style={styles.calendarContainer}>
         {renderWeekDays()}
@@ -368,7 +462,7 @@ export default function CalendarScreen() {
         </View>
       </View>
 
-      {/* Legend */}
+      {/* Enhanced Legend */}
       <View style={styles.legendContainer}>
         <Text style={styles.legendTitle}>Legend</Text>
         <View style={styles.legendGrid}>
@@ -376,26 +470,31 @@ export default function CalendarScreen() {
             <View
               style={[styles.legendColor, { backgroundColor: "#4CAF50" }]}
             />
-            <Text style={styles.legendText}>Goal Achieved</Text>
+            <Text style={styles.legendText}>Goal Achieved (100%+)</Text>
           </View>
           <View style={styles.legendItem}>
             <View
               style={[styles.legendColor, { backgroundColor: "#FF9800" }]}
             />
-            <Text style={styles.legendText}>Close (70-99%)</Text>
+            <Text style={styles.legendText}>Close to Goal (70-99%)</Text>
           </View>
           <View style={styles.legendItem}>
             <View
               style={[styles.legendColor, { backgroundColor: "#F44336" }]}
             />
-            <Text style={styles.legendText}>Below Goal</Text>
+            <Text style={styles.legendText}>Below Goal (&lt;70%)</Text>
           </View>
           <View style={styles.legendItem}>
             <View
               style={[styles.legendColor, { backgroundColor: "#8B0000" }]}
             />
-            <Text style={styles.legendText}>Overeating</Text>
+            <Text style={styles.legendText}>Overeating (110%+)</Text>
           </View>
+        </View>
+        <View style={styles.legendNote}>
+          <Text style={styles.legendNoteText}>
+            💡 Tap day for details • Long press to add event • ⭐ = has events
+          </Text>
         </View>
       </View>
 
@@ -408,113 +507,187 @@ export default function CalendarScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            {selectedDay && (
-              <>
-                <Text style={styles.modalTitle}>
-                  {new Date(selectedDay.date).toLocaleDateString("en-US", {
-                    weekday: "long",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                </Text>
+            <ScrollView>
+              {selectedDay && (
+                <>
+                  <Text style={styles.modalTitle}>
+                    {new Date(selectedDay.date).toLocaleDateString("en-US", {
+                      weekday: "long",
+                      month: "long",
+                      day: "numeric",
+                    })}
+                  </Text>
 
-                <View style={styles.dayDetailGrid}>
-                  <View style={styles.macroItem}>
-                    <Text style={styles.macroLabel}>Calories</Text>
-                    <Text style={styles.macroValue}>
-                      {Math.round(selectedDay.calories_actual)} /{" "}
-                      {selectedDay.calories_goal}
+                  <View style={styles.dayOverview}>
+                    <Text style={styles.dayStatus}>
+                      {getProgressLabel(selectedDay)}
                     </Text>
-                    <View style={styles.macroProgress}>
-                      <View
-                        style={[
-                          styles.macroProgressBar,
-                          {
-                            width: `${Math.min(
-                              getProgressPercentage(
-                                selectedDay.calories_actual,
-                                selectedDay.calories_goal
-                              ),
-                              100
-                            )}%`,
-                            backgroundColor: getDayColor(selectedDay),
-                          },
-                        ]}
-                      />
+                    <Text style={styles.dayProgress}>
+                      {Math.round(
+                        getProgressPercentage(
+                          selectedDay.calories_actual,
+                          selectedDay.calories_goal
+                        )
+                      )}
+                      % of daily goal
+                    </Text>
+                  </View>
+
+                  <View style={styles.dayDetailGrid}>
+                    <View style={styles.macroItem}>
+                      <Text style={styles.macroLabel}>Calories</Text>
+                      <Text style={styles.macroValue}>
+                        {Math.round(selectedDay.calories_actual)} /{" "}
+                        {selectedDay.calories_goal}
+                      </Text>
+                      <View style={styles.macroProgress}>
+                        <View
+                          style={[
+                            styles.macroProgressBar,
+                            {
+                              width: `${Math.min(
+                                getProgressPercentage(
+                                  selectedDay.calories_actual,
+                                  selectedDay.calories_goal
+                                ),
+                                100
+                              )}%`,
+                              backgroundColor: getDayColor(selectedDay),
+                            },
+                          ]}
+                        />
+                      </View>
+                    </View>
+
+                    <View style={styles.macroItem}>
+                      <Text style={styles.macroLabel}>Protein</Text>
+                      <Text style={styles.macroValue}>
+                        {Math.round(selectedDay.protein_actual)}g /{" "}
+                        {selectedDay.protein_goal}g
+                      </Text>
+                      <View style={styles.macroProgress}>
+                        <View
+                          style={[
+                            styles.macroProgressBar,
+                            {
+                              width: `${Math.min(
+                                getProgressPercentage(
+                                  selectedDay.protein_actual,
+                                  selectedDay.protein_goal
+                                ),
+                                100
+                              )}%`,
+                              backgroundColor: "#2196F3",
+                            },
+                          ]}
+                        />
+                      </View>
+                    </View>
+
+                    <View style={styles.macroItem}>
+                      <Text style={styles.macroLabel}>Carbs</Text>
+                      <Text style={styles.macroValue}>
+                        {Math.round(selectedDay.carbs_actual)}g /{" "}
+                        {selectedDay.carbs_goal}g
+                      </Text>
+                      <View style={styles.macroProgress}>
+                        <View
+                          style={[
+                            styles.macroProgressBar,
+                            {
+                              width: `${Math.min(
+                                getProgressPercentage(
+                                  selectedDay.carbs_actual,
+                                  selectedDay.carbs_goal
+                                ),
+                                100
+                              )}%`,
+                              backgroundColor: "#FF9800",
+                            },
+                          ]}
+                        />
+                      </View>
+                    </View>
+
+                    <View style={styles.macroItem}>
+                      <Text style={styles.macroLabel}>Fat</Text>
+                      <Text style={styles.macroValue}>
+                        {Math.round(selectedDay.fat_actual)}g /{" "}
+                        {selectedDay.fat_goal}g
+                      </Text>
+                      <View style={styles.macroProgress}>
+                        <View
+                          style={[
+                            styles.macroProgressBar,
+                            {
+                              width: `${Math.min(
+                                getProgressPercentage(
+                                  selectedDay.fat_actual,
+                                  selectedDay.fat_goal
+                                ),
+                                100
+                              )}%`,
+                              backgroundColor: "#9C27B0",
+                            },
+                          ]}
+                        />
+                      </View>
+                    </View>
+
+                    <View style={styles.macroItem}>
+                      <Text style={styles.macroLabel}>Water</Text>
+                      <Text style={styles.macroValue}>
+                        {Math.round(selectedDay.water_intake_ml)}ml
+                      </Text>
                     </View>
                   </View>
 
-                  <View style={styles.macroItem}>
-                    <Text style={styles.macroLabel}>Protein</Text>
-                    <Text style={styles.macroValue}>
-                      {Math.round(selectedDay.protein_actual)}g /{" "}
-                      {selectedDay.protein_goal}g
-                    </Text>
+                  {selectedDay.events.length > 0 && (
+                    <View style={styles.eventsSection}>
+                      <Text style={styles.eventsTitle}>Events</Text>
+                      {selectedDay.events.map((event) => (
+                        <View key={event.id} style={styles.eventItem}>
+                          <Ionicons name="calendar" size={16} color="#007AFF" />
+                          <Text style={styles.eventText}>{event.title}</Text>
+                          <TouchableOpacity
+                            style={styles.deleteEventButton}
+                            onPress={() =>
+                              handleDeleteEvent(event.id, selectedDay.date)
+                            }
+                            disabled={isDeletingEvent}
+                          >
+                            <Ionicons name="trash" size={16} color="#F44336" />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                  <View style={styles.modalButtons}>
+                    <TouchableOpacity
+                      style={[styles.modalButton, styles.addEventButton]}
+                      onPress={() => {
+                        setShowDayModal(false);
+                        handleAddEvent(selectedDay.date);
+                      }}
+                    >
+                      <Text style={styles.addEventButtonText}>Add Event</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.modalButton, styles.closeButton]}
+                      onPress={() => setShowDayModal(false)}
+                    >
+                      <Text style={styles.closeButtonText}>Close</Text>
+                    </TouchableOpacity>
                   </View>
-
-                  <View style={styles.macroItem}>
-                    <Text style={styles.macroLabel}>Carbs</Text>
-                    <Text style={styles.macroValue}>
-                      {Math.round(selectedDay.carbs_actual)}g /{" "}
-                      {selectedDay.carbs_goal}g
-                    </Text>
-                  </View>
-
-                  <View style={styles.macroItem}>
-                    <Text style={styles.macroLabel}>Fat</Text>
-                    <Text style={styles.macroValue}>
-                      {Math.round(selectedDay.fat_actual)}g /{" "}
-                      {selectedDay.fat_goal}g
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.dayStats}>
-                  <Text style={styles.dayStatsText}>
-                    Meals logged: {selectedDay.meal_count}
-                  </Text>
-                  <Text style={styles.dayStatsText}>
-                    Quality score: {selectedDay.quality_score}/10
-                  </Text>
-                </View>
-
-                {selectedDay.events.length > 0 && (
-                  <View style={styles.eventsSection}>
-                    <Text style={styles.eventsTitle}>Events</Text>
-                    {selectedDay.events.map((event) => (
-                      <View key={event.id} style={styles.eventItem}>
-                        <Ionicons name="calendar" size={16} color="#007AFF" />
-                        <Text style={styles.eventText}>{event.title}</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-
-                <View style={styles.modalButtons}>
-                  <TouchableOpacity
-                    style={[styles.modalButton, styles.addEventButton]}
-                    onPress={() => {
-                      setShowDayModal(false);
-                      handleAddEvent(selectedDay.date);
-                    }}
-                  >
-                    <Text style={styles.addEventButtonText}>Add Event</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.modalButton, styles.closeButton]}
-                    onPress={() => setShowDayModal(false)}
-                  >
-                    <Text style={styles.closeButtonText}>Close</Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
+                </>
+              )}
+            </ScrollView>
           </View>
         </View>
       </Modal>
 
-      {/* Add Event Modal */}
+      {/* Enhanced Add Event Modal */}
       <Modal
         visible={showEventModal}
         animationType="slide"
@@ -533,6 +706,15 @@ export default function CalendarScreen() {
               autoFocus={true}
             />
 
+            <TextInput
+              style={[styles.eventInput, styles.eventDescriptionInput]}
+              placeholder="Description (optional)"
+              value={eventDescription}
+              onChangeText={setEventDescription}
+              multiline
+              numberOfLines={3}
+            />
+
             <View style={styles.eventTypeContainer}>
               <Text style={styles.eventTypeLabel}>Event Type:</Text>
               <View style={styles.eventTypeButtons}>
@@ -541,6 +723,8 @@ export default function CalendarScreen() {
                   { key: "workout", label: "Workout", icon: "fitness" },
                   { key: "social", label: "Social", icon: "people" },
                   { key: "health", label: "Health", icon: "medical" },
+                  { key: "travel", label: "Travel", icon: "airplane" },
+                  { key: "work", label: "Work", icon: "briefcase" },
                 ].map((type) => (
                   <TouchableOpacity
                     key={type.key}
@@ -590,6 +774,118 @@ export default function CalendarScreen() {
                 )}
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Badges Modal */}
+      <Modal
+        visible={showBadgesModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowBadgesModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.badgesHeader}>
+              <Text style={styles.modalTitle}>🏆 Your Achievements</Text>
+              <TouchableOpacity onPress={() => setShowBadgesModal(false)}>
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.badgesScrollView}>
+              {statistics?.gamificationBadges.map((badge) => (
+                <View key={badge.id} style={styles.badgeDetailItem}>
+                  <Text style={styles.badgeDetailIcon}>{badge.icon}</Text>
+                  <View style={styles.badgeDetailContent}>
+                    <Text style={styles.badgeDetailName}>{badge.name}</Text>
+                    <Text style={styles.badgeDetailDescription}>
+                      {badge.description}
+                    </Text>
+                    <Text style={styles.badgeDetailDate}>
+                      Achieved:{" "}
+                      {new Date(badge.achieved_at).toLocaleDateString()}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Weekly Insights Modal */}
+      <Modal
+        visible={showInsightsModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowInsightsModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.insightsHeader}>
+              <Text style={styles.modalTitle}>📊 Weekly Insights</Text>
+              <TouchableOpacity onPress={() => setShowInsightsModal(false)}>
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.insightsScrollView}>
+              {statistics?.weeklyInsights.bestWeekDetails && (
+                <View style={styles.insightCard}>
+                  <Text style={styles.insightCardTitle}>🎯 Best Week</Text>
+                  <Text style={styles.insightCardSubtitle}>
+                    {statistics.weeklyInsights.bestWeekDetails.weekStart} to{" "}
+                    {statistics.weeklyInsights.bestWeekDetails.weekEnd}
+                  </Text>
+                  <Text style={styles.insightCardValue}>
+                    {Math.round(
+                      statistics.weeklyInsights.bestWeekDetails.averageProgress
+                    )}
+                    % average progress
+                  </Text>
+                  <View style={styles.insightHighlights}>
+                    {statistics.weeklyInsights.bestWeekDetails.highlights.map(
+                      (highlight, index) => (
+                        <Text key={index} style={styles.insightHighlight}>
+                          ✅ {highlight}
+                        </Text>
+                      )
+                    )}
+                  </View>
+                </View>
+              )}
+
+              {statistics?.weeklyInsights.challengingWeekDetails && (
+                <View style={styles.insightCard}>
+                  <Text style={styles.insightCardTitle}>
+                    💪 Most Challenging Week
+                  </Text>
+                  <Text style={styles.insightCardSubtitle}>
+                    {statistics.weeklyInsights.challengingWeekDetails.weekStart}{" "}
+                    to{" "}
+                    {statistics.weeklyInsights.challengingWeekDetails.weekEnd}
+                  </Text>
+                  <Text style={styles.insightCardValue}>
+                    {Math.round(
+                      statistics.weeklyInsights.challengingWeekDetails
+                        .averageProgress
+                    )}
+                    % average progress
+                  </Text>
+                  <View style={styles.insightChallenges}>
+                    {statistics.weeklyInsights.challengingWeekDetails.challenges.map(
+                      (challenge, index) => (
+                        <Text key={index} style={styles.insightChallenge}>
+                          🔍 {challenge}
+                        </Text>
+                      )
+                    )}
+                  </View>
+                </View>
+              )}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -832,21 +1128,78 @@ const styles = StyleSheet.create({
     color: "#666",
     textAlign: "center",
   },
-  insightContainer: {
-    backgroundColor: "#f8f9fa",
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 10,
+  averagesGrid: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginBottom: 15,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#f0f0f0",
   },
-  insightTitle: {
-    fontSize: 14,
+  averageItem: {
+    alignItems: "center",
+  },
+  averageValue: {
+    fontSize: 18,
     fontWeight: "600",
     color: "#333",
+  },
+  averageLabel: {
+    fontSize: 11,
+    color: "#666",
+  },
+  insightsButton: {
+    backgroundColor: "#f8f9fa",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 10,
+  },
+  insightsButtonText: {
+    color: "#007AFF",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  gamificationContainer: {
+    backgroundColor: "white",
+    margin: 15,
+    padding: 20,
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  gamificationHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  gamificationTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+  },
+  seeAllText: {
+    color: "#007AFF",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  badgeItem: {
+    alignItems: "center",
+    marginRight: 20,
+    minWidth: 60,
+  },
+  badgeIcon: {
+    fontSize: 24,
     marginBottom: 5,
   },
-  insightText: {
+  badgeName: {
     fontSize: 12,
     color: "#666",
+    textAlign: "center",
   },
   calendarContainer: {
     backgroundColor: "white",
@@ -916,10 +1269,22 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 2,
     right: 2,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  eventCount: {
+    fontSize: 8,
+    color: "#FFD700",
+    marginLeft: 2,
   },
   caloriesText: {
     fontSize: 8,
     color: "white",
+  },
+  qualityScore: {
+    fontSize: 7,
+    color: "white",
+    fontWeight: "600",
   },
   legendContainer: {
     backgroundColor: "white",
@@ -959,6 +1324,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#666",
   },
+  legendNote: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#f0f0f0",
+  },
+  legendNoteText: {
+    fontSize: 12,
+    color: "#666",
+    textAlign: "center",
+    lineHeight: 16,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -979,6 +1356,23 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: "center",
     color: "#333",
+  },
+  dayOverview: {
+    backgroundColor: "#f8f9fa",
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 15,
+    alignItems: "center",
+  },
+  dayStatus: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 5,
+  },
+  dayProgress: {
+    fontSize: 14,
+    color: "#666",
   },
   dayDetailGrid: {
     marginBottom: 20,
@@ -1036,9 +1430,13 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   eventText: {
+    flex: 1,
     marginLeft: 8,
     fontSize: 14,
     color: "#333",
+  },
+  deleteEventButton: {
+    padding: 5,
   },
   eventInput: {
     borderWidth: 1,
@@ -1046,7 +1444,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 15,
     fontSize: 16,
-    marginBottom: 20,
+    marginBottom: 15,
+  },
+  eventDescriptionInput: {
+    height: 80,
+    textAlignVertical: "top",
   },
   eventTypeContainer: {
     marginBottom: 20,
@@ -1070,6 +1472,7 @@ const styles = StyleSheet.create({
     borderColor: "#007AFF",
     borderRadius: 8,
     backgroundColor: "white",
+    minWidth: 100,
   },
   eventTypeButtonActive: {
     backgroundColor: "#007AFF",
@@ -1129,5 +1532,92 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
     fontWeight: "bold",
+  },
+  badgesHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  badgesScrollView: {
+    maxHeight: 400,
+  },
+  badgeDetailItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 15,
+    backgroundColor: "#f8f9fa",
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  badgeDetailIcon: {
+    fontSize: 32,
+    marginRight: 15,
+  },
+  badgeDetailContent: {
+    flex: 1,
+  },
+  badgeDetailName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 5,
+  },
+  badgeDetailDescription: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 5,
+  },
+  badgeDetailDate: {
+    fontSize: 12,
+    color: "#999",
+  },
+  insightsHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  insightsScrollView: {
+    maxHeight: 400,
+  },
+  insightCard: {
+    backgroundColor: "#f8f9fa",
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 15,
+  },
+  insightCardTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 5,
+  },
+  insightCardSubtitle: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 5,
+  },
+  insightCardValue: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#007AFF",
+    marginBottom: 10,
+  },
+  insightHighlights: {
+    marginTop: 10,
+  },
+  insightHighlight: {
+    fontSize: 14,
+    color: "#4CAF50",
+    marginBottom: 5,
+  },
+  insightChallenges: {
+    marginTop: 10,
+  },
+  insightChallenge: {
+    fontSize: 14,
+    color: "#FF9800",
+    marginBottom: 5,
   },
 });

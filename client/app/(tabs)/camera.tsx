@@ -25,6 +25,7 @@ import {
   loadPendingMeal,
 } from "@/src/store/mealSlice";
 import { Ionicons } from "@expo/vector-icons";
+import { t } from "i18next";
 
 export default function CameraScreen() {
   const dispatch = useDispatch<AppDispatch>();
@@ -73,9 +74,7 @@ export default function CameraScreen() {
   if (!permission.granted) {
     return (
       <View style={styles.container}>
-        <Text style={styles.message}>
-          We need your permission to show the camera
-        </Text>
+        <Text style={styles.message}>{t(`camera.permission`)}</Text>
         <TouchableOpacity style={styles.button} onPress={requestPermission}>
           <Text style={styles.buttonText}>Grant Permission</Text>
         </TouchableOpacity>
@@ -149,7 +148,7 @@ export default function CameraScreen() {
       Alert.alert("Error", "Failed to open photo library. Please try again.");
     }
   };
-
+  console.log(pendingMeal?.analysis?.ingredients,"this are ing for this meal");
   const handlePost = async () => {
     if (pendingMeal && !isPosting) {
       const result = await dispatch(postMeal());
@@ -361,7 +360,7 @@ export default function CameraScreen() {
                   {pendingMeal.analysis.ingredients.map((ingredient, index) => (
                     <View key={index} style={styles.ingredientItem}>
                       <Text style={styles.ingredientName}>
-                        🥗 {ingredient.name}
+                        🥗 {ingredient}
                       </Text>
                       <View style={styles.ingredientNutrition}>
                         <Text style={styles.ingredientDetail}>
@@ -495,10 +494,8 @@ export default function CameraScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Analyze Your Meal</Text>
-      <Text style={styles.subtitle}>
-        Take a photo or select from gallery to get nutrition analysis
-      </Text>
+      <Text style={styles.title}>{t(`camera.analyze_photo`)}</Text>
+      <Text style={styles.subtitle}>{t(`camera.description`)}</Text>
 
       {isAnalyzing && (
         <View style={styles.analyzingContainer}>
@@ -515,7 +512,7 @@ export default function CameraScreen() {
           activeOpacity={0.7}
         >
           <Ionicons name="camera" size={30} color="white" />
-          <Text style={styles.buttonText}>Take Photo</Text>
+          <Text style={styles.buttonText}>{t(`camera.take_photo`)}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -528,7 +525,9 @@ export default function CameraScreen() {
           activeOpacity={0.7}
         >
           <Ionicons name="images" size={30} color="#007AFF" />
-          <Text style={styles.galleryButtonText}>Choose from Gallery</Text>
+          <Text style={styles.galleryButtonText}>
+            {t(`camera.choose_from_gallery`)}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>

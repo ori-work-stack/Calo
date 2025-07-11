@@ -798,7 +798,12 @@ export const calendarAPI = {
     }
   },
 
-  addEvent: async (date: string, title: string, type: string) => {
+  addEvent: async (
+    date: string,
+    title: string,
+    type: string,
+    description?: string
+  ) => {
     try {
       console.log("📝 Making add event API request...");
       console.log("📅 Date:", date, "Title:", title, "Type:", type);
@@ -807,6 +812,7 @@ export const calendarAPI = {
         date,
         title,
         type,
+        description,
       });
 
       console.log("✅ Add event response:", response.data);
@@ -826,6 +832,51 @@ export const calendarAPI = {
       } else {
         throw new Error("Failed to add event");
       }
+    }
+  },
+
+  deleteEvent: async (eventId: string) => {
+    try {
+      console.log("🗑️ Making delete event API request...");
+      console.log("🗑️ Event ID:", eventId);
+
+      const response = await api.delete(`/calendar/events/${eventId}`);
+
+      console.log("✅ Delete event response:", response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error("💥 Delete event API error:", error);
+      throw error;
+    }
+  },
+
+  getEventsForDate: async (date: string) => {
+    try {
+      console.log("📅 Making get events for date API request...");
+      console.log("📅 Date:", date);
+
+      const response = await api.get(`/calendar/events/${date}`);
+
+      console.log("✅ Get events for date response:", response.data);
+      return response.data.data;
+    } catch (error: any) {
+      console.error("💥 Get events for date API error:", error);
+      throw error;
+    }
+  },
+
+  getMonthComparison: async (year: number, month: number) => {
+    try {
+      console.log("📊 Making get month comparison API request...");
+      console.log("📊 Year:", year, "Month:", month);
+
+      const response = await api.get(`/calendar/comparison/${year}/${month}`);
+
+      console.log("✅ Get month comparison response:", response.data);
+      return response.data.data;
+    } catch (error: any) {
+      console.error("💥 Get month comparison API error:", error);
+      throw error;
     }
   },
 };
@@ -907,7 +958,7 @@ export const mealPlanAPI = {
     } catch (error: any) {
       console.error("💥 loadMealPlan error:", error);
       return {
-        success: false,
+        success: true,
         error:
           error.response?.data?.error ||
           error.message ||
@@ -1146,3 +1197,5 @@ export const foodScannerAPI = {
     }
   },
 };
+
+// This file defines the API endpoints for the application using axios for making HTTP requests and SecureStore for securely storing authentication tokens.

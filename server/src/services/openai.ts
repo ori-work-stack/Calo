@@ -136,6 +136,7 @@ Return JSON with ALL fields below:
   "health_risk_notes": "Brief health assessment",
   "confidence": number (0-1),
   "ingredients": ["main", "visible", "ingredients"],
+      "ingredients_list": ["ingredient1", "ingredient2", "ingredient3"],
   "servingSize": "1 bowl/2 slices/etc",
   "cookingMethod": "How prepared",
   "healthNotes": "Brief dietary notes"
@@ -275,7 +276,11 @@ Language: ${language}`;
             100,
             Math.max(0, Number(parsed.confidence) * 100 || 75)
           ),
-          ingredients: [],
+          ingredients: Array.isArray(parsed.ingredients)
+            ? parsed.ingredients
+            : typeof parsed.ingredients === "string"
+            ? [parsed.ingredients]
+            : parsed.ingredients_list || parsed.ingredient_list || [],
           servingSize: parsed.servingSize || "1 serving",
           cookingMethod: parsed.cookingMethod || "Unknown",
           healthNotes: parsed.healthNotes || "",
@@ -446,7 +451,9 @@ Language for response: ${language}`;
           ),
           ingredients: Array.isArray(parsed.ingredients)
             ? parsed.ingredients
-            : originalAnalysis.ingredients,
+            : typeof parsed.ingredients === "string"
+            ? [parsed.ingredients]
+            : parsed.ingredients_list || parsed.ingredient_list || [],
           servingSize: parsed.servingSize || originalAnalysis.servingSize,
           cookingMethod: parsed.cookingMethod || originalAnalysis.cookingMethod,
           healthNotes: parsed.healthNotes || originalAnalysis.healthNotes,

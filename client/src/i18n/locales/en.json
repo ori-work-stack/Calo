@@ -83,7 +83,10 @@
     "retake_photo": "Retake Photo",
     "save_meal": "Save Meal",
     "meal_name": "Meal Name",
-    "meal_description": "Meal Description"
+    "meal_description": "Meal Description",
+    "choose_from_gallery": "Choose From Gallery",
+    "permission": "We need your permission",
+    "description": "Take a photo or choose from gallery to get the meal nutritions"
   },
   "food_scanner": {
     "title": "Food Scanner",
@@ -107,7 +110,12 @@
     "product_not_found": "Product Not Found",
     "product_not_found_message": "We couldn't find this product in our database",
     "scan_failed": "Scan Failed",
-    "scan_failed_message": "We couldn't identify the product in the image"
+    "scan_failed_message": "We couldn't identify the product in the image",
+    "start_scan": "Scan",
+    "barcode_instructions": "Point the camera to the barcode",
+    "take_photo": "Take Photo",
+    "image_instructions": "Point the camera to the barcode",
+    "photo_food": "Photo the food"
   },
   "profile": {
     "title": "Profile",
@@ -228,7 +236,7 @@
     "nutritional_value": "Nutritional Value"
   },
   "auth": {
-    "sing_in": "Sign In",
+    "sign_in": "Sign In",
     "sign_up": "Sign Up",
     "email": "Email",
     "password": "Password",
@@ -239,7 +247,9 @@
     "create_account": "Create Account",
     "welcome": "Welcome",
     "welcome_back": "Welcome Back",
-    "email_validation_error": "Please enter a valid email address"
+    "email_validation_error": "Please enter a valid email address",
+    "birth_date": "Birth Date",
+    "language_preference": "Language of choice"
   },
   "questionnaire": {
     "title": "Health Questionnaire",

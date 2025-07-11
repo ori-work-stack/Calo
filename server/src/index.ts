@@ -135,7 +135,7 @@ const apiRouter = express.Router();
 apiRouter.use("/auth", authRoutes);
 apiRouter.use("/questionnaire", questionnaireRoutes);
 apiRouter.use("/nutrition", nutritionRoutes);
-apiRouter.use("/recommended-menu", recommendedMenuRoutes);
+apiRouter.use("/recommended-menus", recommendedMenuRoutes);
 apiRouter.use("/user", userRoutes);
 apiRouter.use("/devices", deviceRoutes);
 apiRouter.use("/calendar", calendarRoutes);

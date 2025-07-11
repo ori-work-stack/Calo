@@ -36,6 +36,10 @@ model User {
   shoppingLists    ShoppingList[]
   recommendedMenus RecommendedMenu[]
 
+  // Calendar relationships
+  calendarEvents     CalendarEvent[]
+  gamificationBadges GamificationBadge[]
+
   created_at DateTime @default(now())
 
   Session Session[]
@@ -478,17 +482,38 @@ model RecommendedIngredient {
   @@map("recommended_ingredients")
 }
 
-model ScannedProduct {
-  scan_id        String   @id @default(cuid())
-  user_id        String
-  barcode        String?
-  product_name   String
-  brand          String?
-  nutrition_data Json
-  scanned_at     DateTime @default(now())
+model CalendarEvent {
+  event_id    String   @id @default(cuid())
+  user_id     String
+  date        DateTime @db.Date
+  title       String
+  type        String   @default("general")
+  description String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  // Relationships
+  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@index([user_id, date])
+  @@map("calendar_events")
+}
+
+model GamificationBadge {
+  badge_id    String   @id @default(cuid())
+  user_id     String
+  name        String
+  description String
+  icon        String
+  condition   String
+  points      Int      @default(0)
+  achieved_at DateTime @default(now())
+
+  // Relationships
+  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
   @@index([user_id])
-  @@map("scanned_products")
+  @@map("gamification_badges")
 }
 
 model FoodProduct {

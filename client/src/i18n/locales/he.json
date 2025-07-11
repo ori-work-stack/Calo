@@ -79,12 +79,15 @@
     "title": "סורק מזון",
     "take_photo": "צילום תמונה",
     "analyze_photo": "ניתוח תמונה",
+    "description":"צלם תמונה או בחר מהגלרייה להשגת נתונים בראותיים",
     "analyzing": "מנתח...",
     "analysis_complete": "הניתוח הושלם",
     "retake_photo": "צילום מחדש",
     "save_meal": "שמירת ארוחה",
     "meal_name": "שם הארוחה",
-    "meal_description": "תיאור הארוחה"
+    "meal_description": "תיאור הארוחה",
+    "choose_from_gallery": "בחר מהגלרייה",
+    "permission": "נדרש אישורך לגישה"
   },
   "food_scanner": {
     "title": "סורק מזון",
