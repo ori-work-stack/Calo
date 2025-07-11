@@ -751,7 +751,7 @@ export default function RecommendedMenusScreen() {
       transparent={true}
       onRequestClose={() => setShowShoppingList(false)}
     >
-      <ScrollView style={styles.modalOverlay}>
+      <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>רשימת קניות</Text>
@@ -797,7 +797,7 @@ export default function RecommendedMenusScreen() {
             <Text style={styles.noDataText}>לא ניתן לטעון את רשימת הקניות</Text>
           )}
         </View>
-      </ScrollView>
+      </View>
     </Modal>
   );
 
@@ -863,57 +863,60 @@ export default function RecommendedMenusScreen() {
           </TouchableOpacity>
         </View>
       </View>
+      <ScrollView>
+        {activeMenu && (
+          <View style={styles.menuInfo}>
+            <Text style={styles.menuTitle}>{activeMenu.title}</Text>
+            <Text style={styles.menuDescription}>{activeMenu.description}</Text>
 
-      {activeMenu && (
-        <View style={styles.menuInfo}>
-          <Text style={styles.menuTitle}>{activeMenu.title}</Text>
-          <Text style={styles.menuDescription}>{activeMenu.description}</Text>
-
-          <View style={styles.menuStats}>
-            <Text style={styles.statText}>
-              📊 {activeMenu.total_calories} קק"ל כולל
-            </Text>
-            <Text style={styles.statText}>📅 {activeMenu.days_count} ימים</Text>
-            {activeMenu.estimated_cost && (
+            <View style={styles.menuStats}>
               <Text style={styles.statText}>
-                💰 ₪{activeMenu.estimated_cost}
+                📊 {activeMenu.total_calories} קק"ל כולל
               </Text>
-            )}
+              <Text style={styles.statText}>
+                📅 {activeMenu.days_count} ימים
+              </Text>
+              {activeMenu.estimated_cost && (
+                <Text style={styles.statText}>
+                  💰 ₪{activeMenu.estimated_cost}
+                </Text>
+              )}
+            </View>
+
+            <View style={styles.menuActions}>
+              <TouchableOpacity
+                style={styles.menuActionButton}
+                onPress={() => startMenuMutation.mutate(activeMenu.menu_id)}
+              >
+                <Text style={styles.menuActionButtonText}>התחל היום</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.menuActionButton, styles.secondaryButton]}
+                onPress={() => {
+                  setActiveMenuId(activeMenu.menu_id);
+                  setShowShoppingList(true);
+                }}
+              >
+                <Text style={styles.menuActionButtonText}>רשימת קניות</Text>
+              </TouchableOpacity>
+            </View>
           </View>
+        )}
 
-          <View style={styles.menuActions}>
-            <TouchableOpacity
-              style={styles.menuActionButton}
-              onPress={() => startMenuMutation.mutate(activeMenu.menu_id)}
-            >
-              <Text style={styles.menuActionButtonText}>התחל היום</Text>
-            </TouchableOpacity>
+        {renderDaySelector()}
+        {renderMealTypeFilter()}
 
-            <TouchableOpacity
-              style={[styles.menuActionButton, styles.secondaryButton]}
-              onPress={() => {
-                setActiveMenuId(activeMenu.menu_id);
-                setShowShoppingList(true);
-              }}
-            >
-              <Text style={styles.menuActionButtonText}>רשימת קניות</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
+        <ScrollView
+          style={styles.mealsContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          {getCurrentDayMeals().map(renderMealCard)}
+        </ScrollView>
 
-      {renderDaySelector()}
-      {renderMealTypeFilter()}
-
-      <ScrollView
-        style={styles.mealsContainer}
-        showsVerticalScrollIndicator={false}
-      >
-        {getCurrentDayMeals().map(renderMealCard)}
+        {renderPreferencesModal()}
+        {renderShoppingListModal()}
       </ScrollView>
-
-      {renderPreferencesModal()}
-      {renderShoppingListModal()}
     </View>
   );
 }
@@ -1635,4 +1638,3 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
-s
