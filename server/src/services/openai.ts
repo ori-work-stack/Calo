@@ -22,31 +22,44 @@ export class OpenAIService {
 
   static async generateText(prompt: string): Promise<string> {
     try {
-      if (!process.env.OPENAI_API_KEY || !openai) {
-        console.log("⚠️ No OpenAI API key found, cannot generate text");
-        return ""; // Or throw an error, depending on your error handling strategy
-      }
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o",
+      console.log("🤖 Sending request to OpenAI...");
+
+      const response = await this.openai?.chat.completions.create({
+        model: "gpt-4",
         messages: [
           {
             role: "system",
             content:
-              "You are a professional nutritionist and meal planner. Generate accurate, healthy meal plans in the exact JSON format requested.",
+              "You are a professional nutritionist and meal planning expert specializing in Israeli cuisine and ingredients. You create comprehensive, detailed meal plans with exact nutrition data and realistic costs in Israeli Shekels. Always return valid JSON without markdown formatting. Focus on creating complete, practical meal plans that people will actually want to eat.",
           },
           {
             role: "user",
             content: prompt,
           },
         ],
-        temperature: 0.7,
-        max_tokens: 4000,
+        max_tokens: 8000, // Increased for comprehensive menus
+        temperature: 0.3, // Lower temperature for more consistent JSON
       });
 
-      return response.choices[0]?.message?.content || "";
+      const content = response?.choices[0]?.message?.content || "";
+      console.log("✅ OpenAI response received, length:", content.length);
+
+      // Clean up the response - remove any markdown formatting
+      const cleanedContent = content
+        .replace(/```json\s*/g, "")
+        .replace(/```\s*/g, "")
+        .trim();
+
+      console.log("🧹 Cleaned OpenAI response");
+      return cleanedContent;
     } catch (error) {
-      console.error("OpenAI text generation error:", error);
-      throw new Error("Failed to generate menu content");
+      console.error("💥 OpenAI API error:", error);
+      if (error.code === "insufficient_quota") {
+        throw new Error(
+          "OpenAI quota exceeded. Using fallback menu generation."
+        );
+      }
+      throw new Error("Failed to generate AI response");
     }
   }
   static async analyzeMealImage(
@@ -886,7 +899,6 @@ Language for response: ${language}`;
         avg_daily_calories: userProfile.target_calories_daily,
         avg_daily_protein: userProfile.target_protein_daily,
         avg_daily_carbs: userProfile.target_carbs_daily,
-        avg_daily_fats: userProfile.target_fats_daily,
         goal_adherence_percentage: 90,
       },
       shopping_tips: [

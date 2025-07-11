@@ -3,6 +3,7 @@ import { NutritionService } from "../services/nutrition";
 import { authenticateToken, AuthRequest } from "../middleware/auth";
 import { mealAnalysisSchema, mealUpdateSchema } from "../types/nutrition";
 import { prisma } from "../lib/database";
+import { z } from "zod";
 
 const router = Router();
 
@@ -45,11 +46,26 @@ router.post("/analyze", async (req: AuthRequest, res) => {
     console.log("Processing meal analysis for user:", req.user.user_id);
     console.log("Image data length:", imageBase64.length);
 
-    const result = await NutritionService.analyzeMeal(req.user.user_id, {
+    // Validate request data
+    const analysisSchema = z.object({
+      imageBase64: z.string().min(1, "Image data is required"),
+      language: z.string().default("english"),
+      date: z.string().optional(),
+      updateText: z.string().optional(),
+    });
+
+    const validatedData = analysisSchema.parse({
       imageBase64,
       language,
-      date: date || new Date().toISOString().split("T")[0],
+      date,
       updateText,
+    });
+
+    const result = await NutritionService.analyzeMeal(req.user.user_id, {
+      imageBase64: validatedData.imageBase64,
+      language: validatedData.language,
+      date: validatedData.date || new Date().toISOString().split("T")[0],
+      updateText: validatedData.updateText,
     });
     console.log("nutrition.ts in routes", result);
     console.log("Analysis completed successfully");

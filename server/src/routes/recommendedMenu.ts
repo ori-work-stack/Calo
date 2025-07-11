@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { authenticateToken, AuthRequest } from "../middleware/auth";
 import { RecommendedMenuService } from "../services/recommendedMenu";
+import { prisma } from "../lib/database";
 
 const router = Router();
 
@@ -8,7 +9,19 @@ const router = Router();
 router.get("/", authenticateToken, async (req: AuthRequest, res) => {
   try {
     const userId = req.user.user_id;
+    console.log("📋 Fetching menus for user:", userId);
+
     const menus = await RecommendedMenuService.getUserMenus(userId);
+
+    console.log("📊 Found", menus.length, "menus for user");
+    menus.forEach((menu, index) => {
+      console.log(`📋 Menu ${index + 1}:`, {
+        menu_id: menu.menu_id,
+        title: menu.title,
+        meals_count: menu.meals?.length || 0,
+        created_at: menu.created_at,
+      });
+    });
 
     res.json({
       success: true,
@@ -19,6 +32,72 @@ router.get("/", authenticateToken, async (req: AuthRequest, res) => {
     res.status(500).json({
       success: false,
       error: "Failed to fetch recommended menus",
+      details: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+});
+
+// GET /api/recommended-menus/debug - Debug endpoint to check menu data
+router.get("/debug", authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user.user_id;
+    console.log("🐛 Debug: Checking menus for user:", userId);
+
+    // Get raw menu count
+    const menuCount = await prisma.recommendedMenu.count({
+      where: { user_id: userId },
+    });
+
+    // Get detailed menu data
+    const menus = await prisma.recommendedMenu.findMany({
+      where: { user_id: userId },
+      include: {
+        meals: {
+          include: {
+            ingredients: true,
+          },
+        },
+      },
+      orderBy: { created_at: "desc" },
+    });
+
+    const debugInfo = {
+      user_id: userId,
+      menu_count: menuCount,
+      menus: menus.map(
+        (menu: {
+          menu_id: any;
+          title: any;
+          created_at: any;
+          meals: any[];
+        }) => ({
+          menu_id: menu.menu_id,
+          title: menu.title,
+          created_at: menu.created_at,
+          meals_count: menu.meals.length,
+          total_ingredients: menu.meals.reduce(
+            (total, meal) => total + meal.ingredients.length,
+            0
+          ),
+          sample_meals: menu.meals.slice(0, 2).map((meal) => ({
+            meal_id: meal.meal_id,
+            name: meal.name,
+            meal_type: meal.meal_type,
+            ingredients_count: meal.ingredients.length,
+          })),
+        })
+      ),
+    };
+
+    res.json({
+      success: true,
+      debug_info: debugInfo,
+    });
+  } catch (error) {
+    console.error("💥 Debug error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Debug failed",
       details: error instanceof Error ? error.message : "Unknown error",
     });
   }
@@ -57,6 +136,9 @@ router.get("/:menuId", authenticateToken, async (req: AuthRequest, res) => {
 router.post("/generate", authenticateToken, async (req: AuthRequest, res) => {
   try {
     const userId = req.user.user_id;
+    console.log("🎯 Generating menu for user:", userId);
+    console.log("📋 Request body:", req.body);
+
     const {
       days = 7,
       mealsPerDay = "3_main", // "3_main", "3_plus_2_snacks", "2_plus_1_intermediate"
@@ -68,6 +150,27 @@ router.post("/generate", authenticateToken, async (req: AuthRequest, res) => {
       excludedIngredients,
       budget,
     } = req.body;
+
+    // Validate input parameters
+    if (days < 1 || days > 30) {
+      return res.status(400).json({
+        success: false,
+        error: "Days must be between 1 and 30",
+      });
+    }
+
+    if (
+      !["3_main", "3_plus_2_snacks", "2_plus_1_intermediate"].includes(
+        mealsPerDay
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid meals per day option",
+      });
+    }
+
+    console.log("✅ Input validation passed, generating menu...");
 
     const menu = await RecommendedMenuService.generatePersonalizedMenu({
       userId,
@@ -82,16 +185,61 @@ router.post("/generate", authenticateToken, async (req: AuthRequest, res) => {
       budget,
     });
 
+    if (!menu) {
+      throw new Error("Menu generation returned null");
+    }
+
+    console.log("🎉 Menu generated successfully!");
+    console.log("📊 Menu stats:", {
+      menu_id: menu?.menu_id,
+      title: menu?.title,
+      meals_count: menu?.meals?.length || 0,
+      total_calories: menu?.total_calories,
+    });
+
+    // Ensure the response has the expected structure
+    const responseData = {
+      ...menu,
+      // Ensure we have at least these fields for the client
+      menu_id: menu.menu_id,
+      title: menu.title,
+      description: menu.description,
+      meals: menu.meals || [],
+      days_count: menu.days_count,
+      total_calories: menu.total_calories,
+      estimated_cost: menu.estimated_cost,
+    };
+
+    console.log("📤 Sending response with", responseData.meals.length, "meals");
+
     res.json({
       success: true,
       message: "Menu generated successfully",
-      data: menu,
+      data: responseData,
     });
   } catch (error) {
     console.error("💥 Error generating menu:", error);
-    res.status(500).json({
+
+    // Provide more specific error messages
+    let errorMessage = "Failed to generate menu";
+    let statusCode = 500;
+
+    if (error instanceof Error) {
+      if (error.message.includes("questionnaire not found")) {
+        errorMessage =
+          "Please complete your questionnaire first before generating a menu";
+        statusCode = 400;
+      } else if (error.message.includes("budget")) {
+        errorMessage = "Please set a daily food budget in your questionnaire";
+        statusCode = 400;
+      } else {
+        errorMessage = error.message;
+      }
+    }
+
+    res.status(statusCode).json({
       success: false,
-      error: "Failed to generate menu",
+      error: errorMessage,
       details: error instanceof Error ? error.message : "Unknown error",
     });
   }

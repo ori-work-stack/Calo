@@ -40,6 +40,9 @@ model User {
   calendarEvents     CalendarEvent[]
   gamificationBadges GamificationBadge[]
 
+  // Food scanner relationship
+  foodProducts FoodProduct[]
+
   created_at DateTime @default(now())
 
   Session Session[]
@@ -202,7 +205,7 @@ model UserQuestionnaire {
 
 model Meal {
   meal_id                Int            @id @default(autoincrement())
-  user                   User           @relation(fields: [user_id], references: [user_id])
+  user                   User           @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
   user_id                String
   image_url              String
   upload_time            DateTime       @default(now())
@@ -240,7 +243,11 @@ model Meal {
   health_risk_notes      String?
   ingredients            Json?
   created_at             DateTime       @default(now())
-  updated_at             DateTime?
+  updated_at             DateTime?      @updatedAt
+
+  @@index([user_id, created_at])
+  @@index([analysis_status])
+  @@index([upload_time])
 }
 
 model NutritionPlan {
@@ -268,17 +275,7 @@ model SubscriptionPayment {
   created_at     DateTime         @default(now())
 }
 
-model AdminDashboard {
-  record_id       Int      @id @default(autoincrement())
-  date            DateTime
-  active_users    Int
-  paying_users    Int
-  revenue         Float
-  api_calls       Int
-  marketing_spend Float
-  notes           String?
-  created_at      DateTime @default(now())
-}
+// Removed AdminDashboard - unused model
 
 // NEW MEAL PLAN MODELS
 
@@ -517,24 +514,30 @@ model GamificationBadge {
 }
 
 model FoodProduct {
-  user_id            String
   product_id         Int      @id @default(autoincrement())
+  user_id            String
   barcode            String   @unique
   product_name       String
   brand              String?
   category           String
-  nutrition_per_100g Json // calories, protein, carbs, fat, fiber, sugar, sodium
-  ingredients        Json // array of ingredient names
-  allergens          Json // array of allergen names
-  labels             Json // array of labels like kosher, vegan, etc.
-  health_score       Int? // 0-100 score
+  nutrition_per_100g Json
+  ingredients        Json
+  allergens          Json
+  labels             Json
+  health_score       Int?
   image_url          String?
   created_at         DateTime @default(now())
-  updated_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
   @@index([category])
   @@index([barcode])
+  @@index([user_id])
 }
+
+// Add the missing relation in User model
 
 // ENUMS
 
@@ -547,7 +550,6 @@ enum SubscriptionType {
 enum SmokingStatus {
   YES
   NO
-  UNKNOWN
 }
 
 enum PhysicalActivityLevel {

@@ -127,15 +127,14 @@ const clearAuthToken = async (): Promise<void> => {
 
 // Helper function to transform server meal data to client format
 const transformMealData = (serverMeal: any): Meal => {
-  console.log("🔄 Transforming meal data:", serverMeal);
-
-  const transformed = {
-    // Server fields (keep as-is)
+  return {
+    // Primary fields
     meal_id: serverMeal.meal_id,
+    id: serverMeal.meal_id?.toString() || serverMeal.id || "0",
     user_id: serverMeal.user_id,
     image_url: serverMeal.image_url,
     upload_time: serverMeal.upload_time,
-    analysis_status: serverMeal.analysis_status,
+    analysis_status: serverMeal.analysis_status || "PENDING",
     meal_name: serverMeal.meal_name,
     calories: serverMeal.calories,
     protein_g: serverMeal.protein_g,
@@ -147,9 +146,8 @@ const transformMealData = (serverMeal: any): Meal => {
     created_at: serverMeal.created_at,
 
     // Computed fields for compatibility
-    id: serverMeal.meal_id?.toString() || serverMeal.id,
     name: serverMeal.meal_name || "Unknown Meal",
-    description: serverMeal.meal_name,
+    description: serverMeal.meal_name || "",
     imageUrl: serverMeal.image_url,
     protein: serverMeal.protein_g || 0,
     carbs: serverMeal.carbs_g || 0,
@@ -160,18 +158,26 @@ const transformMealData = (serverMeal: any): Meal => {
     userId: serverMeal.user_id,
 
     // History features
-    isFavorite: serverMeal.isFavorite || false,
-    tasteRating: serverMeal.tasteRating || 0,
-    satietyRating: serverMeal.satietyRating || 0,
-    energyRating: serverMeal.energyRating || 0,
-    heavinessRating: serverMeal.heavinessRating || 0,
+    is_favorite: serverMeal.is_favorite || false,
+    taste_rating: serverMeal.taste_rating || 0,
+    satiety_rating: serverMeal.satiety_rating || 0,
+    energy_rating: serverMeal.energy_rating || 0,
+    heaviness_rating: serverMeal.heaviness_rating || 0,
 
-    // Ingredients field
-    ingredients: Array.isArray(serverMeal.ingredients)
-      ? serverMeal.ingredients
-      : [],
+    // Ingredients - properly parse JSON if needed
+    ingredients: (() => {
+      if (Array.isArray(serverMeal.ingredients)) return serverMeal.ingredients;
+      if (typeof serverMeal.ingredients === "string") {
+        try {
+          return JSON.parse(serverMeal.ingredients);
+        } catch {
+          return [];
+        }
+      }
+      return [];
+    })(),
 
-    // Optional fields
+    // Optional nutritional fields
     saturated_fats_g: serverMeal.saturated_fats_g,
     polyunsaturated_fats_g: serverMeal.polyunsaturated_fats_g,
     monounsaturated_fats_g: serverMeal.monounsaturated_fats_g,
@@ -195,46 +201,33 @@ const transformMealData = (serverMeal: any): Meal => {
     additives_json: serverMeal.additives_json,
     health_risk_notes: serverMeal.health_risk_notes,
   };
-
-  console.log("✅ Transformed meal:", transformed);
-  return transformed;
 };
 
 // Request interceptor with deduplication and auth token
 api.interceptors.request.use(
   async (config) => {
     try {
-      console.log("🔄 Making request to:", config.url);
-      console.log("📱 Platform:", Platform.OS);
-
       // Add request deduplication for GET requests
       if (config.method?.toLowerCase() === "get") {
         const requestKey = createRequestKey(config);
         if (pendingRequests.has(requestKey)) {
-          console.log("⚡ Using deduplicated request for:", config.url);
           return pendingRequests.get(requestKey);
         }
       }
 
       if (Platform.OS !== "web") {
-        // Only add Authorization header for mobile
         const token = await getAuthToken();
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
-          console.log("🔐 Added auth token to mobile request");
-        } else {
-          console.log("⚠️ No auth token found for mobile request");
         }
-      } else {
-        console.log("🌐 Web request - cookies will be sent automatically");
       }
     } catch (error) {
-      console.warn("⚠️ Failed to get auth token for request:", error);
+      console.warn("Failed to get auth token:", error);
     }
     return config;
   },
   (error) => {
-    console.error("🚨 Request interceptor error:", error);
+    console.error("Request interceptor error:", error);
     return Promise.reject(error);
   }
 );
