@@ -47,7 +47,7 @@ router.get("/debug", authenticateToken, async (req: AuthRequest, res) => {
     const menuCount = await prisma.recommendedMenu.count({
       where: { user_id: userId },
     });
-
+ 
     // Get detailed menu data
     const menus = await prisma.recommendedMenu.findMany({
       where: { user_id: userId },
