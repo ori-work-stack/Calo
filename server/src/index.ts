@@ -30,7 +30,7 @@ const config = {
   clientUrl: process.env.CLIENT_URL,
   openaiApiKey: process.env.OPENAI_API_KEY,
   isDevelopment: process.env.NODE_ENV !== "production",
-  serverIp: process.env.API_BASE_URL ,
+  serverIp: process.env.API_BASE_URL,
 };
 
 // Derived configuration

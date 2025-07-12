@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import { QuestionnaireData } from "../types";
-import { api } from "../services/api";
+import { questionnaireAPI } from "../services/api";
 import { setQuestionnaireCompleted } from "./authSlice";
 
 interface QuestionnaireState {
@@ -21,11 +21,13 @@ export const fetchQuestionnaire = createAsyncThunk(
   "questionnaire/fetch",
   async (_, { rejectWithValue }) => {
     try {
-      const response = await api.get("/questionnaire");
-      return response.data.questionnaire;
+      const response = await questionnaireAPI.getQuestionnaire();
+      return response.data;
     } catch (error: any) {
       return rejectWithValue(
-        error.response?.data?.error || "Failed to fetch questionnaire"
+        error.response?.data?.error ||
+          error.message ||
+          "Failed to fetch questionnaire"
       );
     }
   }
@@ -38,13 +40,19 @@ export const saveQuestionnaire = createAsyncThunk(
     { rejectWithValue, dispatch }
   ) => {
     try {
-      const response = await api.post("/questionnaire", questionnaireData);
+      const response = await questionnaireAPI.saveQuestionnaire(
+        questionnaireData
+      );
+
       // Update auth slice to mark questionnaire as completed
       dispatch(setQuestionnaireCompleted());
-      return response.data.questionnaire;
+
+      return response.data?.questionnaire || response.data;
     } catch (error: any) {
       return rejectWithValue(
-        error.response?.data?.error || "Failed to save questionnaire"
+        error.response?.data?.error ||
+          error.message ||
+          "Failed to save questionnaire"
       );
     }
   }

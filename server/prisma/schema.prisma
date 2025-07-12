@@ -127,9 +127,9 @@ model UserQuestionnaire {
 
   // Personal data
   age                      Int
-  gender                   String?
-  height_cm                Float?
-  weight_kg                Float?
+  gender                   String
+  height_cm                Float
+  weight_kg                Float
   target_weight_kg         Float?
   body_fat_percentage      Float?
   additional_personal_info String[]
@@ -139,7 +139,7 @@ model UserQuestionnaire {
   main_goal_text         String[]
   specific_goal          String[]
   goal_timeframe_days    Int?
-  commitment_level       String?
+  commitment_level       String
   most_important_outcome String[]
   special_personal_goal  String[]
 
@@ -149,7 +149,7 @@ model UserQuestionnaire {
   sport_types              String[]
   sport_duration_min       Int?
   workout_times            String[]
-  uses_fitness_devices     Boolean?
+  uses_fitness_devices     Boolean               @default(false)
   fitness_device_type      String[]
   additional_activity_info String[]
 
@@ -162,20 +162,20 @@ model UserQuestionnaire {
   food_related_medical_issues String[]
 
   // Means and conditions
-  meals_per_day             Int?
-  snacks_between_meals      Boolean?
+  meals_per_day             Int      @default(3)
+  snacks_between_meals      Boolean  @default(false)
   meal_times                String?
-  cooking_preference        String?
+  cooking_preference        String
   available_cooking_methods String[]
   daily_food_budget         Float?
   shopping_method           String[]
   daily_cooking_time        String?
 
   // Dietary preferences and restrictions
-  kosher                  Boolean?
+  kosher                  Boolean  @default(false)
   allergies               String[]
   allergies_text          String[]
-  dietary_style           String?
+  dietary_style           String
   meal_texture_preference String[]
   disliked_foods          String[]
   liked_foods             String[]

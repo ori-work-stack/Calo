@@ -1114,6 +1114,45 @@ export const chatAPI = {
   },
 };
 
+// QUESTIONNAIRE API
+export const questionnaireAPI = {
+  saveQuestionnaire: async (questionnaireData: any) => {
+    try {
+      console.log("📝 Saving questionnaire...");
+      console.log("🌐 API URL:", `${API_BASE_URL}/questionnaire`);
+
+      const response = await api.post("/questionnaire", questionnaireData);
+
+      console.log("✅ Questionnaire saved successfully");
+      return response.data;
+    } catch (error: any) {
+      console.error("💥 Save questionnaire error:", error);
+
+      if (error.code === "NETWORK_ERROR" || error.message === "Network Error") {
+        throw new Error(
+          "Cannot connect to server. Please check your internet connection and ensure the server is running."
+        );
+      }
+
+      throw error;
+    }
+  },
+
+  getQuestionnaire: async () => {
+    try {
+      console.log("📖 Getting questionnaire...");
+
+      const response = await api.get("/questionnaire");
+
+      console.log("✅ Questionnaire retrieved successfully");
+      return response.data;
+    } catch (error: any) {
+      console.error("💥 Get questionnaire error:", error);
+      throw error;
+    }
+  },
+};
+
 // NEW FOOD SCANNER API
 export const foodScannerAPI = {
   scanBarcode: async (barcode: string) => {

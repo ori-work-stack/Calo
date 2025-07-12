@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../lib/database";
 import { authenticateToken, AuthRequest } from "../middleware/auth";
+import { questionnaireSchema } from "../types/questionnaire";
 
 const router = Router();
 
@@ -9,7 +10,6 @@ router.post("/", authenticateToken, async (req: AuthRequest, res) => {
   try {
     const userId = req.user.user_id;
     const questionnaireData = req.body;
-    console.log(userId);
 
     console.log("📝 Saving questionnaire for user:", userId);
     console.log("📝 Questionnaire data:", questionnaireData);
@@ -19,19 +19,17 @@ router.post("/", authenticateToken, async (req: AuthRequest, res) => {
       where: { user_id: userId },
     });
 
-    let savedQuestionnaire;
-
     // Sanitize and validate data
     const sanitizeFloat = (val: any) => {
-      return val === "" || val === null || val === undefined
-        ? null
-        : parseFloat(val);
+      if (val === "" || val === null || val === undefined) return null;
+      const parsed = parseFloat(val);
+      return isNaN(parsed) ? null : parsed;
     };
 
     const sanitizeInt = (val: any) => {
-      return val === "" || val === null || val === undefined
-        ? null
-        : parseInt(val);
+      if (val === "" || val === null || val === undefined) return null;
+      const parsed = parseInt(val);
+      return isNaN(parsed) ? null : parsed;
     };
 
     const sanitizeBoolean = (val: any) => {
@@ -39,35 +37,48 @@ router.post("/", authenticateToken, async (req: AuthRequest, res) => {
       if (typeof val === "string") {
         return val.toLowerCase() === "true" || val === "1";
       }
-      return null;
+      return false; // Default to false for required boolean fields
     };
 
     const sanitizeArray = (val: any) => {
       if (Array.isArray(val)) return val;
       if (typeof val === "string") {
+        if (val.trim() === "" || val.toLowerCase() === "none") return [];
         try {
           return JSON.parse(val);
         } catch {
           return val
             .split(",")
             .map((item) => item.trim())
-            .filter((item) => item);
+            .filter((item) => item && item.toLowerCase() !== "none");
         }
       }
       return [];
     };
 
-    // Sanitize numeric fields
-    questionnaireData.body_fat_percentage = sanitizeFloat(
-      questionnaireData.body_fat_percentage
-    );
-    questionnaireData.height_cm = sanitizeFloat(questionnaireData.height_cm);
-    questionnaireData.weight_kg = sanitizeFloat(questionnaireData.weight_kg);
+    const sanitizeStringArray = (val: any) => {
+      if (typeof val === "string") {
+        if (val.trim() === "" || val.toLowerCase() === "none") return [];
+        return [val];
+      }
+      return sanitizeArray(val);
+    };
+
+    // Sanitize all fields according to Prisma schema requirements
+
+    // Required numeric fields
+    questionnaireData.age = sanitizeInt(questionnaireData.age) || 18; // Default to 18 if invalid
+    questionnaireData.height_cm =
+      sanitizeFloat(questionnaireData.height_cm) || 170;
+    questionnaireData.weight_kg =
+      sanitizeFloat(questionnaireData.weight_kg) || 70;
+
+    // Optional numeric fields
     questionnaireData.target_weight_kg = sanitizeFloat(
       questionnaireData.target_weight_kg
     );
-    questionnaireData.daily_food_budget = sanitizeFloat(
-      questionnaireData.daily_food_budget
+    questionnaireData.body_fat_percentage = sanitizeFloat(
+      questionnaireData.body_fat_percentage
     );
     questionnaireData.goal_timeframe_days = sanitizeInt(
       questionnaireData.goal_timeframe_days
@@ -75,87 +86,98 @@ router.post("/", authenticateToken, async (req: AuthRequest, res) => {
     questionnaireData.sport_duration_min = sanitizeInt(
       questionnaireData.sport_duration_min
     );
-    questionnaireData.meals_per_day = sanitizeInt(
-      questionnaireData.meals_per_day
+    questionnaireData.meals_per_day =
+      sanitizeInt(questionnaireData.meals_per_day) || 3;
+    questionnaireData.daily_food_budget = sanitizeFloat(
+      questionnaireData.daily_food_budget
     );
-    questionnaireData.age = sanitizeInt(questionnaireData.age);
 
-    // Sanitize array fields - ensure all array fields are properly handled
+    // Required string fields - ensure they're not empty
+    questionnaireData.gender = questionnaireData.gender || "לא צוין";
+    questionnaireData.commitment_level =
+      questionnaireData.commitment_level || "בינוני";
+    questionnaireData.cooking_preference =
+      questionnaireData.cooking_preference || "קל";
+    questionnaireData.dietary_style = questionnaireData.dietary_style || "רגיל";
+
+    // Optional string fields
+    questionnaireData.daily_cooking_time =
+      questionnaireData.daily_cooking_time || null;
+
+    // Handle meal_times - convert array to string as per Prisma schema
+    if (Array.isArray(questionnaireData.meal_times)) {
+      questionnaireData.meal_times = questionnaireData.meal_times.join(", ");
+    }
+    questionnaireData.meal_times =
+      questionnaireData.meal_times || "8:00, 12:00, 18:00";
+
+    // Handle fasting_hours - ensure it's a string or null as per Prisma schema
+    if (
+      questionnaireData.fasting_hours === "" ||
+      questionnaireData.fasting_hours === undefined
+    ) {
+      questionnaireData.fasting_hours = null;
+    } else if (questionnaireData.fasting_hours) {
+      questionnaireData.fasting_hours = String(questionnaireData.fasting_hours);
+    } else {
+      questionnaireData.fasting_hours = null;
+    }
+
+    // Array fields that should be arrays in Prisma
+    questionnaireData.additional_personal_info = sanitizeStringArray(
+      questionnaireData.additional_personal_info
+    );
+    questionnaireData.main_goal_text = sanitizeStringArray(
+      questionnaireData.main_goal_text
+    );
+    questionnaireData.specific_goal = sanitizeStringArray(
+      questionnaireData.specific_goal
+    );
+    questionnaireData.most_important_outcome = sanitizeStringArray(
+      questionnaireData.most_important_outcome
+    );
+    questionnaireData.special_personal_goal = sanitizeStringArray(
+      questionnaireData.special_personal_goal
+    );
     questionnaireData.sport_types = sanitizeArray(
       questionnaireData.sport_types
+    );
+    questionnaireData.workout_times = sanitizeStringArray(
+      questionnaireData.workout_times
+    );
+    questionnaireData.fitness_device_type = sanitizeStringArray(
+      questionnaireData.fitness_device_type
+    );
+    questionnaireData.additional_activity_info = sanitizeStringArray(
+      questionnaireData.additional_activity_info
     );
     questionnaireData.medical_conditions = sanitizeArray(
       questionnaireData.medical_conditions
     );
-    questionnaireData.allergies = sanitizeArray(questionnaireData.allergies);
+    questionnaireData.medical_conditions_text = sanitizeStringArray(
+      questionnaireData.medical_conditions_text
+    );
     questionnaireData.available_cooking_methods = sanitizeArray(
       questionnaireData.available_cooking_methods
     );
-    questionnaireData.regular_drinks = sanitizeArray(
-      questionnaireData.regular_drinks
-    );
-
-    // Additional array fields from schema
-    questionnaireData.additional_personal_info = sanitizeArray(
-      questionnaireData.additional_personal_info
-    );
-    questionnaireData.main_goal_text = sanitizeArray(
-      questionnaireData.main_goal_text
-    );
-    questionnaireData.specific_goal = sanitizeArray(
-      questionnaireData.specific_goal
-    );
-    questionnaireData.most_important_outcome = sanitizeArray(
-      questionnaireData.most_important_outcome
-    );
-    questionnaireData.special_personal_goal = sanitizeArray(
-      questionnaireData.special_personal_goal
-    );
-    questionnaireData.workout_times = sanitizeArray(
-      questionnaireData.workout_times
-    );
-    questionnaireData.fitness_device_type = sanitizeArray(
-      questionnaireData.fitness_device_type
-    );
-    questionnaireData.additional_activity_info = sanitizeArray(
-      questionnaireData.additional_activity_info
-    );
-    questionnaireData.medical_conditions_text = sanitizeArray(
-      questionnaireData.medical_conditions_text
-    );
-    questionnaireData.medications = sanitizeArray(
-      questionnaireData.medications
-    );
-    questionnaireData.health_goals = sanitizeArray(
-      questionnaireData.health_goals
-    );
-    questionnaireData.functional_issues = sanitizeArray(
-      questionnaireData.functional_issues
-    );
-    questionnaireData.food_related_medical_issues = sanitizeArray(
-      questionnaireData.food_related_medical_issues
-    );
-    questionnaireData.meal_times = sanitizeArray(questionnaireData.meal_times);
-    questionnaireData.shopping_method = sanitizeArray(
+    questionnaireData.shopping_method = sanitizeStringArray(
       questionnaireData.shopping_method
     );
-    questionnaireData.allergies_text = sanitizeArray(
+    questionnaireData.allergies = sanitizeArray(questionnaireData.allergies);
+    questionnaireData.allergies_text = sanitizeStringArray(
       questionnaireData.allergies_text
     );
-    questionnaireData.meal_texture_preference = sanitizeArray(
+    questionnaireData.meal_texture_preference = sanitizeStringArray(
       questionnaireData.meal_texture_preference
     );
-    questionnaireData.disliked_foods = sanitizeArray(
-      questionnaireData.disliked_foods
-    );
-    questionnaireData.liked_foods = sanitizeArray(
-      questionnaireData.liked_foods
+    questionnaireData.regular_drinks = sanitizeArray(
+      questionnaireData.regular_drinks
     );
     questionnaireData.past_diet_difficulties = sanitizeArray(
       questionnaireData.past_diet_difficulties
     );
 
-    // Sanitize boolean fields
+    // Boolean fields
     questionnaireData.snacks_between_meals = sanitizeBoolean(
       questionnaireData.snacks_between_meals
     );
@@ -167,44 +189,105 @@ router.post("/", authenticateToken, async (req: AuthRequest, res) => {
       questionnaireData.intermittent_fasting
     );
 
-    // Validate enums
-    const allowedPhysicalActivityLevels = ["NONE", "LIGHT", "MODERATE", "HIGH"];
-    const allowedMainGoals = [
-      "WEIGHT_LOSS",
-      "WEIGHT_MAINTENANCE",
-      "WEIGHT_GAIN",
-      "GENERAL_HEALTH",
-      "MEDICAL_CONDITION",
-      "SPORTS_PERFORMANCE",
-      "ALERTNESS",
-      "ENERGY",
-      "SLEEP_QUALITY",
-      "OTHER",
-    ];
-    const allowedSportFrequencies = [
-      "NONE",
-      "ONCE_A_WEEK",
-      "TWO_TO_THREE",
-      "FOUR_TO_FIVE",
-      "MORE_THAN_FIVE",
-    ];
+    // Validate and normalize enums
+    const normalizeEnum = (
+      value: string,
+      allowedValues: string[],
+      defaultValue: string
+    ) => {
+      if (!value || value === "") return defaultValue;
 
-    const normalizeEnum = (value: string, allowedValues: string[]) => {
-      return allowedValues.includes(value) ? value : null;
+      // Handle physical activity level variations
+      if (allowedValues.includes("MODERATE")) {
+        const lowerValue = value.toLowerCase();
+        if (lowerValue.includes("none") || lowerValue.includes("ללא"))
+          return "NONE";
+        if (lowerValue.includes("light") || lowerValue.includes("קל"))
+          return "LIGHT";
+        if (lowerValue.includes("moderate") || lowerValue.includes("בינוני"))
+          return "MODERATE";
+        if (lowerValue.includes("high") || lowerValue.includes("גבוה"))
+          return "HIGH";
+      }
+
+      // Handle sport frequency variations
+      if (allowedValues.includes("TWO_TO_THREE")) {
+        const lowerValue = value.toLowerCase();
+        if (lowerValue.includes("none") || lowerValue.includes("ללא"))
+          return "NONE";
+        if (lowerValue.includes("once") || lowerValue.includes("פעם"))
+          return "ONCE_A_WEEK";
+        if (
+          lowerValue.includes("2-3") ||
+          lowerValue.includes("שתיים") ||
+          lowerValue.includes("שלוש")
+        )
+          return "TWO_TO_THREE";
+        if (
+          lowerValue.includes("4-5") ||
+          lowerValue.includes("ארבע") ||
+          lowerValue.includes("חמש")
+        )
+          return "FOUR_TO_FIVE";
+        if (lowerValue.includes("more than") || lowerValue.includes("יותר"))
+          return "MORE_THAN_FIVE";
+      }
+
+      return allowedValues.includes(value) ? value : defaultValue;
     };
 
+    // Required enum fields with defaults
     questionnaireData.physical_activity_level = normalizeEnum(
       questionnaireData.physical_activity_level,
-      allowedPhysicalActivityLevels
+      ["NONE", "LIGHT", "MODERATE", "HIGH"],
+      "MODERATE"
     );
-    questionnaireData.main_goal = normalizeEnum(
-      questionnaireData.main_goal,
-      allowedMainGoals
-    );
+
     questionnaireData.sport_frequency = normalizeEnum(
       questionnaireData.sport_frequency,
-      allowedSportFrequencies
+      ["NONE", "ONCE_A_WEEK", "TWO_TO_THREE", "FOUR_TO_FIVE", "MORE_THAN_FIVE"],
+      "TWO_TO_THREE"
     );
+
+    questionnaireData.main_goal = normalizeEnum(
+      questionnaireData.main_goal,
+      [
+        "WEIGHT_LOSS",
+        "WEIGHT_MAINTENANCE",
+        "WEIGHT_GAIN",
+        "GENERAL_HEALTH",
+        "MEDICAL_CONDITION",
+        "SPORTS_PERFORMANCE",
+        "ALERTNESS",
+        "ENERGY",
+        "SLEEP_QUALITY",
+        "OTHER",
+      ],
+      "GENERAL_HEALTH"
+    );
+
+    // Validate using the imported schema
+    const validationResult = questionnaireSchema.safeParse(questionnaireData);
+
+    if (!validationResult.success) {
+      console.error("Questionnaire validation error:", validationResult.error);
+      return res.status(400).json({
+        success: false,
+        error: "Validation failed",
+        details: validationResult.error.errors.map((err) => ({
+          field: err.path.join("."),
+          message: err.message,
+          received:
+            err.code === "invalid_type" ? (err as any).received : undefined,
+          expected:
+            err.code === "invalid_type" ? (err as any).expected : undefined,
+        })),
+      });
+    }
+
+    const validatedData = validationResult.data;
+
+    let savedQuestionnaire;
 
     if (existingQuestionnaire) {
       // Update existing questionnaire
@@ -212,144 +295,138 @@ router.post("/", authenticateToken, async (req: AuthRequest, res) => {
         where: { questionnaire_id: existingQuestionnaire.questionnaire_id },
         data: {
           // Personal data
-          age: questionnaireData.age,
-          gender: questionnaireData.gender,
-          height_cm: questionnaireData.height_cm,
-          weight_kg: questionnaireData.weight_kg,
-          target_weight_kg: questionnaireData.target_weight_kg,
-          body_fat_percentage: questionnaireData.body_fat_percentage,
-          additional_personal_info: questionnaireData.additional_personal_info,
+          age: validatedData.age,
+          gender: validatedData.gender,
+          height_cm: validatedData.height_cm,
+          weight_kg: validatedData.weight_kg,
+          target_weight_kg: validatedData.target_weight_kg,
+          body_fat_percentage: validatedData.body_fat_percentage,
+          additional_personal_info: validatedData.additional_personal_info,
 
           // Goals
-          main_goal: questionnaireData.main_goal,
-          main_goal_text: questionnaireData.main_goal_text,
-          specific_goal: questionnaireData.specific_goal,
-          goal_timeframe_days: questionnaireData.goal_timeframe_days,
-          commitment_level: questionnaireData.commitment_level,
-          most_important_outcome: questionnaireData.most_important_outcome,
-          special_personal_goal: questionnaireData.special_personal_goal,
+          main_goal: validatedData.main_goal,
+          main_goal_text: validatedData.main_goal_text,
+          specific_goal: validatedData.specific_goal,
+          goal_timeframe_days: validatedData.goal_timeframe_days,
+          commitment_level: validatedData.commitment_level,
+          most_important_outcome: validatedData.most_important_outcome,
+          special_personal_goal: validatedData.special_personal_goal,
 
           // Physical activity
-          physical_activity_level: questionnaireData.physical_activity_level,
-          sport_frequency: questionnaireData.sport_frequency,
-          sport_types: questionnaireData.sport_types,
-          sport_duration_min: questionnaireData.sport_duration_min,
-          workout_times: questionnaireData.workout_times,
-          uses_fitness_devices: questionnaireData.uses_fitness_devices,
-          fitness_device_type: questionnaireData.fitness_device_type,
-          additional_activity_info: questionnaireData.additional_activity_info,
+          physical_activity_level: validatedData.physical_activity_level,
+          sport_frequency: validatedData.sport_frequency,
+          sport_types: validatedData.sport_types,
+          sport_duration_min: validatedData.sport_duration_min,
+          workout_times: validatedData.workout_times,
+          uses_fitness_devices: validatedData.uses_fitness_devices,
+          fitness_device_type: validatedData.fitness_device_type,
+          additional_activity_info: validatedData.additional_activity_info,
 
           // Health
-          medical_conditions: questionnaireData.medical_conditions,
-          medical_conditions_text: questionnaireData.medical_conditions_text,
-          medications: questionnaireData.medications,
-          health_goals: questionnaireData.health_goals,
-          functional_issues: questionnaireData.functional_issues,
+          medical_conditions: validatedData.medical_conditions,
+          medical_conditions_text: validatedData.medical_conditions_text,
+          medications: validatedData.medications,
+          health_goals: validatedData.health_goals,
+          functional_issues: validatedData.functional_issues,
           food_related_medical_issues:
-            questionnaireData.food_related_medical_issues,
+            validatedData.food_related_medical_issues,
 
           // Means and conditions
-          meals_per_day: questionnaireData.meals_per_day,
-          snacks_between_meals: questionnaireData.snacks_between_meals,
-          meal_times: Array.isArray(questionnaireData.meal_times)
-            ? questionnaireData.meal_times.join(", ")
-            : questionnaireData.meal_times,
-          cooking_preference: questionnaireData.cooking_preference,
-          available_cooking_methods:
-            questionnaireData.available_cooking_methods,
-          daily_food_budget: questionnaireData.daily_food_budget,
-          shopping_method: questionnaireData.shopping_method,
-          daily_cooking_time: questionnaireData.daily_cooking_time,
+          meals_per_day: validatedData.meals_per_day,
+          snacks_between_meals: validatedData.snacks_between_meals,
+          meal_times: validatedData.meal_times,
+          cooking_preference: validatedData.cooking_preference,
+          available_cooking_methods: validatedData.available_cooking_methods,
+          daily_food_budget: validatedData.daily_food_budget,
+          shopping_method: validatedData.shopping_method,
+          daily_cooking_time: validatedData.daily_cooking_time,
 
           // Dietary preferences and restrictions
-          kosher: questionnaireData.kosher,
-          allergies: questionnaireData.allergies,
-          allergies_text: questionnaireData.allergies_text,
-          dietary_style: questionnaireData.dietary_style,
-          meal_texture_preference: questionnaireData.meal_texture_preference,
-          disliked_foods: questionnaireData.disliked_foods,
-          liked_foods: questionnaireData.liked_foods,
-          regular_drinks: questionnaireData.regular_drinks,
-          intermittent_fasting: questionnaireData.intermittent_fasting,
-          fasting_hours: questionnaireData.fasting_hours,
+          kosher: validatedData.kosher,
+          allergies: validatedData.allergies,
+          allergies_text: validatedData.allergies_text,
+          dietary_style: validatedData.dietary_style,
+          meal_texture_preference: validatedData.meal_texture_preference,
+          disliked_foods: validatedData.disliked_foods,
+          liked_foods: validatedData.liked_foods,
+          regular_drinks: validatedData.regular_drinks,
+          intermittent_fasting: validatedData.intermittent_fasting,
+          fasting_hours: validatedData.fasting_hours,
 
           // Additional
-          past_diet_difficulties: questionnaireData.past_diet_difficulties,
+          past_diet_difficulties: validatedData.past_diet_difficulties,
 
           date_completed: new Date(),
         },
       });
     } else {
-      // Create new questionnaire with proper user connection
+      // Create new questionnaire
       savedQuestionnaire = await prisma.userQuestionnaire.create({
         data: {
           user: {
             connect: { user_id: userId },
           },
           // Personal data
-          age: questionnaireData.age,
-          gender: questionnaireData.gender,
-          height_cm: questionnaireData.height_cm,
-          weight_kg: questionnaireData.weight_kg,
-          target_weight_kg: questionnaireData.target_weight_kg,
-          body_fat_percentage: questionnaireData.body_fat_percentage,
-          additional_personal_info: questionnaireData.additional_personal_info,
+          age: validatedData.age,
+          gender: validatedData.gender,
+          height_cm: validatedData.height_cm,
+          weight_kg: validatedData.weight_kg,
+          target_weight_kg: validatedData.target_weight_kg,
+          body_fat_percentage: validatedData.body_fat_percentage,
+          additional_personal_info: validatedData.additional_personal_info,
 
           // Goals
-          main_goal: questionnaireData.main_goal,
-          main_goal_text: questionnaireData.main_goal_text,
-          specific_goal: questionnaireData.specific_goal,
-          goal_timeframe_days: questionnaireData.goal_timeframe_days,
-          commitment_level: questionnaireData.commitment_level,
-          most_important_outcome: questionnaireData.most_important_outcome,
-          special_personal_goal: questionnaireData.special_personal_goal,
+          main_goal: validatedData.main_goal,
+          main_goal_text: validatedData.main_goal_text,
+          specific_goal: validatedData.specific_goal,
+          goal_timeframe_days: validatedData.goal_timeframe_days,
+          commitment_level: validatedData.commitment_level,
+          most_important_outcome: validatedData.most_important_outcome,
+          special_personal_goal: validatedData.special_personal_goal,
 
           // Physical activity
-          physical_activity_level: "HIGH",
-          sport_frequency: questionnaireData.sport_frequency,
-          sport_types: questionnaireData.sport_types,
-          sport_duration_min: questionnaireData.sport_duration_min,
-          workout_times: questionnaireData.workout_times,
-          uses_fitness_devices: questionnaireData.uses_fitness_devices,
-          fitness_device_type: questionnaireData.fitness_device_type,
-          additional_activity_info: questionnaireData.additional_activity_info,
+          physical_activity_level: validatedData.physical_activity_level,
+          sport_frequency: validatedData.sport_frequency,
+          sport_types: validatedData.sport_types,
+          sport_duration_min: validatedData.sport_duration_min,
+          workout_times: validatedData.workout_times,
+          uses_fitness_devices: validatedData.uses_fitness_devices,
+          fitness_device_type: validatedData.fitness_device_type,
+          additional_activity_info: validatedData.additional_activity_info,
 
           // Health
-          medical_conditions: questionnaireData.medical_conditions,
-          medical_conditions_text: questionnaireData.medical_conditions_text,
-          medications: questionnaireData.medications,
-          health_goals: questionnaireData.health_goals,
-          functional_issues: questionnaireData.functional_issues,
+          medical_conditions: validatedData.medical_conditions,
+          medical_conditions_text: validatedData.medical_conditions_text,
+          medications: validatedData.medications,
+          health_goals: validatedData.health_goals,
+          functional_issues: validatedData.functional_issues,
           food_related_medical_issues:
-            questionnaireData.food_related_medical_issues,
+            validatedData.food_related_medical_issues,
 
           // Means and conditions
-          meals_per_day: questionnaireData.meals_per_day,
-          snacks_between_meals: questionnaireData.snacks_between_meals,
-          meal_times: Array.isArray(questionnaireData.meal_times)
-            ? questionnaireData.meal_times.join(", ")
-            : questionnaireData.meal_times,
-          cooking_preference: questionnaireData.cooking_preference,
-          available_cooking_methods:
-            questionnaireData.available_cooking_methods,
-          daily_food_budget: questionnaireData.daily_food_budget,
-          shopping_method: questionnaireData.shopping_method,
-          daily_cooking_time: questionnaireData.daily_cooking_time,
+          meals_per_day: validatedData.meals_per_day,
+          snacks_between_meals: validatedData.snacks_between_meals,
+          meal_times: validatedData.meal_times,
+          cooking_preference: validatedData.cooking_preference,
+          available_cooking_methods: validatedData.available_cooking_methods,
+          daily_food_budget: validatedData.daily_food_budget,
+          shopping_method: validatedData.shopping_method,
+          daily_cooking_time: validatedData.daily_cooking_time,
 
           // Dietary preferences and restrictions
-          kosher: questionnaireData.kosher,
-          allergies: questionnaireData.allergies,
-          allergies_text: questionnaireData.allergies_text,
-          dietary_style: questionnaireData.dietary_style,
-          meal_texture_preference: questionnaireData.meal_texture_preference,
-          disliked_foods: questionnaireData.disliked_foods,
-          liked_foods: questionnaireData.liked_foods,
-          regular_drinks: questionnaireData.regular_drinks,
-          intermittent_fasting: questionnaireData.intermittent_fasting,
-          fasting_hours: questionnaireData.fasting_hours,
+          kosher: validatedData.kosher,
+          allergies: validatedData.allergies,
+          allergies_text: validatedData.allergies_text,
+          dietary_style: validatedData.dietary_style,
+          meal_texture_preference: validatedData.meal_texture_preference,
+          disliked_foods: validatedData.disliked_foods,
+          liked_foods: validatedData.liked_foods,
+          regular_drinks: validatedData.regular_drinks,
+          intermittent_fasting: validatedData.intermittent_fasting,
+          fasting_hours: validatedData.fasting_hours,
 
           // Additional
-          past_diet_difficulties: questionnaireData.past_diet_difficulties,
+          past_diet_difficulties: validatedData.past_diet_difficulties,
 
           date_completed: new Date(),
         },
@@ -366,17 +443,7 @@ router.post("/", authenticateToken, async (req: AuthRequest, res) => {
 
     console.log("✅ Questionnaire saved successfully");
 
-    // Generate initial recommended menu (optional - can be done in background)
-    try {
-      const { RecommendedMenuService } = await import(
-        "../services/recommendedMenu"
-      );
-      await RecommendedMenuService.generatePersonalizedMenu({ userId });
-      console.log("✅ Initial menu generated successfully");
-    } catch (error) {
-      console.log("⚠️ Menu generation will be available later:", error);
-    }
-
+    // Send response immediately
     res.json({
       success: true,
       message: "Questionnaire saved successfully",
@@ -384,6 +451,19 @@ router.post("/", authenticateToken, async (req: AuthRequest, res) => {
         questionnaire: savedQuestionnaire,
         is_questionnaire_completed: true,
       },
+    });
+
+    // Generate initial recommended menu in background (non-blocking)
+    setImmediate(async () => {
+      try {
+        const { RecommendedMenuService } = await import(
+          "../services/recommendedMenu"
+        );
+        await RecommendedMenuService.generatePersonalizedMenu({ userId });
+        console.log("✅ Initial menu generated successfully in background");
+      } catch (error) {
+        console.log("⚠️ Background menu generation failed:", error);
+      }
     });
   } catch (error) {
     console.error("💥 Questionnaire save error:", error);

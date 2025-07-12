@@ -35,3 +35,84 @@ export const mealSchema = z.object({
 export type MealAnalysisInput = z.infer<typeof mealAnalysisSchema>;
 export type MealUpdateInput = z.infer<typeof mealUpdateSchema>;
 export type Meal = z.infer<typeof mealSchema>;
+
+export const directMealUpdateSchema = z.object({
+  meal_name: z.string().optional(),
+  calories: z
+    .union([z.number(), z.string()])
+    .optional()
+    .transform((val) =>
+      val ? (typeof val === "string" ? parseFloat(val) : val) : undefined
+    ),
+  protein_g: z
+    .union([z.number(), z.string()])
+    .optional()
+    .transform((val) =>
+      val ? (typeof val === "string" ? parseFloat(val) : val) : undefined
+    ),
+  carbs_g: z
+    .union([z.number(), z.string()])
+    .optional()
+    .transform((val) =>
+      val ? (typeof val === "string" ? parseFloat(val) : val) : undefined
+    ),
+  fats_g: z
+    .union([z.number(), z.string()])
+    .optional()
+    .transform((val) =>
+      val ? (typeof val === "string" ? parseFloat(val) : val) : undefined
+    ),
+  fiber_g: z
+    .union([z.number(), z.string()])
+    .optional()
+    .transform((val) =>
+      val ? (typeof val === "string" ? parseFloat(val) : val) : undefined
+    ),
+  sugar_g: z
+    .union([z.number(), z.string()])
+    .optional()
+    .transform((val) =>
+      val ? (typeof val === "string" ? parseFloat(val) : val) : undefined
+    ),
+  sodium_mg: z
+    .union([z.number(), z.string()])
+    .optional()
+    .transform((val) =>
+      val ? (typeof val === "string" ? parseFloat(val) : val) : undefined
+    ),
+  saturated_fats_g: z
+    .union([z.number(), z.string()])
+    .optional()
+    .transform((val) =>
+      val ? (typeof val === "string" ? parseFloat(val) : val) : undefined
+    ),
+  polyunsaturated_fats_g: z
+    .union([z.number(), z.string()])
+    .optional()
+    .transform((val) =>
+      val ? (typeof val === "string" ? parseFloat(val) : val) : undefined
+    ),
+  monounsaturated_fats_g: z
+    .union([z.number(), z.string()])
+    .optional()
+    .transform((val) =>
+      val ? (typeof val === "string" ? parseFloat(val) : val) : undefined
+    ),
+  cholesterol_mg: z
+    .union([z.number(), z.string()])
+    .optional()
+    .transform((val) =>
+      val ? (typeof val === "string" ? parseFloat(val) : val) : undefined
+    ),
+  serving_size_g: z
+    .union([z.number(), z.string()])
+    .optional()
+    .transform((val) =>
+      val ? (typeof val === "string" ? parseFloat(val) : val) : undefined
+    ),
+  ingredients: z.any().optional(),
+  food_category: z.string().optional(),
+  cooking_method: z.string().optional(),
+});
+
+export type DirectMealUpdateInput = z.infer<typeof directMealUpdateSchema>;

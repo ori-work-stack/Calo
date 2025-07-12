@@ -52,7 +52,7 @@ router.post("/analyze", async (req: AuthRequest, res) => {
       language: z.string().default("english"),
       date: z.string().optional(),
       updateText: z.string().optional(),
-    });
+    }); 
 
     const validatedData = analysisSchema.parse({
       imageBase64,
@@ -82,7 +82,7 @@ router.post("/analyze", async (req: AuthRequest, res) => {
 });
 
 // Update meal endpoint
-router.put("/update", async (req: AuthRequest, res) => {
+router.put("/update", authenticateToken, async (req: AuthRequest, res) => {
   try {
     console.log("Update meal request received");
 
@@ -109,8 +109,10 @@ router.put("/update", async (req: AuthRequest, res) => {
     });
 
     console.log("Meal updated successfully");
+
     res.json({
       success: true,
+      message: "Meal updated successfully",
       data: meal,
     });
   } catch (error) {
@@ -123,6 +125,103 @@ router.put("/update", async (req: AuthRequest, res) => {
     });
   }
 });
+
+// Direct meal update endpoint for manual edits
+router.put(
+  "/meals/:mealId",
+  authenticateToken,
+  async (req: AuthRequest, res) => {
+    try {
+      const { mealId } = req.params;
+      const userId = req.user.user_id;
+      const mealData = req.body;
+
+      console.log("Direct meal update for user:", userId, "meal:", mealId);
+
+      // Validate meal belongs to user
+      const existingMeal = await prisma.meal.findFirst({
+        where: {
+          meal_id: parseInt(mealId),
+          user_id: userId,
+        },
+      });
+
+      if (!existingMeal) {
+        return res.status(404).json({
+          success: false,
+          error: "Meal not found or access denied",
+        });
+      }
+
+      // Update meal with provided data
+      const updatedMeal = await prisma.meal.update({
+        where: {
+          meal_id: parseInt(mealId),
+        },
+        data: {
+          meal_name: mealData.meal_name || existingMeal.meal_name,
+          calories: mealData.calories
+            ? parseFloat(mealData.calories)
+            : existingMeal.calories,
+          protein_g: mealData.protein_g
+            ? parseFloat(mealData.protein_g)
+            : existingMeal.protein_g,
+          carbs_g: mealData.carbs_g
+            ? parseFloat(mealData.carbs_g)
+            : existingMeal.carbs_g,
+          fats_g: mealData.fats_g
+            ? parseFloat(mealData.fats_g)
+            : existingMeal.fats_g,
+          fiber_g: mealData.fiber_g
+            ? parseFloat(mealData.fiber_g)
+            : existingMeal.fiber_g,
+          sugar_g: mealData.sugar_g
+            ? parseFloat(mealData.sugar_g)
+            : existingMeal.sugar_g,
+          sodium_mg: mealData.sodium_mg
+            ? parseFloat(mealData.sodium_mg)
+            : existingMeal.sodium_mg,
+          saturated_fats_g: mealData.saturated_fats_g
+            ? parseFloat(mealData.saturated_fats_g)
+            : existingMeal.saturated_fats_g,
+          polyunsaturated_fats_g: mealData.polyunsaturated_fats_g
+            ? parseFloat(mealData.polyunsaturated_fats_g)
+            : existingMeal.polyunsaturated_fats_g,
+          monounsaturated_fats_g: mealData.monounsaturated_fats_g
+            ? parseFloat(mealData.monounsaturated_fats_g)
+            : existingMeal.monounsaturated_fats_g,
+          cholesterol_mg: mealData.cholesterol_mg
+            ? parseFloat(mealData.cholesterol_mg)
+            : existingMeal.cholesterol_mg,
+          serving_size_g: mealData.serving_size_g
+            ? parseFloat(mealData.serving_size_g)
+            : existingMeal.serving_size_g,
+          ingredients: mealData.ingredients || existingMeal.ingredients,
+          food_category: mealData.food_category || existingMeal.food_category,
+          cooking_method:
+            mealData.cooking_method || existingMeal.cooking_method,
+          updated_at: new Date(),
+        },
+      });
+
+      console.log("Meal updated successfully");
+
+      res.json({
+        success: true,
+        message: "Meal updated successfully",
+        data: updatedMeal,
+      });
+    } catch (error) {
+      console.error("Direct meal update error:", error);
+      const message =
+        error instanceof Error ? error.message : "Failed to update meal";
+      res.status(500).json({
+        success: false,
+        error: message,
+      });
+    }
+  }
+);
 
 // Save meal endpoint
 router.post("/save", async (req: AuthRequest, res) => {

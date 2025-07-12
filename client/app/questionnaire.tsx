@@ -262,9 +262,14 @@ export default function QuestionnaireScreen() {
 
   const handleSubmit = async () => {
     try {
-      // Validate required fields
-      if (!formData.age || !formData.gender || !formData.main_goal) {
-        Alert.alert("שגיאה", "אנא מלא את כל השדות הנדרשים");
+      // Comprehensive validation
+      const validationErrors = validateFormData(formData);
+      if (validationErrors.length > 0) {
+        Alert.alert(
+          "שדות חסרים",
+          "אנא מלא את השדות הבאים:\n" + validationErrors.join("\n"),
+          [{ text: "OK" }]
+        );
         return;
       }
 
@@ -272,20 +277,86 @@ export default function QuestionnaireScreen() {
       const result = await dispatch(saveQuestionnaire(formData));
 
       if (saveQuestionnaire.fulfilled.match(result)) {
+        // Navigate immediately after successful save
+        router.replace("/(tabs)");
+
+        // Show success message without blocking navigation
         Alert.alert(
           "הצלחה!",
-          "השאלון נשמר בהצלחה. אנחנו כעת בונים עבורך תוכנית תזונה מותאמת אישית.",
-          [
-            {
-              text: "המשך",
-              onPress: () => router.replace("/(tabs)"),
-            },
-          ]
+          "השאלון נשמר בהצלחה. תוכנית התזונה המותאמת אישית שלך נבנית ברקע.",
+          [{ text: "הבנתי" }]
         );
       }
-    } catch (error) {
-      Alert.alert("שגיאה", "אירעה שגיאה בשמירת השאלון");
+    } catch (error: any) {
+      console.error("Questionnaire submission error:", error);
+
+      // Provide more specific error handling
+      if (error.message?.includes("Network Error")) {
+        Alert.alert(
+          "בעיית חיבור",
+          "אין חיבור לשרת. אנא בדוק את החיבור לאינטרנט ונסה שוב."
+        );
+      } else {
+        Alert.alert("שגיאה", "אירעה שגיאה בשמירת השאלון. אנא נסה שוב.");
+      }
     }
+  };
+
+  const validateFormData = (data: QuestionnaireData): string[] => {
+    const errors: string[] = [];
+
+    // Required fields validation
+    if (!data.age || parseInt(data.age) <= 0) {
+      errors.push("• גיל תקין");
+    }
+    if (!data.gender || data.gender.trim() === "") {
+      errors.push("• מגדר");
+    }
+    if (!data.height_cm || parseFloat(data.height_cm) <= 0) {
+      errors.push("• גובה תקין");
+    }
+    if (!data.weight_kg || parseFloat(data.weight_kg) <= 0) {
+      errors.push("• משקל תקין");
+    }
+    if (!data.main_goal || data.main_goal.trim() === "") {
+      errors.push("• מטרה עיקרית");
+    }
+    if (
+      !data.physical_activity_level ||
+      data.physical_activity_level.trim() === ""
+    ) {
+      errors.push("• רמת פעילות גופנית");
+    }
+    if (!data.sport_frequency || data.sport_frequency.trim() === "") {
+      errors.push("• תדירות ספורט");
+    }
+    if (!data.cooking_preference || data.cooking_preference.trim() === "") {
+      errors.push("• העדפת בישול");
+    }
+    if (!data.dietary_style || data.dietary_style.trim() === "") {
+      errors.push("• סגנון תזונה");
+    }
+    if (!data.commitment_level || data.commitment_level.trim() === "") {
+      errors.push("• רמת מחויבות");
+    }
+
+    // Validate numeric ranges
+    const age = parseInt(data.age);
+    if (age > 0 && (age < 10 || age > 120)) {
+      errors.push("• גיל בין 10 ל-120");
+    }
+
+    const height = parseFloat(data.height_cm);
+    if (height > 0 && (height < 100 || height > 250)) {
+      errors.push('• גובה בין 100 ל-250 ס"מ');
+    }
+
+    const weight = parseFloat(data.weight_kg);
+    if (weight > 0 && (weight < 30 || weight > 300)) {
+      errors.push('• משקל בין 30 ל-300 ק"ג');
+    }
+
+    return errors;
   };
 
   useEffect(() => {
@@ -318,7 +389,10 @@ export default function QuestionnaireScreen() {
       <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>גיל *</Text>
         <TextInput
-          style={styles.textInput}
+          style={[
+            styles.textInput,
+            (!formData.age || parseInt(formData.age) <= 0) && styles.inputError,
+          ]}
           value={formData.age.toString()}
           onChangeText={(text) => setFormData({ ...formData, age: text })}
           keyboardType="numeric"
@@ -352,9 +426,13 @@ export default function QuestionnaireScreen() {
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>גובה (ס"מ)</Text>
+        <Text style={styles.inputLabel}>גובה (ס"מ) *</Text>
         <TextInput
-          style={styles.textInput}
+          style={[
+            styles.textInput,
+            (!formData.height_cm || parseFloat(formData.height_cm) <= 0) &&
+              styles.inputError,
+          ]}
           value={formData.height_cm}
           onChangeText={(text) => setFormData({ ...formData, height_cm: text })}
           keyboardType="numeric"
@@ -363,9 +441,13 @@ export default function QuestionnaireScreen() {
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>משקל נוכחי (ק"ג)</Text>
+        <Text style={styles.inputLabel}>משקל נוכחי (ק"ג) *</Text>
         <TextInput
-          style={styles.textInput}
+          style={[
+            styles.textInput,
+            (!formData.weight_kg || parseFloat(formData.weight_kg) <= 0) &&
+              styles.inputError,
+          ]}
           value={formData.weight_kg}
           onChangeText={(text) => setFormData({ ...formData, weight_kg: text })}
           keyboardType="numeric"
@@ -487,7 +569,7 @@ export default function QuestionnaireScreen() {
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>באיזו רמת מחויבות תרצה לפעול?</Text>
+        <Text style={styles.inputLabel}>באיזו רמת מחויבות תרצה לפעול? *</Text>
         <View style={styles.optionGroup}>
           {["קל", "ממוצע", "קפדני"].map((level) => (
             <TouchableOpacity
@@ -525,7 +607,7 @@ export default function QuestionnaireScreen() {
       </Text>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>רמת הפעילות הגופנית שלך</Text>
+        <Text style={styles.inputLabel}>רמת הפעילות הגופנית שלך *</Text>
         <View style={styles.optionGroup}>
           {PHYSICAL_ACTIVITY_LEVELS.map((level) => (
             <TouchableOpacity
@@ -554,7 +636,7 @@ export default function QuestionnaireScreen() {
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>תדירות ספורט</Text>
+        <Text style={styles.inputLabel}>תדירות ספורט *</Text>
         <View style={styles.optionGroup}>
           {SPORT_FREQUENCIES.map((freq) => (
             <TouchableOpacity
@@ -790,7 +872,7 @@ export default function QuestionnaireScreen() {
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>העדפת הכנה</Text>
+        <Text style={styles.inputLabel}>העדפת הכנה *</Text>
         <View style={styles.optionGroup}>
           {["מבושל", "קל הכנה", "מוכן מראש", "ללא בישול"].map((pref) => (
             <TouchableOpacity
@@ -819,7 +901,7 @@ export default function QuestionnaireScreen() {
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>אמצעי בישול זמינים</Text>
+        <Text style={styles.inputLabel}>אמצעי בישול זמינים *</Text>
         <View style={styles.checkboxGroup}>
           {COOKING_METHODS.map((method) => (
             <TouchableOpacity
@@ -1224,7 +1306,7 @@ export default function QuestionnaireScreen() {
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>סגנון תזונה מועדף</Text>
+        <Text style={styles.inputLabel}>סגנון תזונה מועדף *</Text>
         <View style={styles.optionGroup}>
           {DIETARY_STYLES.map((style) => (
             <TouchableOpacity
@@ -1458,9 +1540,45 @@ export default function QuestionnaireScreen() {
   const canProceed = () => {
     switch (currentStep) {
       case 1:
-        return formData.age && formData.gender;
+        return (
+          formData.age &&
+          parseInt(formData.age) > 0 &&
+          formData.gender &&
+          formData.gender.trim() !== "" &&
+          formData.height_cm &&
+          parseFloat(formData.height_cm) > 0 &&
+          formData.weight_kg &&
+          parseFloat(formData.weight_kg) > 0
+        );
       case 2:
-        return formData.main_goal;
+        return (
+          formData.main_goal &&
+          formData.main_goal.trim() !== "" &&
+          formData.commitment_level &&
+          formData.commitment_level.trim() !== ""
+        );
+      case 3:
+        return (
+          formData.physical_activity_level &&
+          formData.physical_activity_level.trim() !== "" &&
+          formData.sport_frequency &&
+          formData.sport_frequency.trim() !== ""
+        );
+      case 4:
+        return true; // Health step - all optional
+      case 5:
+        return (
+          formData.cooking_preference &&
+          formData.cooking_preference.trim() !== "" &&
+          formData.available_cooking_methods &&
+          formData.available_cooking_methods.length > 0
+        );
+      case 6:
+        return formData.dietary_style && formData.dietary_style.trim() !== "";
+      case 7:
+        return true; // Lifestyle step - all optional
+      case 8:
+        return true; // Preferences step - all optional
       default:
         return true;
     }
@@ -1665,6 +1783,10 @@ const styles = StyleSheet.create({
     padding: 15,
     fontSize: 16,
     backgroundColor: "white",
+  },
+  inputError: {
+    borderColor: "#FF3B30",
+    borderWidth: 2,
   },
   textInputRTL: {
     textAlign: "right",
