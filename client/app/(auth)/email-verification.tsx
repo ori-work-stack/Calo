@@ -46,16 +46,6 @@ export default function EmailVerificationScreen() {
     ]).start();
   }, []);
 
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (resendCooldown > 0) {
-      interval = setInterval(() => {
-        setResendCooldown((prev) => prev - 1);
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [resendCooldown]);
-
   const handleVerifyEmail = async () => {
     if (!verificationCode || verificationCode.length !== 6) {
       Alert.alert("שגיאה", "אנא הכנס קוד אימות בן 6 ספרות");
