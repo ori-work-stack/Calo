@@ -20,6 +20,7 @@ import LanguageSelector from "@/components/LanguageSelector";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "@/src/store";
 import { signOut } from "@/src/store/authSlice";
+import { router } from "expo-router";
 
 export default function ProfileScreen() {
   const { t } = useTranslation();
@@ -41,6 +42,13 @@ export default function ProfileScreen() {
       id: "notifications",
       title: t("profile.notifications"),
       icon: "notifications-outline",
+      color: "#FF9500",
+      gradient: ["#FF9500", "#FF6B35"],
+    },
+    {
+      id: "personalData",
+      title: t("profile.personal_data"),
+      icon: "personal-data",
       color: "#FF9500",
       gradient: ["#FF9500", "#FF6B35"],
     },
@@ -103,6 +111,9 @@ export default function ProfileScreen() {
         return <NotificationSettings onClose={() => setActiveSection(null)} />;
       case "privacy":
         return <PrivacySettings onClose={() => setActiveSection(null)} />;
+      case "personalData":
+        router.push("/questionnaire");
+        return;
       default:
         return null;
     }
