@@ -46,9 +46,16 @@ model User {
   // Food scanner relationship
   foodProducts FoodProduct[]
 
+  level        Int? @default(1)
+  total_points Int? @default(0)
+  current_xp   Int? @default(0)
+
   created_at DateTime @default(now())
 
   Session Session[]
+
+  badges       UserBadge[]
+  achievements UserAchievement[]
 }
 
 model Session {
@@ -540,6 +547,63 @@ model FoodProduct {
   @@index([user_id])
 }
 
+model Badge {
+  id             String      @id @default(cuid())
+  name           String
+  description    String
+  icon           String
+  rarity         BadgeRarity
+  points_awarded Int
+  category       String
+  requirements   Json?
+  created_at     DateTime    @default(now())
+
+  // Relations
+  userBadges UserBadge[]
+}
+
+model UserBadge {
+  id          String   @id @default(cuid())
+  user_id     String
+  badge_id    String
+  earned_date DateTime @default(now())
+
+  // Relations
+  user  User  @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  badge Badge @relation(fields: [badge_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, badge_id])
+}
+
+model Achievement {
+  id             String              @id @default(cuid())
+  title          String
+  description    String
+  category       AchievementCategory
+  max_progress   Int
+  points_awarded Int
+  requirements   Json?
+  created_at     DateTime            @default(now())
+
+  // Relations
+  userAchievements UserAchievement[]
+}
+
+model UserAchievement {
+  id             String    @id @default(cuid())
+  user_id        String
+  achievement_id String
+  progress       Int       @default(0)
+  unlocked       Boolean   @default(false)
+  unlocked_date  DateTime?
+
+  // Relations
+  user        User        @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievement_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, achievement_id])
+}
+
 // Add the missing relation in User model
 
 // ENUMS
@@ -657,4 +721,32 @@ enum DietaryCategory {
   GLUTEN_FREE
   DAIRY_FREE
   BALANCED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum ActivityLevel {
+  SEDENTARY
+  LIGHTLY_ACTIVE
+  MODERATELY_ACTIVE
+  VERY_ACTIVE
+  EXTREMELY_ACTIVE
+}
+
+enum BadgeRarity {
+  COMMON
+  RARE
+  EPIC
+  LEGENDARY
+}
+
+enum AchievementCategory {
+  STREAK
+  GOAL
+  IMPROVEMENT
+  CONSISTENCY
 }

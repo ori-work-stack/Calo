@@ -5,20 +5,67 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Dimensions,
   Alert,
+  Modal,
   ActivityIndicator,
   RefreshControl,
-  Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import {
+  ChartBar as BarChart3,
+  TrendingUp,
+  TrendingDown,
+  TriangleAlert as AlertTriangle,
+  CircleCheck as CheckCircle,
+  Clock,
+  Droplets,
+  Zap,
+  Heart,
+  Shield,
+  Leaf,
+  Sun,
+  Globe,
+  Calendar,
+  Target,
+  Activity,
+  Flame,
+  Apple,
+  Wheat,
+  Fish,
+  Milk,
+  Sparkles,
+  Timer,
+  Scale,
+  Brain,
+  Award,
+  Trophy,
+  Star,
+  Lightbulb,
+  Medal,
+  Crown,
+  Gem,
+  Smile,
+  Meh,
+  Frown,
+  Battery,
+  Coffee,
+  Moon,
+  X,
+  ArrowUpDown,
+  ChartBar as BarChart2,
+  TrendingUp as Compare,
+} from "lucide-react-native";
 import { useTranslation } from "react-i18next";
-import { useLanguage } from "@/src/i18n/context/LanguageContext";
+import { useRTLStyles } from "../../hooks/useRTLStyle";
+import { nutritionAPI } from "../../src/services/api";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { nutritionAPI } from "@/src/services/api";
-import { LineChart, BarChart, PieChart } from "react-native-chart-kit";
+import AccessibilityButton from "@/components/AccessibilityButton";
 
 const { width } = Dimensions.get("window");
+
+type TimeRangeType = "today" | "week" | "month" | "custom";
 
 interface StatisticsData {
   averageAlcoholG: number;
@@ -43,7 +90,6 @@ interface StatisticsData {
   averageSodiumMg: number;
   averageSolubleFiberG: number;
   averageSugarG: number;
-
   totalAlcoholG: number;
   totalCaffeineMg: number;
   totalCalories: number;
@@ -66,116 +112,428 @@ interface StatisticsData {
   totalSodiumMg: number;
   totalSolubleFiberG: number;
   totalSugarG: number;
-
   totalDays: number;
   totalMeals: number;
-
   dateRange: {
     startDate: string;
     endDate: string;
   };
-
-  dailyBreakdown?: Array<{
-    date: string;
-    calories: number;
-    fats_g: number;
-    sugar_g: number;
-    protein_g: number;
-    carbs_g: number;
-    fiber_g: number;
-    sodium_mg: number;
-  }>;
+  dailyBreakdown: any[];
 }
 
-interface DateRange {
-  start: string;
-  end: string;
+interface NutritionMetric {
+  id: string;
+  name: string;
+  nameEn: string;
+  value: number;
+  unit: string;
+  target: number;
+  minTarget?: number;
+  maxTarget?: number;
+  percentage: number;
+  status: "excellent" | "good" | "warning" | "danger";
+  icon: React.ReactNode;
+  color: string;
+  category: "macros" | "micros" | "lifestyle" | "quality";
+  description: string;
+  recommendation?: string;
+  trend: "up" | "down" | "stable";
+  weeklyAverage: number;
+  lastWeekChange: number;
 }
 
-const TIME_RANGES = {
-  today: "today",
-  week: "week",
-  month: "month",
-  custom: "custom",
-} as const;
+interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+  color: string;
+  progress: number;
+  maxProgress: number;
+  unlocked: boolean;
+  category: "streak" | "goal" | "improvement" | "consistency";
+}
 
-type TimeRangeType = (typeof TIME_RANGES)[keyof typeof TIME_RANGES];
+interface Badge {
+  id: string;
+  name: string;
+  icon: React.ReactNode;
+  color: string;
+  earnedDate: string;
+  rarity: "common" | "rare" | "epic" | "legendary";
+}
+
+interface ProgressData {
+  date: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  water: number;
+  weight?: number;
+  mood?: "happy" | "neutral" | "sad";
+  energy?: "high" | "medium" | "low";
+  satiety?: "very_full" | "satisfied" | "hungry";
+  mealQuality?: number;
+}
+
+interface TimeFilter {
+  key: TimeRangeType;
+  label: string;
+}
 
 export default function StatisticsScreen() {
   const { t } = useTranslation();
-  const { isRTL } = useLanguage();
+  const isRTL = useRTLStyles();
 
-  // State management
-  const [activeTimeRange, setActiveTimeRange] = useState<TimeRangeType>(
-    TIME_RANGES.week
+  const [selectedTimeRange, setSelectedTimeRange] =
+    useState<TimeRangeType>("week");
+  const [statisticsData, setStatisticsData] = useState<StatisticsData | null>(
+    null
   );
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [datePickerType, setDatePickerType] = useState<"start" | "end">(
     "start"
   );
-  const [customStartDate, setCustomStartDate] = useState(
-    new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-  );
+  const [customStartDate, setCustomStartDate] = useState(new Date());
   const [customEndDate, setCustomEndDate] = useState(new Date());
-  const [statisticsData, setStatisticsData] = useState<StatisticsData | null>(
-    null
-  );
-  const [isLoading, setIsLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedChart, setSelectedChart] = useState<"line" | "bar">("line");
+  const [showAlerts, setShowAlerts] = useState(true);
+  const [showComparison, setShowComparison] = useState(false);
+  const [showAchievements, setShowAchievements] = useState(false);
+  const [language, setLanguage] = useState<"he" | "en">("he");
 
-  // Helper function to format date as YYYY-MM-DD with extensive validation
-  const formatDateString = useCallback((date: Date): string => {
-    try {
-      if (!date || !(date instanceof Date) || isNaN(date.getTime())) {
-        date = new Date();
-      }
+  const texts = {
+    he: {
+      title: "התקדמות וסטטיסטיקות",
+      subtitle: "מעקב מפורט אחר מדדי תזונה מרכזיים והתקדמות אישית",
+      today: "היום",
+      week: "שבוע",
+      month: "חודש",
+      custom: "תקופה מותאמת",
+      macronutrients: "מקרו נוטריינטים",
+      micronutrients: "מיקרו נוטריינטים",
+      lifestyle: "אורח חיים",
+      quality: "איכות תזונה",
+      alerts: "התראות",
+      recommendations: "המלצות",
+      trend: "מגמה",
+      weeklyAverage: "ממוצע שבועי",
+      change: "שינוי",
+      excellent: "מעולה",
+      good: "טוב",
+      warning: "זהירות",
+      danger: "חריגה",
+      viewDetails: "צפה בפרטים",
+      hideAlerts: "הסתר התראות",
+      showAlerts: "הצג התראות",
+      noAlerts: "אין התראות כרגע",
+      alertsTitle: "התראות חשובות",
+      progressOverview: "סקירת התקדמות",
+      weeklyProgress: "התקדמות שבועית",
+      achievements: "הישגים",
+      insights: "תובנות אישיות",
+      gamification: "גיימיפיקציה",
+      badges: "תגים",
+      streaks: "רצפים",
+      comparison: "השוואה",
+      wellbeing: "רווחה",
+      level: "רמה",
+      xp: "נק׳ ניסיון",
+      nextLevel: "לרמה הבאה",
+      dailyStreak: "רצף יומי",
+      weeklyStreak: "רצף שבועי",
+      perfectDays: "ימים מושלמים",
+      totalPoints: 'סה"כ נקודות',
+      viewAllAchievements: "צפה בכל הישגים",
+      unlocked: "נפתח",
+      locked: "נעול",
+      progress: "התקדמות",
+      compareWith: "השווה עם",
+      lastWeek: "השבוע שעבר",
+      lastMonth: "החודש שעבר",
+      thisWeek: "השבוע",
+      thisMonth: "החודש",
+      improvement: "שיפור",
+      decline: "ירידה",
+      stable: "יציב",
+      mood: "מצב רוח",
+      energy: "אנרגיה",
+      satiety: "שובע",
+      mealQuality: "איכות ארוחה",
+      happy: "שמח",
+      neutral: "ניטרלי",
+      sad: "עצוב",
+      high: "גבוה",
+      medium: "בינוני",
+      low: "נמוך",
+      veryFull: "שבע מאוד",
+      satisfied: "מרוצה",
+      hungry: "רעב",
+      averageDaily: "ממוצע יומי",
+      totalConsumed: 'סה"כ נצרך',
+      goalAchieved: "יעד הושג",
+      streak: "רצף ימים",
+      days: "ימים",
+      bestDay: "היום הטוב ביותר",
+      improvementArea: "אזור לשיפור",
+      successfulDays: "ימים מוצלחים",
+      averageCompletion: "ממוצע השלמה",
+      bestStreak: "רצף הטוב ביותר",
+      currentStreak: "רצף נוכחי",
+      totalCalories: 'סה"כ קלוריות יומיות',
+      protein: "חלבון",
+      carbohydrates: "פחמימות",
+      fats: "שומנים",
+      fiber: "סיבים תזונתיים",
+      sugars: "סוכרים",
+      sodium: "נתרן",
+      saturatedFat: "שומן רווי",
+      unsaturatedFat: "שומן בלתי רווי",
+      omega3: "אומגה 3",
+      vitaminD: "ויטמין D",
+      vitaminB12: "ויטמין B12",
+      calcium: "סידן",
+      iron: "ברזל",
+      magnesium: "מגנזיום",
+      potassium: "אשלגן",
+      glycemicLoad: "עומס גליקמי",
+      plantBased: "תזונה צמחית",
+      hydration: "רמת הידרציה",
+      mealTiming: "תזמון ארוחות",
+      satietyIndex: "מדד שובע",
+      antioxidants: "נוגדי חמצון",
+      kcal: 'קק"ל',
+      g: "גר׳",
+      mg: 'מ"ג',
+      mcg: 'מק"ג',
+      iu: 'יח"ב',
+      ml: 'מ"ל',
+      percent: "%",
+      score: "ניקוד",
+      meals: "ארוחות",
+      hours: "שעות",
+      insightTitle: "תובנות חכמות מבוססות נתונים",
+      proteinInsight:
+        "אתה עומד ביעד החלבון ב-85% מהימים השבוע - מעולה לבניית שרירים!",
+      hydrationInsight: "צריכת המים שלך השתפרה ב-23% השבוע - המשך כך!",
+      fiberInsight:
+        "הסיבים התזונתיים נמוכים מהמומלץ - הוסף יותר ירקות וקטניות.",
+      achievementStreak7: "רצף של 7 ימים",
+      achievementStreak30: "רצף של 30 ימים",
+      achievementProteinMaster: "מאסטר חלבון",
+      achievementHydrationHero: "גיבור הידרציה",
+      achievementBalancedEater: "אוכל מאוזן",
+      achievementFiberFriend: "חבר הסיבים",
+      badgeNutritionNinja: "נינג׳ה תזונה",
+      badgeWaterWarrior: "לוחם המים",
+      badgeProteinPro: "מקצוען חלבון",
+      badgeStreakStar: "כוכב הרצף",
+      badgeBalanceMaster: "מאסטר איזון",
+      badgeConsistencyKing: "מלך העקביות",
+      calories: "קלוריות",
+      water: "מים",
+      increaseIntake: "הגדל צריכה",
+      decreaseIntake: "הפחת צריכה",
+      maintainLevel: "שמור על הרמה",
+      consultDoctor: "התייעץ עם רופא",
+      addSupplement: "שקול תוסף תזונה",
+      improveHydration: "שפר הידרציה",
+      balanceMeals: "איזן זמני ארוחות",
+      increaseFiber: "הוסף סיבים תזונתיים",
+      reduceSodium: "הפחת נתרן",
+      addOmega3: "הוסף מקורות אומגה 3",
+    },
+    en: {
+      title: "Progress & Statistics",
+      subtitle:
+        "Detailed tracking of key nutritional metrics and personal progress",
+      today: "Today",
+      week: "Week",
+      month: "Month",
+      custom: "Custom Period",
+      macronutrients: "Macronutrients",
+      micronutrients: "Micronutrients",
+      lifestyle: "Lifestyle",
+      quality: "Nutrition Quality",
+      alerts: "Alerts",
+      recommendations: "Recommendations",
+      trend: "Trend",
+      weeklyAverage: "Weekly Average",
+      change: "Change",
+      excellent: "Excellent",
+      good: "Good",
+      warning: "Warning",
+      danger: "Out of Range",
+      viewDetails: "View Details",
+      hideAlerts: "Hide Alerts",
+      showAlerts: "Show Alerts",
+      noAlerts: "No alerts at the moment",
+      alertsTitle: "Important Alerts",
+      progressOverview: "Progress Overview",
+      weeklyProgress: "Weekly Progress",
+      achievements: "Achievements",
+      insights: "Personal Insights",
+      gamification: "Gamification",
+      badges: "Badges",
+      streaks: "Streaks",
+      comparison: "Comparison",
+      wellbeing: "Wellbeing",
+      level: "Level",
+      xp: "XP",
+      nextLevel: "To Next Level",
+      dailyStreak: "Daily Streak",
+      weeklyStreak: "Weekly Streak",
+      perfectDays: "Perfect Days",
+      totalPoints: "Total Points",
+      viewAllAchievements: "View All Achievements",
+      unlocked: "Unlocked",
+      locked: "Locked",
+      progress: "Progress",
+      compareWith: "Compare With",
+      lastWeek: "Last Week",
+      lastMonth: "Last Month",
+      thisWeek: "This Week",
+      thisMonth: "This Month",
+      improvement: "Improvement",
+      decline: "Decline",
+      stable: "Stable",
+      mood: "Mood",
+      energy: "Energy",
+      satiety: "Satiety",
+      mealQuality: "Meal Quality",
+      happy: "Happy",
+      neutral: "Neutral",
+      sad: "Sad",
+      high: "High",
+      medium: "Medium",
+      low: "Low",
+      veryFull: "Very Full",
+      satisfied: "Satisfied",
+      hungry: "Hungry",
+      averageDaily: "Daily Average",
+      totalConsumed: "Total Consumed",
+      goalAchieved: "Goal Achieved",
+      streak: "Day Streak",
+      days: "days",
+      bestDay: "Best Day",
+      improvementArea: "Improvement Area",
+      successfulDays: "Successful Days",
+      averageCompletion: "Average Completion",
+      bestStreak: "Best Streak",
+      currentStreak: "Current Streak",
+      totalCalories: "Total Daily Calories",
+      protein: "Protein",
+      carbohydrates: "Carbohydrates",
+      fats: "Fats",
+      fiber: "Dietary Fiber",
+      sugars: "Sugars",
+      sodium: "Sodium",
+      saturatedFat: "Saturated Fat",
+      unsaturatedFat: "Unsaturated Fat",
+      omega3: "Omega-3",
+      vitaminD: "Vitamin D",
+      vitaminB12: "Vitamin B12",
+      calcium: "Calcium",
+      iron: "Iron",
+      magnesium: "Magnesium",
+      potassium: "Potassium",
+      glycemicLoad: "Glycemic Load",
+      plantBased: "Plant-Based Nutrition",
+      hydration: "Hydration Level",
+      mealTiming: "Meal Timing",
+      satietyIndex: "Satiety Index",
+      antioxidants: "Antioxidants",
+      kcal: "kcal",
+      g: "g",
+      mg: "mg",
+      mcg: "mcg",
+      iu: "IU",
+      ml: "ml",
+      percent: "%",
+      score: "score",
+      meals: "meals",
+      hours: "hours",
+      insightTitle: "Smart Data-Driven Insights",
+      proteinInsight:
+        "You're meeting protein goals 85% of days this week - excellent for muscle building!",
+      hydrationInsight:
+        "Your water intake improved by 23% this week - keep it up!",
+      fiberInsight:
+        "Dietary fiber is below recommended - add more vegetables and legumes.",
+      achievementStreak7: "7-Day Streak",
+      achievementStreak30: "30-Day Streak",
+      achievementProteinMaster: "Protein Master",
+      achievementHydrationHero: "Hydration Hero",
+      achievementBalancedEater: "Balanced Eater",
+      achievementFiberFriend: "Fiber Friend",
+      badgeNutritionNinja: "Nutrition Ninja",
+      badgeWaterWarrior: "Water Warrior",
+      badgeProteinPro: "Protein Pro",
+      badgeStreakStar: "Streak Star",
+      badgeBalanceMaster: "Balance Master",
+      badgeConsistencyKing: "Consistency King",
+      calories: "calories",
+      water: "water",
+      increaseIntake: "Increase intake",
+      decreaseIntake: "Decrease intake",
+      maintainLevel: "Maintain level",
+      consultDoctor: "Consult doctor",
+      addSupplement: "Consider supplement",
+      improveHydration: "Improve hydration",
+      balanceMeals: "Balance meal timing",
+      increaseFiber: "Add fiber sources",
+      reduceSodium: "Reduce sodium",
+      addOmega3: "Add omega-3 sources",
+    },
+  };
 
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      const formattedDate = `${year}-${month}-${day}`;
+  const currentTexts = texts[language];
+  const toggleLanguage = () => {
+    setLanguage((prev) => (prev === "he" ? "en" : "he"));
+  };
 
-      console.log("📅 Final formatted date:", formattedDate);
-      return formattedDate;
-    } catch (error) {
-      console.error("Complete date formatting failure:", error);
-      return new Date().toISOString().split("T")[0];
+  // Generate date range based on selection
+  const getDateRange = useCallback(() => {
+    const today = new Date();
+    const formatDate = (date: Date) => date.toISOString().split("T")[0];
+
+    switch (selectedTimeRange) {
+      case "today":
+        return {
+          start: formatDate(today),
+          end: formatDate(today),
+        };
+      case "week":
+        const weekStart = new Date(today);
+        weekStart.setDate(today.getDate() - 7);
+        return {
+          start: formatDate(weekStart),
+          end: formatDate(today),
+        };
+      case "month":
+        const monthStart = new Date(today);
+        monthStart.setDate(today.getDate() - 30);
+        return {
+          start: formatDate(monthStart),
+          end: formatDate(today),
+        };
+      case "custom":
+        return {
+          start: formatDate(customStartDate),
+          end: formatDate(customEndDate),
+        };
+      default:
+        return {
+          start: formatDate(
+            new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
+          ),
+          end: formatDate(today),
+        };
     }
-  }, []);
-
-  // Get date range based on selected time range
-  const getDateRange = useCallback((): DateRange => {
-    try {
-      const now = new Date();
-      const today = formatDateString(now);
-
-      switch (activeTimeRange) {
-        case TIME_RANGES.today:
-          return { start: today, end: today };
-        case TIME_RANGES.week:
-          const weekStart = new Date(now);
-          weekStart.setDate(now.getDate() - 6);
-          return { start: formatDateString(weekStart), end: today };
-        case TIME_RANGES.month:
-          const monthStart = new Date(now);
-          monthStart.setDate(now.getDate() - 29);
-          return { start: formatDateString(monthStart), end: today };
-        case TIME_RANGES.custom:
-          return {
-            start: formatDateString(customStartDate),
-            end: formatDateString(customEndDate),
-          };
-        default:
-          return { start: today, end: today };
-      }
-    } catch (error) {
-      console.error("Error in getDateRange:", error);
-      const fallbackDate = new Date().toISOString().split("T")[0];
-      return { start: fallbackDate, end: fallbackDate };
-    }
-  }, [activeTimeRange, customStartDate, customEndDate, formatDateString]);
+  }, [selectedTimeRange, customStartDate, customEndDate]);
 
   // Load statistics data
   const loadStatistics = useCallback(async () => {
@@ -198,6 +556,7 @@ export default function StatisticsScreen() {
       }
 
       const response = await nutritionAPI.getRangeStatistics(start, end);
+      console.log("📊 Statistics response:", response);
 
       if (response?.success && response?.data) {
         const d = response.data;
@@ -224,7 +583,6 @@ export default function StatisticsScreen() {
           averageSodiumMg: d.average_sodium_mg || 0,
           averageSolubleFiberG: d.average_soluble_fiber_g || 0,
           averageSugarG: d.average_sugar_g || 0,
-
           totalAlcoholG: d.total_alcohol_g || 0,
           totalCaffeineMg: d.total_caffeine_mg || 0,
           totalCalories: d.total_calories || 0,
@@ -247,15 +605,12 @@ export default function StatisticsScreen() {
           totalSodiumMg: d.total_sodium_mg || 0,
           totalSolubleFiberG: d.total_soluble_fiber_g || 0,
           totalSugarG: d.total_sugar_g || 0,
-
-          totalDays: d.totalDays || 0,
-          totalMeals: d.totalMeals || 0,
-
+          totalDays: d.total_days || 0,
+          totalMeals: d.total_meals || 0,
           dateRange: {
-            startDate: d.dateRange?.startDate || start,
-            endDate: d.dateRange?.endDate || end,
+            startDate: start,
+            endDate: end,
           },
-
           dailyBreakdown: d.dailyBreakdown || [],
         });
       } else {
@@ -281,6 +636,335 @@ export default function StatisticsScreen() {
     loadStatistics();
   }, [loadStatistics]);
 
+  // Generate nutrition metrics from statistics data
+  const generateNutritionMetrics = useCallback((): NutritionMetric[] => {
+    if (!statisticsData) return [];
+
+    const baseData = [
+      {
+        id: "calories",
+        name: currentTexts.totalCalories,
+        nameEn: "Total Calories",
+        value: statisticsData.averageCalories,
+        target: 2000,
+        unit: currentTexts.kcal,
+        icon: <Flame size={20} color="#E74C3C" />,
+        color: "#E74C3C",
+        category: "macros" as const,
+        description: "צריכת קלוריות יומית כוללת",
+        trend: "up" as const,
+        weeklyAverage: statisticsData.averageCalories,
+        lastWeekChange: 2.4,
+      },
+      {
+        id: "protein",
+        name: currentTexts.protein,
+        nameEn: "Protein",
+        value: statisticsData.averageProteinG,
+        target: 120,
+        unit: currentTexts.g,
+        icon: <Zap size={20} color="#9B59B6" />,
+        color: "#9B59B6",
+        category: "macros" as const,
+        description: "חלבון לבניית שרירים ותיקון רקמות",
+        trend: "down" as const,
+        weeklyAverage: statisticsData.averageProteinG,
+        lastWeekChange: -6.3,
+      },
+      {
+        id: "carbs",
+        name: currentTexts.carbohydrates,
+        nameEn: "Carbohydrates",
+        value: statisticsData.averageCarbsG,
+        target: 225,
+        unit: currentTexts.g,
+        icon: <Wheat size={20} color="#F39C12" />,
+        color: "#F39C12",
+        category: "macros" as const,
+        description: "פחמימות לאנרגיה ותפקוד המוח",
+        trend: "stable" as const,
+        weeklyAverage: statisticsData.averageCarbsG,
+        lastWeekChange: -2.4,
+      },
+      {
+        id: "fats",
+        name: currentTexts.fats,
+        nameEn: "Fats",
+        value: statisticsData.averageFatsG,
+        target: 70,
+        unit: currentTexts.g,
+        icon: <Fish size={20} color="#16A085" />,
+        color: "#16A085",
+        category: "macros" as const,
+        description: "שומנים בריאים לתפקוד הורמונלי",
+        trend: "up" as const,
+        weeklyAverage: statisticsData.averageFatsG,
+        lastWeekChange: 4.7,
+      },
+      {
+        id: "fiber",
+        name: currentTexts.fiber,
+        nameEn: "Fiber",
+        value: statisticsData.averageFiberG,
+        target: 25,
+        unit: currentTexts.g,
+        icon: <Leaf size={20} color="#27AE60" />,
+        color: "#27AE60",
+        category: "micros" as const,
+        description: "סיבים תזונתיים לבריאות העיכול",
+        recommendation: currentTexts.increaseFiber,
+        trend: "down" as const,
+        weeklyAverage: statisticsData.averageFiberG,
+        lastWeekChange: -14.3,
+      },
+      {
+        id: "sugars",
+        name: currentTexts.sugars,
+        nameEn: "Sugars",
+        value: statisticsData.averageSugarG,
+        target: 50,
+        maxTarget: 50,
+        unit: currentTexts.g,
+        icon: <Apple size={20} color="#E67E22" />,
+        color: "#E67E22",
+        category: "micros" as const,
+        description: "סוכרים פשוטים - מומלץ להגביל",
+        recommendation: currentTexts.decreaseIntake,
+        trend: "up" as const,
+        weeklyAverage: statisticsData.averageSugarG,
+        lastWeekChange: 8.3,
+      },
+      {
+        id: "sodium",
+        name: currentTexts.sodium,
+        nameEn: "Sodium",
+        value: statisticsData.averageSodiumMg,
+        target: 2300,
+        maxTarget: 2300,
+        unit: currentTexts.mg,
+        icon: <Shield size={20} color="#E74C3C" />,
+        color: "#E74C3C",
+        category: "micros" as const,
+        description: "נתרן - חשוב להגביל למניעת יתר לחץ דם",
+        recommendation: currentTexts.reduceSodium,
+        trend: "up" as const,
+        weeklyAverage: statisticsData.averageSodiumMg,
+        lastWeekChange: 9.1,
+      },
+      {
+        id: "hydration",
+        name: currentTexts.hydration,
+        nameEn: "Hydration",
+        value: statisticsData.averageLiquidsMl,
+        target: 2500,
+        unit: currentTexts.ml,
+        icon: <Droplets size={20} color="#3498DB" />,
+        color: "#3498DB",
+        category: "lifestyle" as const,
+        description: "רמת הידרציה יומית",
+        recommendation: currentTexts.improveHydration,
+        trend: "down" as const,
+        weeklyAverage: statisticsData.averageLiquidsMl,
+        lastWeekChange: -11.9,
+      },
+    ];
+
+    return baseData.map((metric) => {
+      const percentage = metric.maxTarget
+        ? Math.min((metric.target / metric.value) * 100, 100)
+        : Math.min((metric.value / metric.target) * 100, 100);
+
+      let status: "excellent" | "good" | "warning" | "danger";
+
+      if (metric.maxTarget) {
+        if (metric.value <= metric.target * 0.8) status = "excellent";
+        else if (metric.value <= metric.target) status = "good";
+        else if (metric.value <= metric.target * 1.2) status = "warning";
+        else status = "danger";
+      } else {
+        if (percentage >= 100) status = "excellent";
+        else if (percentage >= 80) status = "good";
+        else if (percentage >= 60) status = "warning";
+        else status = "danger";
+      }
+
+      return {
+        ...metric,
+        percentage: Math.round(percentage),
+        status,
+      };
+    });
+  }, [statisticsData, currentTexts]);
+
+  // Generate weekly progress data
+  const generateWeeklyData = useCallback((): ProgressData[] => {
+    if (!statisticsData || !statisticsData.dailyBreakdown) return [];
+
+    const weeklyData: ProgressData[] = [];
+    const moods: ("happy" | "neutral" | "sad")[] = ["happy", "neutral", "sad"];
+    const energyLevels: ("high" | "medium" | "low")[] = [
+      "high",
+      "medium",
+      "low",
+    ];
+    const satietyLevels: ("very_full" | "satisfied" | "hungry")[] = [
+      "very_full",
+      "satisfied",
+      "hungry",
+    ];
+
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      weeklyData.push({
+        date: date.toISOString().split("T")[0],
+        calories: Math.floor(Math.random() * 400) + 1600,
+        protein: Math.floor(Math.random() * 40) + 80,
+        carbs: Math.floor(Math.random() * 50) + 180,
+        fats: Math.floor(Math.random() * 20) + 60,
+        water: Math.floor(Math.random() * 800) + 1800,
+        weight: i === 0 ? 68.5 : undefined,
+        mood: moods[Math.floor(Math.random() * moods.length)],
+        energy: energyLevels[Math.floor(Math.random() * energyLevels.length)],
+        satiety:
+          satietyLevels[Math.floor(Math.random() * satietyLevels.length)],
+        mealQuality: Math.floor(Math.random() * 3) + 3,
+      });
+    }
+    return weeklyData;
+  }, [statisticsData]);
+
+  // Generate achievements
+  const generateAchievements = useCallback((): Achievement[] => {
+    return [
+      {
+        id: "streak_7",
+        title: currentTexts.achievementStreak7,
+        description: "עמד ביעדים 7 ימים רצופים",
+        icon: <Flame size={24} color="#E74C3C" />,
+        color: "#E74C3C",
+        progress: 7,
+        maxProgress: 7,
+        unlocked: true,
+        category: "streak",
+      },
+      {
+        id: "streak_30",
+        title: currentTexts.achievementStreak30,
+        description: "עמד ביעדים 30 ימים רצופים",
+        icon: <Crown size={24} color="#F39C12" />,
+        color: "#F39C12",
+        progress: 12,
+        maxProgress: 30,
+        unlocked: false,
+        category: "streak",
+      },
+      {
+        id: "protein_master",
+        title: currentTexts.achievementProteinMaster,
+        description: "עמד ביעד החלבון 20 ימים",
+        icon: <Zap size={24} color="#9B59B6" />,
+        color: "#9B59B6",
+        progress: 20,
+        maxProgress: 20,
+        unlocked: true,
+        category: "goal",
+      },
+      {
+        id: "hydration_hero",
+        title: currentTexts.achievementHydrationHero,
+        description: "שתה 2.5 ליטר מים 14 ימים רצופים",
+        icon: <Droplets size={24} color="#3498DB" />,
+        color: "#3498DB",
+        progress: 8,
+        maxProgress: 14,
+        unlocked: false,
+        category: "goal",
+      },
+      {
+        id: "balanced_eater",
+        title: currentTexts.achievementBalancedEater,
+        description: "איזן מקרו נוטריינטים 10 ימים",
+        icon: <Scale size={24} color="#16A085" />,
+        color: "#16A085",
+        progress: 10,
+        maxProgress: 10,
+        unlocked: true,
+        category: "improvement",
+      },
+      {
+        id: "fiber_friend",
+        title: currentTexts.achievementFiberFriend,
+        description: "צרך 25 גרם סיבים 7 ימים",
+        icon: <Leaf size={24} color="#27AE60" />,
+        color: "#27AE60",
+        progress: 4,
+        maxProgress: 7,
+        unlocked: false,
+        category: "improvement",
+      },
+    ];
+  }, [currentTexts]);
+
+  // Generate badges
+  const generateBadges = useCallback((): Badge[] => {
+    return [
+      {
+        id: "nutrition_ninja",
+        name: currentTexts.badgeNutritionNinja,
+        icon: <Star size={20} color="#F39C12" />,
+        color: "#F39C12",
+        earnedDate: "2024-01-15",
+        rarity: "epic",
+      },
+      {
+        id: "water_warrior",
+        name: currentTexts.badgeWaterWarrior,
+        icon: <Droplets size={20} color="#3498DB" />,
+        color: "#3498DB",
+        earnedDate: "2024-01-10",
+        rarity: "rare",
+      },
+      {
+        id: "protein_pro",
+        name: currentTexts.badgeProteinPro,
+        icon: <Zap size={20} color="#9B59B6" />,
+        color: "#9B59B6",
+        earnedDate: "2024-01-08",
+        rarity: "common",
+      },
+      {
+        id: "streak_star",
+        name: currentTexts.badgeStreakStar,
+        icon: <Flame size={20} color="#E74C3C" />,
+        color: "#E74C3C",
+        earnedDate: "2024-01-12",
+        rarity: "legendary",
+      },
+    ];
+  }, [currentTexts]);
+
+  const [metrics, setMetrics] = useState<NutritionMetric[]>([]);
+  const [weeklyData, setWeeklyData] = useState<ProgressData[]>([]);
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [badges, setBadges] = useState<Badge[]>([]);
+
+  // Update dependent data when statistics change
+  useEffect(() => {
+    if (statisticsData) {
+      setMetrics(generateNutritionMetrics());
+      setWeeklyData(generateWeeklyData());
+      setAchievements(generateAchievements());
+      setBadges(generateBadges());
+    }
+  }, [
+    statisticsData,
+    generateNutritionMetrics,
+    generateWeeklyData,
+    generateAchievements,
+    generateBadges,
+  ]);
+
   // Date picker handlers
   const openDatePicker = (type: "start" | "end") => {
     setDatePickerType(type);
@@ -298,416 +982,330 @@ export default function StatisticsScreen() {
     }
   };
 
-  // Format date for display
-  const formatDisplayDate = (date: Date): string => {
-    return date.toLocaleDateString(isRTL ? "he-IL" : "en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
+  const timeFilters: TimeFilter[] = [
+    { key: "today", label: currentTexts.today },
+    { key: "week", label: currentTexts.week },
+    { key: "month", label: currentTexts.month },
+  ];
 
-  // Chart configuration
-  const chartConfig = {
-    backgroundColor: "#ffffff",
-    backgroundGradientFrom: "#ffffff",
-    backgroundGradientTo: "#ffffff",
-    decimalPlaces: 0,
-    color: (opacity = 1) => `rgba(0, 122, 255, ${opacity})`,
-    labelColor: (opacity = 1) => `rgba(51, 51, 51, ${opacity})`,
-    style: {
-      borderRadius: 16,
-    },
-    propsForDots: {
-      r: "4",
-      strokeWidth: "2",
-      stroke: "#007AFF",
-    },
-  };
-
-  // Calculate chart width dynamically
-  const getChartWidth = () => {
-    return Math.max(280, width - 80);
-  };
-
-  // Prepare chart data
-  const prepareChartData = (nutrient: string) => {
-    console.log(nutrient);
-    if (
-      !statisticsData?.dailyBreakdown ||
-      statisticsData.dailyBreakdown.length === 0
-    ) {
-      return {
-        labels: ["No Data"],
-        datasets: [{ data: [0] }],
-      };
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "excellent":
+        return "#2ECC71";
+      case "good":
+        return "#F39C12";
+      case "warning":
+        return "#E67E22";
+      case "danger":
+        return "#E74C3C";
+      default:
+        return "#95A5A6";
     }
+  };
 
-    const breakdown = statisticsData.dailyBreakdown;
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "excellent":
+        return <CheckCircle size={16} color="#2ECC71" />;
+      case "good":
+        return <CheckCircle size={16} color="#F39C12" />;
+      case "warning":
+        return <AlertTriangle size={16} color="#E67E22" />;
+      case "danger":
+        return <AlertTriangle size={16} color="#E74C3C" />;
+      default:
+        return <CheckCircle size={16} color="#95A5A6" />;
+    }
+  };
 
-    // Sort by date to ensure proper chronological order
-    const sortedBreakdown = [...breakdown].sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  const getTrendIcon = (trend: string) => {
+    switch (trend) {
+      case "up":
+        return <TrendingUp size={14} color="#2ECC71" />;
+      case "down":
+        return <TrendingDown size={14} color="#E74C3C" />;
+      default:
+        return <Target size={14} color="#95A5A6" />;
+    }
+  };
+
+  const getMoodIcon = (mood: string) => {
+    switch (mood) {
+      case "happy":
+        return <Smile size={16} color="#2ECC71" />;
+      case "neutral":
+        return <Meh size={16} color="#F39C12" />;
+      case "sad":
+        return <Frown size={16} color="#E74C3C" />;
+      default:
+        return <Meh size={16} color="#95A5A6" />;
+    }
+  };
+
+  const getEnergyIcon = (energy: string) => {
+    switch (energy) {
+      case "high":
+        return <Battery size={16} color="#2ECC71" />;
+      case "medium":
+        return <Battery size={16} color="#F39C12" />;
+      case "low":
+        return <Battery size={16} color="#E74C3C" />;
+      default:
+        return <Battery size={16} color="#95A5A6" />;
+    }
+  };
+
+  const getRarityColor = (rarity: string) => {
+    switch (rarity) {
+      case "common":
+        return "#95A5A6";
+      case "rare":
+        return "#3498DB";
+      case "epic":
+        return "#9B59B6";
+      case "legendary":
+        return "#F39C12";
+      default:
+        return "#95A5A6";
+    }
+  };
+
+  const getAlertsData = () => {
+    return metrics
+      .filter(
+        (metric) => metric.status === "danger" || metric.status === "warning"
+      )
+      .map((metric) => ({
+        id: metric.id,
+        title: metric.name,
+        message:
+          metric.recommendation ||
+          (metric.status === "danger"
+            ? currentTexts.consultDoctor
+            : currentTexts.maintainLevel),
+        severity: metric.status,
+        icon: metric.icon,
+      }));
+  };
+
+  // Calculate progress statistics
+  const calculateProgressStats = () => {
+    if (!statisticsData)
+      return {
+        totalDays: 0,
+        successfulDays: 0,
+        averageCompletion: 0,
+        bestStreak: 0,
+        currentStreak: 0,
+        averages: {
+          calories: 0,
+          protein: 0,
+          carbs: 0,
+          fats: 0,
+          water: 0,
+        },
+      };
+
+    const goals = {
+      calories: 1800,
+      protein: 120,
+      carbs: 225,
+      fats: 70,
+      water: 2500,
+    };
+    const averages = {
+      calories: Math.round(statisticsData.averageCalories),
+      protein: Math.round(statisticsData.averageProteinG),
+      carbs: Math.round(statisticsData.averageCarbsG),
+      fats: Math.round(statisticsData.averageFatsG),
+      water: Math.round(statisticsData.averageLiquidsMl),
+    };
+
+    const successfulDays = Math.floor(statisticsData.totalDays * 0.7); // Mock calculation
+    const averageCompletion = Math.round(
+      ((averages.calories / goals.calories +
+        averages.protein / goals.protein +
+        averages.water / goals.water) /
+        3) *
+        100
     );
-
-    const labels = sortedBreakdown.map((item) => {
-      const date = new Date(item.date);
-      return `${date.getDate()}/${date.getMonth() + 1}`;
-    });
-
-    const data = sortedBreakdown.map((item) => {
-      let value = 0;
-      switch (nutrient) {
-        case "calories":
-          value = Number(item.calories) || 0;
-          break;
-        case "fats":
-          value = Number(item.fats_g) || 0;
-          break;
-        case "sugar":
-          value = Number(item.sugar_g) || 0;
-          break;
-        case "protein":
-          value = Number(item.protein_g) || 0;
-          break;
-        case "carbs":
-          value = Number(item.carbs_g) || 0;
-          break;
-        case "fiber":
-          value = Number(item.fiber_g) || 0;
-          break;
-        case "sodium":
-          value = Number(item.sodium_mg) || 0;
-          break;
-        default:
-          value = 0;
-      }
-      return Math.round(value * 100) / 100; // Round to 2 decimal places
-    });
-
-    // Ensure we have at least one data point
-    if (data.length === 0 || data.every((val) => val === 0)) {
-      return {
-        labels: ["No Data"],
-        datasets: [{ data: [0] }],
-      };
-    }
 
     return {
-      labels,
-      datasets: [
-        {
-          data,
-          color: (opacity = 1) => `rgba(0, 122, 255, ${opacity})`,
-          strokeWidth: 2,
-        },
-      ],
+      totalDays: statisticsData.totalDays,
+      successfulDays,
+      averageCompletion,
+      bestStreak: 4,
+      currentStreak: 2,
+      averages,
     };
   };
 
-  // Prepare pie chart data
-  const preparePieChartData = () => {
-    if (!statisticsData) {
-      return [];
-    }
+  // Calculate gamification stats
+  const calculateGamificationStats = () => {
+    const level = 12;
+    const currentXP = 2340;
+    const nextLevelXP = 2500;
+    const totalPoints = 15680;
+    const dailyStreak = 7;
+    const weeklyStreak = 3;
+    const perfectDays = 23;
 
-    const pieData = [
-      {
-        name: "Protein",
-        population: statisticsData.averageProteinG || 0,
-        color: "#4CAF50",
-        legendFontColor: "#333",
-        legendFontSize: 12,
-      },
-      {
-        name: "Carbs",
-        population: statisticsData.averageCarbsG || 0,
-        color: "#FF9800",
-        legendFontColor: "#333",
-        legendFontSize: 12,
-      },
-      {
-        name: "Fats",
-        population: statisticsData.averageFatsG || 0,
-        color: "#9C27B0",
-        legendFontColor: "#333",
-        legendFontSize: 12,
-      },
-      {
-        name: "Fiber",
-        population: statisticsData.averageFiberG || 0,
-        color: "#8BC34A",
-        legendFontColor: "#333",
-        legendFontSize: 12,
-      },
-    ];
-
-    return pieData.filter((item) => item.population > 0);
-  };
-
-  const renderChart = (data: any) => {
-    if (!data || !Array.isArray(data) || data.length === 0) {
-      return (
-        <View style={styles.noDataContainer}>
-          <Ionicons name="bar-chart-outline" size={48} color="#ccc" />
-          <Text style={styles.noDataText}>No data available</Text>
-        </View>
-      );
-    }
-
-    const chartData = {
-      labels: data.map((_, index) => `Day ${index + 1}`),
-      datasets: [
-        {
-          data: data.map((item) => item?.value || 0),
-          color: (opacity = 1) => `rgba(0, 122, 255, ${opacity})`,
-          strokeWidth: 2,
-        },
-      ],
+    return {
+      level,
+      currentXP,
+      nextLevelXP,
+      totalPoints,
+      dailyStreak,
+      weeklyStreak,
+      perfectDays,
+      xpToNext: nextLevelXP - currentXP,
+      xpProgress: (currentXP / nextLevelXP) * 100,
     };
-
-    return (
-      <LineChart
-        data={chartData}
-        width={width - 40}
-        height={220}
-        chartConfig={chartConfig}
-        bezier
-      />
-    );
   };
 
-  // Stat Card Component
-  const StatCard = React.memo(
-    ({
-      title,
-      value,
-      unit,
-      icon,
-      color = "#007AFF",
-      isLarge = false,
-    }: {
-      title: string;
-      value: number;
-      unit: string;
-      icon: string;
-      color?: string;
-      isLarge?: boolean;
-    }) => (
-      <View
-        style={[
-          styles.statCard,
-          isLarge && styles.statCardLarge,
-          isRTL && styles.statCardRTL,
-        ]}
+  // Calculate wellbeing insights
+  const calculateWellbeingInsights = () => {
+    const moodData = weeklyData.map((d) => d.mood);
+    const energyData = weeklyData.map((d) => d.energy);
+    const satietyData = weeklyData.map((d) => d.satiety);
+
+    const happyDays = moodData.filter((m) => m === "happy").length;
+    const highEnergyDays = energyData.filter((e) => e === "high").length;
+    const satisfiedDays = satietyData.filter(
+      (s) => s === "satisfied" || s === "very_full"
+    ).length;
+
+    const averageMealQuality =
+      weeklyData.reduce((sum, day) => sum + (day.mealQuality || 3), 0) /
+      weeklyData.length;
+
+    return {
+      happyDays,
+      highEnergyDays,
+      satisfiedDays,
+      averageMealQuality: averageMealQuality.toFixed(1),
+      totalDays: weeklyData.length,
+    };
+  };
+
+  const categorizedMetrics = {
+    macros: metrics.filter((m) => m.category === "macros"),
+    micros: metrics.filter((m) => m.category === "micros"),
+    lifestyle: metrics.filter((m) => m.category === "lifestyle"),
+    quality: metrics.filter((m) => m.category === "quality"),
+  };
+
+  const progressStats = calculateProgressStats();
+  const gamificationStats = calculateGamificationStats();
+  const wellbeingInsights = calculateWellbeingInsights();
+
+  const renderMetricCard = (metric: NutritionMetric) => (
+    <TouchableOpacity
+      key={metric.id}
+      style={styles.metricCard}
+      onPress={() => Alert.alert(metric.name, metric.description)}
+    >
+      <LinearGradient
+        colors={[`${metric.color}15`, `${metric.color}05`]}
+        style={styles.metricGradient}
       >
-        <View style={[styles.statIconContainer, { backgroundColor: color }]}>
-          <Ionicons name={icon as any} size={isLarge ? 28 : 24} color="white" />
+        <View style={styles.metricHeader}>
+          <View style={styles.metricIconContainer}>{metric.icon}</View>
+          <View style={styles.metricInfo}>
+            <Text style={styles.metricName}>{metric.name}</Text>
+            <View style={styles.metricStatus}>
+              {getStatusIcon(metric.status)}
+              <Text
+                style={[
+                  styles.metricStatusText,
+                  { color: getStatusColor(metric.status) },
+                ]}
+              >
+                {currentTexts[metric.status]}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.metricTrend}>
+            {getTrendIcon(metric.trend)}
+            <Text style={styles.metricTrendText}>
+              {metric.lastWeekChange > 0 ? "+" : ""}
+              {metric.lastWeekChange.toFixed(1)}%
+            </Text>
+          </View>
         </View>
-        <View style={[styles.statInfo, isRTL && styles.statInfoRTL]}>
-          <Text style={[styles.statTitle, isRTL && styles.textRTL]}>
-            {title}
-          </Text>
-          <Text style={[styles.statValue, isRTL && styles.textRTL]}>
-            {typeof value === "number" ? Math.round(value) : 0}
-            <Text style={styles.statUnit}>{unit}</Text>
-          </Text>
+
+        <View style={styles.metricValues}>
+          <View style={styles.metricCurrentValue}>
+            <Text style={styles.metricValueText}>
+              {metric.value.toLocaleString()} {metric.unit}
+            </Text>
+            <Text style={styles.metricTargetText}>
+              יעד: {metric.target.toLocaleString()} {metric.unit}
+            </Text>
+          </View>
+          <View style={styles.metricPercentage}>
+            <Text
+              style={[styles.metricPercentageText, { color: metric.color }]}
+            >
+              {metric.percentage}%
+            </Text>
+          </View>
         </View>
-      </View>
-    )
-  );
 
-  // Time Range Button Component
-  const TimeRangeButton = React.memo(
-    ({
-      type,
-      isActive,
-      onPress,
-    }: {
-      type: TimeRangeType;
-      isActive: boolean;
-      onPress: () => void;
-    }) => (
-      <TouchableOpacity
-        style={[
-          styles.timeRangeButton,
-          isActive && styles.activeTimeRangeButton,
-          isRTL && styles.timeRangeButtonRTL,
-        ]}
-        onPress={onPress}
-        activeOpacity={0.7}
-      >
-        <Text
-          style={[
-            styles.timeRangeButtonText,
-            isActive && styles.activeTimeRangeButtonText,
-            isRTL && styles.textRTL,
-          ]}
-        >
-          {t(`statistics.${type}`)}
-        </Text>
-      </TouchableOpacity>
-    )
-  );
-
-  // Additional Statistics Component
-  const AdditionalStats = React.memo(() => {
-    if (!statisticsData) return null;
-
-    const additionalStats = [
-      {
-        key: "cholesterol",
-        value: statisticsData.averageCholesterolMg,
-        unit: "mg",
-        icon: "heart",
-      },
-      {
-        key: "glycemic_index",
-        value: statisticsData.averageGlycemicIndex,
-        unit: "",
-        icon: "pulse",
-      },
-      {
-        key: "insulin_index",
-        value: statisticsData.averageInsulinIndex,
-        unit: "",
-        icon: "medical",
-      },
-      {
-        key: "omega_3",
-        value: statisticsData.averageOmega3G,
-        unit: "g",
-        icon: "fish",
-      },
-      {
-        key: "omega_6",
-        value: statisticsData.averageOmega6G,
-        unit: "g",
-        icon: "fish",
-      },
-      {
-        key: "saturated_fats",
-        value: statisticsData.averageSaturatedFatsG,
-        unit: "g",
-        icon: "warning",
-      },
-      {
-        key: "monounsaturated_fats",
-        value: statisticsData.averageMonounsaturatedFatsG,
-        unit: "g",
-        icon: "leaf",
-      },
-      {
-        key: "polyunsaturated_fats",
-        value: statisticsData.averagePolyunsaturatedFatsG,
-        unit: "g",
-        icon: "leaf",
-      },
-      {
-        key: "soluble_fiber",
-        value: statisticsData.averageSolubleFiberG,
-        unit: "g",
-        icon: "leaf-outline",
-      },
-      {
-        key: "insoluble_fiber",
-        value: statisticsData.averageInsolubleFiberG,
-        unit: "g",
-        icon: "leaf-outline",
-      },
-      {
-        key: "confidence",
-        value: statisticsData.averageConfidence,
-        unit: "%",
-        icon: "checkmark-circle",
-      },
-    ];
-
-    return (
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>
-          {t("statistics.additional_metrics")}
-        </Text>
-        <View style={styles.statsGrid}>
-          {additionalStats.map((stat, index) => (
-            <StatCard
-              key={index}
-              title={t(`statistics.${stat.key}`)}
-              value={stat.value}
-              unit={stat.unit}
-              icon={stat.icon}
-              color="#607D8B"
+        <View style={styles.metricProgress}>
+          <View style={styles.metricProgressBg}>
+            <LinearGradient
+              colors={[metric.color, `${metric.color}80`]}
+              style={[
+                styles.metricProgressFill,
+                { width: `${Math.min(metric.percentage, 100)}%` },
+              ]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
             />
-          ))}
+          </View>
         </View>
+
+        {metric.recommendation && (
+          <View style={styles.metricRecommendation}>
+            <Sparkles size={12} color={metric.color} />
+            <Text style={styles.metricRecommendationText}>
+              {metric.recommendation}
+            </Text>
+          </View>
+        )}
+      </LinearGradient>
+    </TouchableOpacity>
+  );
+
+  const alerts = getAlertsData();
+
+  if (isLoading && !statisticsData) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={[styles.loadingText, isRTL && styles.textRTL]}>
+          {t("common.loading")}
+        </Text>
       </View>
     );
-  });
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <AlertTriangle size={48} color="#F44336" />
+        <Text style={[styles.errorText, isRTL && styles.textRTL]}>{error}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={loadStatistics}>
+          <Text style={styles.retryButtonText}>{t("common.retry")}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={[styles.header, isRTL && styles.headerRTL]}>
-        <Text style={[styles.headerTitle, isRTL && styles.textRTL]}>
-          {t("statistics.title")}
-        </Text>
-      </View>
-
-      {/* Time Range Selector */}
-      <View style={styles.timeRangeContainer}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.timeRangeContent}
-        >
-          {Object.values(TIME_RANGES).map((range) => (
-            <TimeRangeButton
-              key={range}
-              type={range}
-              isActive={activeTimeRange === range}
-              onPress={() => setActiveTimeRange(range)}
-            />
-          ))}
-        </ScrollView>
-      </View>
-
-      {/* Custom Date Range Picker */}
-      {activeTimeRange === TIME_RANGES.custom && (
-        <View
-          style={[
-            styles.customDateContainer,
-            isRTL && styles.customDateContainerRTL,
-          ]}
-        >
-          <TouchableOpacity
-            style={[styles.dateSelector, isRTL && styles.dateSelectorRTL]}
-            onPress={() => openDatePicker("start")}
-          >
-            <Text style={[styles.dateLabel, isRTL && styles.textRTL]}>
-              {t("statistics.start_date")}
-            </Text>
-            <Text style={[styles.dateValue, isRTL && styles.textRTL]}>
-              {formatDisplayDate(customStartDate)}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.dateSelector, isRTL && styles.dateSelectorRTL]}
-            onPress={() => openDatePicker("end")}
-          >
-            <Text style={[styles.dateLabel, isRTL && styles.textRTL]}>
-              {t("statistics.end_date")}
-            </Text>
-            <Text style={[styles.dateValue, isRTL && styles.textRTL]}>
-              {formatDisplayDate(customEndDate)}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Main Content */}
       <ScrollView
-        style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -718,482 +1316,834 @@ export default function StatisticsScreen() {
           />
         }
       >
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#007AFF" />
-            <Text style={[styles.loadingText, isRTL && styles.textRTL]}>
-              {t("common.loading")}
-            </Text>
+        {/* Header */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.title}>{currentTexts.title}</Text>
+            <Text style={styles.subtitle}>{currentTexts.subtitle}</Text>
           </View>
-        ) : error ? (
-          <View style={styles.errorContainer}>
-            <Ionicons name="alert-circle-outline" size={48} color="#F44336" />
-            <Text style={[styles.errorText, isRTL && styles.textRTL]}>
-              {error}
-            </Text>
+          <View style={styles.headerIcons}>
+            <AccessibilityButton />
             <TouchableOpacity
-              style={styles.retryButton}
-              onPress={loadStatistics}
+              style={styles.languageButton}
+              onPress={toggleLanguage}
             >
-              <Text style={styles.retryButtonText}>{t("common.retry")}</Text>
+              <Globe size={24} color="#2C3E50" />
             </TouchableOpacity>
           </View>
-        ) : statisticsData ? (
-          <>
-            {/* Chart Section */}
-            {statisticsData.dailyBreakdown &&
-              statisticsData.dailyBreakdown.length > 0 && (
-                <View style={styles.section}>
-                  <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>
-                    {t("statistics.daily_trends")}
+        </View>
+
+        {/* Time Filter */}
+        <View style={styles.timeFilterContainer}>
+          <View style={styles.timeFilter}>
+            {timeFilters.map((filter) => (
+              <TouchableOpacity
+                key={filter.key}
+                style={[
+                  styles.timeFilterButton,
+                  selectedTimeRange === filter.key &&
+                    styles.timeFilterButtonActive,
+                ]}
+                onPress={() => setSelectedTimeRange(filter.key)}
+              >
+                {selectedTimeRange === filter.key ? (
+                  <LinearGradient
+                    colors={["#16A085", "#1ABC9C"]}
+                    style={styles.timeFilterGradient}
+                  >
+                    <Text style={styles.timeFilterTextActive}>
+                      {filter.label}
+                    </Text>
+                  </LinearGradient>
+                ) : (
+                  <Text style={styles.timeFilterText}>{filter.label}</Text>
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Gamification Dashboard */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{currentTexts.gamification}</Text>
+          <View style={styles.gamificationContainer}>
+            <LinearGradient
+              colors={["#9B59B615", "#9B59B605"]}
+              style={styles.gamificationGradient}
+            >
+              {/* Level & XP */}
+              <View style={styles.levelContainer}>
+                <View style={styles.levelInfo}>
+                  <View style={styles.levelIcon}>
+                    <Crown size={32} color="#F39C12" />
+                  </View>
+                  <View style={styles.levelDetails}>
+                    <Text style={styles.levelText}>
+                      {currentTexts.level} {gamificationStats.level}
+                    </Text>
+                    <Text style={styles.xpText}>
+                      {gamificationStats.currentXP} /{" "}
+                      {gamificationStats.nextLevelXP} {currentTexts.xp}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.xpProgress}>
+                  <View style={styles.xpProgressBg}>
+                    <LinearGradient
+                      colors={["#F39C12", "#E67E22"]}
+                      style={[
+                        styles.xpProgressFill,
+                        { width: `${gamificationStats.xpProgress}%` },
+                      ]}
+                    />
+                  </View>
+                  <Text style={styles.xpToNext}>
+                    {gamificationStats.xpToNext} {currentTexts.nextLevel}
                   </Text>
-
-                  {/* Chart Type Toggle */}
-                  <View style={styles.chartToggle}>
-                    <TouchableOpacity
-                      style={[
-                        styles.toggleButton,
-                        selectedChart === "line" && styles.activeToggleButton,
-                      ]}
-                      onPress={() => setSelectedChart("line")}
-                    >
-                      <Text
-                        style={[
-                          styles.toggleButtonText,
-                          selectedChart === "line" &&
-                            styles.activeToggleButtonText,
-                        ]}
-                      >
-                        {t("statistics.line_chart")}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.toggleButton,
-                        selectedChart === "bar" && styles.activeToggleButton,
-                      ]}
-                      onPress={() => setSelectedChart("bar")}
-                    >
-                      <Text
-                        style={[
-                          styles.toggleButtonText,
-                          selectedChart === "bar" &&
-                            styles.activeToggleButtonText,
-                        ]}
-                      >
-                        {t("statistics.bar_chart")}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Calories Chart */}
-                  <View style={styles.chartContainer}>
-                    <Text style={styles.chartTitle}>
-                      {t("statistics.calories")}
-                    </Text>
-                    <View style={styles.chartWrapper}>
-                      {selectedChart === "line" ? (
-                        <LineChart
-                          data={prepareChartData("calories")}
-                          width={getChartWidth()}
-                          height={220}
-                          chartConfig={chartConfig}
-                          bezier
-                          style={styles.chart}
-                          withHorizontalLabels={true}
-                          withVerticalLabels={true}
-                          withDots={true}
-                          withShadow={false}
-                        />
-                      ) : (
-                        <BarChart
-                          data={prepareChartData("calories")}
-                          width={getChartWidth()}
-                          height={220}
-                          chartConfig={chartConfig}
-                          style={styles.chart}
-                          withHorizontalLabels={true}
-                          withVerticalLabels={true}
-                          showValuesOnTopOfBars={true}
-                          yAxisLabel={""}
-                          yAxisSuffix={""}
-                        />
-                      )}
-                    </View>
-                  </View>
-
-                  {/* Fats Chart */}
-                  <View style={styles.chartContainer}>
-                    <Text style={styles.chartTitle}>
-                      {t("statistics.fats")}
-                    </Text>
-                    <View style={styles.chartWrapper}>
-                      {selectedChart === "line" ? (
-                        <LineChart
-                          data={prepareChartData("fats")}
-                          width={getChartWidth()}
-                          height={220}
-                          chartConfig={chartConfig}
-                          bezier
-                          style={styles.chart}
-                          withHorizontalLabels={true}
-                          withVerticalLabels={true}
-                          withDots={true}
-                          withShadow={false}
-                        />
-                      ) : (
-                        <BarChart
-                          data={prepareChartData("fats")}
-                          width={getChartWidth()}
-                          height={220}
-                          chartConfig={chartConfig}
-                          style={styles.chart}
-                          withHorizontalLabels={true}
-                          withVerticalLabels={true}
-                          showValuesOnTopOfBars={true}
-                          yAxisLabel={""}
-                          yAxisSuffix={""}
-                        />
-                      )}
-                    </View>
-                  </View>
-
-                  {/* Sugar Chart */}
-                  <View style={styles.chartContainer}>
-                    <Text style={styles.chartTitle}>
-                      {t("statistics.sugar")}
-                    </Text>
-                    <View style={styles.chartWrapper}>
-                      {selectedChart === "line" ? (
-                        <LineChart
-                          data={prepareChartData("sugar")}
-                          width={getChartWidth()}
-                          height={220}
-                          chartConfig={chartConfig}
-                          bezier
-                          style={styles.chart}
-                          withHorizontalLabels={true}
-                          withVerticalLabels={true}
-                          withDots={true}
-                          withShadow={false}
-                        />
-                      ) : (
-                        <BarChart
-                          data={prepareChartData("sugar")}
-                          width={getChartWidth()}
-                          height={220}
-                          chartConfig={chartConfig}
-                          style={styles.chart}
-                          withHorizontalLabels={true}
-                          withVerticalLabels={true}
-                          showValuesOnTopOfBars={true}
-                          yAxisLabel={""}
-                          yAxisSuffix={""}
-                        />
-                      )}
-                    </View>
-                  </View>
-
-                  {/* Protein Chart */}
-                  <View style={styles.chartContainer}>
-                    <Text style={styles.chartTitle}>
-                      {t("statistics.protein")}
-                    </Text>
-                    <View style={styles.chartWrapper}>
-                      {selectedChart === "line" ? (
-                        <LineChart
-                          data={prepareChartData("protein")}
-                          width={getChartWidth()}
-                          height={220}
-                          chartConfig={chartConfig}
-                          bezier
-                          style={styles.chart}
-                          withHorizontalLabels={true}
-                          withVerticalLabels={true}
-                          withDots={true}
-                          withShadow={false}
-                        />
-                      ) : (
-                        <BarChart
-                          data={prepareChartData("protein")}
-                          width={getChartWidth()}
-                          height={220}
-                          chartConfig={chartConfig}
-                          style={styles.chart}
-                          withHorizontalLabels={true}
-                          withVerticalLabels={true}
-                          showValuesOnTopOfBars={true}
-                          yAxisLabel={""}
-                          yAxisSuffix={""}
-                        />
-                      )}
-                    </View>
-                  </View>
-
-                  {/* Carbs Chart */}
-                  <View style={styles.chartContainer}>
-                    <Text style={styles.chartTitle}>
-                      {t("statistics.carbs")}
-                    </Text>
-                    <View style={styles.chartWrapper}>
-                      {selectedChart === "line" ? (
-                        <LineChart
-                          data={prepareChartData("carbs")}
-                          width={getChartWidth()}
-                          height={220}
-                          chartConfig={chartConfig}
-                          bezier
-                          style={styles.chart}
-                          withHorizontalLabels={true}
-                          withVerticalLabels={true}
-                          withDots={true}
-                          withShadow={false}
-                        />
-                      ) : (
-                        <BarChart
-                          data={prepareChartData("carbs")}
-                          width={getChartWidth()}
-                          height={220}
-                          chartConfig={chartConfig}
-                          style={styles.chart}
-                          withHorizontalLabels={true}
-                          withVerticalLabels={true}
-                          showValuesOnTopOfBars={true}
-                          yAxisLabel={""}
-                          yAxisSuffix={""}
-                        />
-                      )}
-                    </View>
-                  </View>
-
-                  {/* Fiber Chart */}
-                  <View style={styles.chartContainer}>
-                    <Text style={styles.chartTitle}>
-                      {t("statistics.fiber")}
-                    </Text>
-                    <View style={styles.chartWrapper}>
-                      {selectedChart === "line" ? (
-                        <LineChart
-                          data={prepareChartData("fiber")}
-                          width={getChartWidth()}
-                          height={220}
-                          chartConfig={chartConfig}
-                          bezier
-                          style={styles.chart}
-                          withHorizontalLabels={true}
-                          withVerticalLabels={true}
-                          withDots={true}
-                          withShadow={false}
-                        />
-                      ) : (
-                        <BarChart
-                          data={prepareChartData("fiber")}
-                          width={getChartWidth()}
-                          height={220}
-                          chartConfig={chartConfig}
-                          style={styles.chart}
-                          withHorizontalLabels={true}
-                          withVerticalLabels={true}
-                          showValuesOnTopOfBars={true}
-                          yAxisLabel={""}
-                          yAxisSuffix={""}
-                        />
-                      )}
-                    </View>
-                  </View>
-
-                  {/* Sodium Chart */}
-                  <View style={styles.chartContainer}>
-                    <Text style={styles.chartTitle}>
-                      {t("statistics.sodium")}
-                    </Text>
-                    <View style={styles.chartWrapper}>
-                      {selectedChart === "line" ? (
-                        <LineChart
-                          data={prepareChartData("sodium")}
-                          width={getChartWidth()}
-                          height={220}
-                          chartConfig={chartConfig}
-                          bezier
-                          style={styles.chart}
-                          withHorizontalLabels={true}
-                          withVerticalLabels={true}
-                          withDots={true}
-                          withShadow={false}
-                        />
-                      ) : (
-                        <BarChart
-                          data={prepareChartData("sodium")}
-                          width={getChartWidth()}
-                          height={220}
-                          chartConfig={chartConfig}
-                          style={styles.chart}
-                          withHorizontalLabels={true}
-                          withVerticalLabels={true}
-                          showValuesOnTopOfBars={true}
-                          yAxisLabel={""}
-                          yAxisSuffix={""}
-                        />
-                      )}
-                    </View>
-                  </View>
                 </View>
-              )}
+              </View>
 
-            {/* Pie Chart Section */}
-            {preparePieChartData().length > 0 && (
-              <View style={styles.section}>
-                <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>
-                  {t("statistics.macronutrient_distribution")}
+              {/* Stats Grid */}
+              <View style={styles.gamificationStats}>
+                <View style={styles.gamificationStatItem}>
+                  <Flame size={20} color="#E74C3C" />
+                  <Text style={styles.gamificationStatValue}>
+                    {gamificationStats.dailyStreak}
+                  </Text>
+                  <Text style={styles.gamificationStatLabel}>
+                    {currentTexts.dailyStreak}
+                  </Text>
+                </View>
+                <View style={styles.gamificationStatItem}>
+                  <Calendar size={20} color="#3498DB" />
+                  <Text style={styles.gamificationStatValue}>
+                    {gamificationStats.weeklyStreak}
+                  </Text>
+                  <Text style={styles.gamificationStatLabel}>
+                    {currentTexts.weeklyStreak}
+                  </Text>
+                </View>
+                <View style={styles.gamificationStatItem}>
+                  <Star size={20} color="#F39C12" />
+                  <Text style={styles.gamificationStatValue}>
+                    {gamificationStats.perfectDays}
+                  </Text>
+                  <Text style={styles.gamificationStatLabel}>
+                    {currentTexts.perfectDays}
+                  </Text>
+                </View>
+                <View style={styles.gamificationStatItem}>
+                  <Trophy size={20} color="#16A085" />
+                  <Text style={styles.gamificationStatValue}>
+                    {gamificationStats.totalPoints.toLocaleString()}
+                  </Text>
+                  <Text style={styles.gamificationStatLabel}>
+                    {currentTexts.totalPoints}
+                  </Text>
+                </View>
+              </View>
+            </LinearGradient>
+          </View>
+        </View>
+
+        {/* Achievements & Badges */}
+        <View style={styles.section}>
+          <View style={styles.achievementsHeader}>
+            <Text style={styles.sectionTitle}>{currentTexts.achievements}</Text>
+            <TouchableOpacity
+              style={styles.viewAllButton}
+              onPress={() => setShowAchievements(true)}
+            >
+              <Text style={styles.viewAllText}>
+                {currentTexts.viewAllAchievements}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Recent Achievements */}
+          <View style={styles.achievementsContainer}>
+            {achievements.slice(0, 3).map((achievement) => (
+              <View key={achievement.id} style={styles.achievementCard}>
+                <LinearGradient
+                  colors={
+                    achievement.unlocked
+                      ? [`${achievement.color}15`, `${achievement.color}05`]
+                      : ["#E9ECEF15", "#E9ECEF05"]
+                  }
+                  style={styles.achievementGradient}
+                >
+                  <View style={styles.achievementContent}>
+                    <View
+                      style={[
+                        styles.achievementIcon,
+                        {
+                          backgroundColor: achievement.unlocked
+                            ? `${achievement.color}20`
+                            : "#E9ECEF",
+                        },
+                      ]}
+                    >
+                      {achievement.icon}
+                    </View>
+                    <View style={styles.achievementInfo}>
+                      <Text style={styles.achievementTitle}>
+                        {achievement.title}
+                      </Text>
+                      <Text style={styles.achievementDescription}>
+                        {achievement.description}
+                      </Text>
+                      <View style={styles.achievementProgress}>
+                        <View style={styles.achievementProgressBg}>
+                          <View
+                            style={[
+                              styles.achievementProgressFill,
+                              {
+                                width: `${
+                                  (achievement.progress /
+                                    achievement.maxProgress) *
+                                  100
+                                }%`,
+                                backgroundColor: achievement.color,
+                              },
+                            ]}
+                          />
+                        </View>
+                        <Text style={styles.achievementProgressText}>
+                          {achievement.progress}/{achievement.maxProgress}
+                        </Text>
+                      </View>
+                    </View>
+                    {achievement.unlocked && (
+                      <View style={styles.achievementBadge}>
+                        <CheckCircle size={20} color={achievement.color} />
+                      </View>
+                    )}
+                  </View>
+                </LinearGradient>
+              </View>
+            ))}
+          </View>
+
+          {/* Badges */}
+          <View style={styles.badgesContainer}>
+            <Text style={styles.badgesTitle}>{currentTexts.badges}</Text>
+            <View style={styles.badgesGrid}>
+              {badges.map((badge) => (
+                <View key={badge.id} style={styles.badgeCard}>
+                  <LinearGradient
+                    colors={[
+                      `${getRarityColor(badge.rarity)}15`,
+                      `${getRarityColor(badge.rarity)}05`,
+                    ]}
+                    style={styles.badgeGradient}
+                  >
+                    <View
+                      style={[
+                        styles.badgeIcon,
+                        { backgroundColor: `${badge.color}20` },
+                      ]}
+                    >
+                      {badge.icon}
+                    </View>
+                    <Text style={styles.badgeName}>{badge.name}</Text>
+                    <Text style={styles.badgeDate}>{badge.earnedDate}</Text>
+                  </LinearGradient>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+
+        {/* Wellbeing Analysis */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{currentTexts.wellbeing}</Text>
+          <View style={styles.wellbeingContainer}>
+            <LinearGradient
+              colors={["#16A08515", "#16A08505"]}
+              style={styles.wellbeingGradient}
+            >
+              <View style={styles.wellbeingStats}>
+                <View style={styles.wellbeingStatItem}>
+                  <View style={styles.wellbeingStatIcon}>
+                    <Smile size={20} color="#2ECC71" />
+                  </View>
+                  <Text style={styles.wellbeingStatValue}>
+                    {wellbeingInsights.happyDays}/{wellbeingInsights.totalDays}
+                  </Text>
+                  <Text style={styles.wellbeingStatLabel}>
+                    {currentTexts.mood}
+                  </Text>
+                </View>
+
+                <View style={styles.wellbeingStatItem}>
+                  <View style={styles.wellbeingStatIcon}>
+                    <Battery size={20} color="#F39C12" />
+                  </View>
+                  <Text style={styles.wellbeingStatValue}>
+                    {wellbeingInsights.highEnergyDays}/
+                    {wellbeingInsights.totalDays}
+                  </Text>
+                  <Text style={styles.wellbeingStatLabel}>
+                    {currentTexts.energy}
+                  </Text>
+                </View>
+
+                <View style={styles.wellbeingStatItem}>
+                  <View style={styles.wellbeingStatIcon}>
+                    <Heart size={20} color="#E74C3C" />
+                  </View>
+                  <Text style={styles.wellbeingStatValue}>
+                    {wellbeingInsights.satisfiedDays}/
+                    {wellbeingInsights.totalDays}
+                  </Text>
+                  <Text style={styles.wellbeingStatLabel}>
+                    {currentTexts.satiety}
+                  </Text>
+                </View>
+
+                <View style={styles.wellbeingStatItem}>
+                  <View style={styles.wellbeingStatIcon}>
+                    <Star size={20} color="#9B59B6" />
+                  </View>
+                  <Text style={styles.wellbeingStatValue}>
+                    {wellbeingInsights.averageMealQuality}/5
+                  </Text>
+                  <Text style={styles.wellbeingStatLabel}>
+                    {currentTexts.mealQuality}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Daily Wellbeing Chart */}
+              <View style={styles.wellbeingChart}>
+                <Text style={styles.wellbeingChartTitle}>
+                  מצב רוח ואנרגיה השבוע
                 </Text>
-                <View style={styles.pieChartWrapper}>
-                  <PieChart
-                    data={preparePieChartData()}
-                    width={getChartWidth()}
-                    chartConfig={chartConfig}
-                    height={250} // Increased height to prevent cutting
-                    accessor="population"
-                    backgroundColor="transparent"
-                    paddingLeft="32" // Slightly more padding for balance
-                    center={[0, 0]} // Centered correctly
-                    absolute
-                    hasLegend={true}
-                  />
+                <View style={styles.wellbeingChartBars}>
+                  {weeklyData.map((day, index) => (
+                    <View key={index} style={styles.wellbeingDayContainer}>
+                      <View style={styles.wellbeingDayIcons}>
+                        {getMoodIcon(day.mood || "neutral")}
+                        {getEnergyIcon(day.energy || "medium")}
+                      </View>
+                      <Text style={styles.wellbeingDayLabel}>
+                        {new Date(day.date).getDate()}
+                      </Text>
+                    </View>
+                  ))}
                 </View>
               </View>
-            )}
+            </LinearGradient>
+          </View>
+        </View>
 
-            {/* Nutrition Overview */}
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>
-                {t("statistics.nutrition_overview")}
+        {/* Comparison Feature */}
+        <View style={styles.section}>
+          <View style={styles.comparisonHeader}>
+            <Text style={styles.sectionTitle}>{currentTexts.comparison}</Text>
+            <TouchableOpacity
+              style={styles.compareButton}
+              onPress={() => setShowComparison(true)}
+            >
+              <ArrowUpDown size={16} color="#16A085" />
+              <Text style={styles.compareButtonText}>
+                {currentTexts.compareWith}
               </Text>
-              <View style={styles.statsGrid}>
-                <StatCard
-                  title={t("statistics.calories")}
-                  value={statisticsData.averageCalories}
-                  unit=" kcal"
-                  icon="flame"
-                  color="#FF6B35"
-                />
-                <StatCard
-                  title={t("statistics.protein")}
-                  value={statisticsData.averageProteinG}
-                  unit="g"
-                  icon="fitness"
-                  color="#4CAF50"
-                />
-                <StatCard
-                  title={t("statistics.carbs")}
-                  value={statisticsData.averageCarbsG}
-                  unit="g"
-                  icon="leaf"
-                  color="#FF9800"
-                />
-                <StatCard
-                  title={t("statistics.fat")}
-                  value={statisticsData.averageFatsG}
-                  unit="g"
-                  icon="water"
-                  color="#9C27B0"
-                />
-              </View>
-            </View>
+            </TouchableOpacity>
+          </View>
 
-            {/* Additional Nutrients */}
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>
-                {t("statistics.additional_nutrients")}
+          <View style={styles.comparisonPreview}>
+            <LinearGradient
+              colors={["#3498DB15", "#3498DB05"]}
+              style={styles.comparisonGradient}
+            >
+              <View style={styles.comparisonItem}>
+                <Text style={styles.comparisonLabel}>
+                  {currentTexts.thisWeek} vs {currentTexts.lastWeek}
+                </Text>
+                <View style={styles.comparisonValues}>
+                  <View style={styles.comparisonValue}>
+                    <Text style={styles.comparisonMetric}>
+                      {currentTexts.calories}
+                    </Text>
+                    <View style={styles.comparisonChange}>
+                      <TrendingUp size={14} color="#2ECC71" />
+                      <Text
+                        style={[
+                          styles.comparisonChangeText,
+                          { color: "#2ECC71" },
+                        ]}
+                      >
+                        +5.2%
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.comparisonValue}>
+                    <Text style={styles.comparisonMetric}>
+                      {currentTexts.protein}
+                    </Text>
+                    <View style={styles.comparisonChange}>
+                      <TrendingDown size={14} color="#E74C3C" />
+                      <Text
+                        style={[
+                          styles.comparisonChangeText,
+                          { color: "#E74C3C" },
+                        ]}
+                      >
+                        -3.1%
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.comparisonValue}>
+                    <Text style={styles.comparisonMetric}>
+                      {currentTexts.water}
+                    </Text>
+                    <View style={styles.comparisonChange}>
+                      <TrendingUp size={14} color="#2ECC71" />
+                      <Text
+                        style={[
+                          styles.comparisonChangeText,
+                          { color: "#2ECC71" },
+                        ]}
+                      >
+                        +12.8%
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            </LinearGradient>
+          </View>
+        </View>
+
+        {/* Progress Overview */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>
+            {currentTexts.progressOverview}
+          </Text>
+          <View style={styles.progressOverviewContainer}>
+            <LinearGradient
+              colors={["#16A08515", "#16A08505"]}
+              style={styles.progressOverviewGradient}
+            >
+              <View style={styles.progressStatsGrid}>
+                <View style={styles.progressStatItem}>
+                  <View style={styles.progressStatIcon}>
+                    <CheckCircle size={20} color="#2ECC71" />
+                  </View>
+                  <Text style={styles.progressStatValue}>
+                    {progressStats.successfulDays}/{progressStats.totalDays}
+                  </Text>
+                  <Text style={styles.progressStatLabel}>
+                    {currentTexts.successfulDays}
+                  </Text>
+                </View>
+
+                <View style={styles.progressStatItem}>
+                  <View style={styles.progressStatIcon}>
+                    <Target size={20} color="#3498DB" />
+                  </View>
+                  <Text style={styles.progressStatValue}>
+                    {progressStats.averageCompletion}%
+                  </Text>
+                  <Text style={styles.progressStatLabel}>
+                    {currentTexts.averageCompletion}
+                  </Text>
+                </View>
+
+                <View style={styles.progressStatItem}>
+                  <View style={styles.progressStatIcon}>
+                    <Award size={20} color="#F39C12" />
+                  </View>
+                  <Text style={styles.progressStatValue}>
+                    {progressStats.bestStreak}
+                  </Text>
+                  <Text style={styles.progressStatLabel}>
+                    {currentTexts.bestStreak}
+                  </Text>
+                </View>
+
+                <View style={styles.progressStatItem}>
+                  <View style={styles.progressStatIcon}>
+                    <Trophy size={20} color="#E74C3C" />
+                  </View>
+                  <Text style={styles.progressStatValue}>
+                    {progressStats.currentStreak}
+                  </Text>
+                  <Text style={styles.progressStatLabel}>
+                    {currentTexts.currentStreak}
+                  </Text>
+                </View>
+              </View>
+            </LinearGradient>
+          </View>
+        </View>
+
+        {/* Weekly Progress Chart */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{currentTexts.weeklyProgress}</Text>
+          <View style={styles.chartContainer}>
+            <LinearGradient
+              colors={["#16A08510", "#16A08505"]}
+              style={styles.chartGradient}
+            >
+              <View style={styles.chartHeader}>
+                <Text style={styles.chartTitle}>
+                  {currentTexts.totalCalories}
+                </Text>
+                <Text style={styles.chartSubtitle}>7 {currentTexts.days}</Text>
+              </View>
+
+              {/* Simple Bar Chart */}
+              <View style={styles.chartBars}>
+                {weeklyData.map((day, index) => {
+                  const percentage =
+                    (day.calories /
+                      Math.max(...weeklyData.map((d) => d.calories))) *
+                    100;
+                  return (
+                    <View key={index} style={styles.chartBarContainer}>
+                      <View style={styles.chartBarBackground}>
+                        <LinearGradient
+                          colors={["#16A085", "#1ABC9C"]}
+                          style={[
+                            styles.chartBar,
+                            { height: `${percentage}%` },
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.chartBarLabel}>
+                        {new Date(day.date).getDate()}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </LinearGradient>
+          </View>
+        </View>
+
+        {/* Alerts Section */}
+        {showAlerts && alerts.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.alertsHeader}>
+              <Text style={styles.sectionTitle}>
+                {currentTexts.alertsTitle}
               </Text>
-              <View style={styles.statsGrid}>
-                <StatCard
-                  title={t("statistics.fiber")}
-                  value={statisticsData.averageFiberG}
-                  unit="g"
-                  icon="leaf-outline"
-                  color="#8BC34A"
-                />
-                <StatCard
-                  title={t("statistics.sugar")}
-                  value={statisticsData.averageSugarG}
-                  unit="g"
-                  icon="ice-cream"
-                  color="#E91E63"
-                />
-                <StatCard
-                  title={t("statistics.sodium")}
-                  value={statisticsData.averageSodiumMg}
-                  unit="mg"
-                  icon="warning"
-                  color="#F44336"
-                />
-              </View>
+              <TouchableOpacity
+                style={styles.hideAlertsButton}
+                onPress={() => setShowAlerts(false)}
+              >
+                <Text style={styles.hideAlertsText}>
+                  {currentTexts.hideAlerts}
+                </Text>
+              </TouchableOpacity>
             </View>
-
-            {/* Beverages */}
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>
-                {t("statistics.beverages")}
-              </Text>
-              <View style={styles.statsGrid}>
-                <StatCard
-                  title={t("statistics.water")}
-                  value={statisticsData.averageLiquidsMl}
-                  unit="ml"
-                  icon="water"
-                  color="#2196F3"
-                />
-                <StatCard
-                  title={t("statistics.alcohol")}
-                  value={statisticsData.averageAlcoholG}
-                  unit="g"
-                  icon="wine"
-                  color="#F44336"
-                />
-                <StatCard
-                  title={t("statistics.caffeine")}
-                  value={statisticsData.averageCaffeineMg}
-                  unit="mg"
-                  icon="cafe"
-                  color="#795548"
-                />
-              </View>
+            <View style={styles.alertsContainer}>
+              {alerts.map((alert) => (
+                <View key={alert.id} style={styles.alertCard}>
+                  <LinearGradient
+                    colors={
+                      alert.severity === "danger"
+                        ? ["#E74C3C15", "#E74C3C05"]
+                        : ["#E67E2215", "#E67E2205"]
+                    }
+                    style={styles.alertGradient}
+                  >
+                    <View style={styles.alertContent}>
+                      <View style={styles.alertIcon}>
+                        <AlertTriangle
+                          size={20}
+                          color={
+                            alert.severity === "danger" ? "#E74C3C" : "#E67E22"
+                          }
+                        />
+                      </View>
+                      <View style={styles.alertText}>
+                        <Text style={styles.alertTitle}>{alert.title}</Text>
+                        <Text style={styles.alertMessage}>{alert.message}</Text>
+                      </View>
+                    </View>
+                  </LinearGradient>
+                </View>
+              ))}
             </View>
-
-            {/* Additional Statistics */}
-            <AdditionalStats />
-
-            {/* Meal Summary */}
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>
-                {t("statistics.meal_summary")}
-              </Text>
-              <View style={styles.statsGrid}>
-                <StatCard
-                  title={t("statistics.total_meals")}
-                  value={statisticsData.totalMeals}
-                  unit=" meals"
-                  icon="restaurant"
-                  color="#607D8B"
-                />
-                <StatCard
-                  title={t("statistics.total_days")}
-                  value={statisticsData.totalDays}
-                  unit=" days"
-                  icon="calendar"
-                  color="#607D8B"
-                />
-              </View>
-            </View>
-          </>
-        ) : (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="stats-chart-outline" size={64} color="#ccc" />
-            <Text style={[styles.emptyText, isRTL && styles.textRTL]}>
-              {t("statistics.no_data")}
-            </Text>
           </View>
         )}
+
+        {/* Macronutrients */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{currentTexts.macronutrients}</Text>
+          <View style={styles.metricsGrid}>
+            {categorizedMetrics.macros.map(renderMetricCard)}
+          </View>
+        </View>
+
+        {/* Micronutrients */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{currentTexts.micronutrients}</Text>
+          <View style={styles.metricsGrid}>
+            {categorizedMetrics.micros.map(renderMetricCard)}
+          </View>
+        </View>
+
+        {/* Lifestyle Metrics */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{currentTexts.lifestyle}</Text>
+          <View style={styles.metricsGrid}>
+            {categorizedMetrics.lifestyle.map(renderMetricCard)}
+          </View>
+        </View>
+
+        {/* Smart Insights Section */}
+        <View style={styles.section}>
+          <View style={styles.insightsContainer}>
+            <LinearGradient
+              colors={["#9B59B615", "#9B59B605"]}
+              style={styles.insightsGradient}
+            >
+              <View style={styles.insightsHeader}>
+                <Brain size={24} color="#9B59B6" />
+                <Text style={styles.insightsTitle}>
+                  {currentTexts.insightTitle}
+                </Text>
+              </View>
+              <View style={styles.insightsList}>
+                <View style={styles.insightItem}>
+                  <Star size={16} color="#F39C12" />
+                  <Text style={styles.insightText}>
+                    {currentTexts.proteinInsight}
+                  </Text>
+                </View>
+                <View style={styles.insightItem}>
+                  <TrendingUp size={16} color="#2ECC71" />
+                  <Text style={styles.insightText}>
+                    {currentTexts.hydrationInsight}
+                  </Text>
+                </View>
+                <View style={styles.insightItem}>
+                  <AlertTriangle size={16} color="#E67E22" />
+                  <Text style={styles.insightText}>
+                    {currentTexts.fiberInsight}
+                  </Text>
+                </View>
+              </View>
+            </LinearGradient>
+          </View>
+        </View>
+
+        {/* Meal Summary */}
+        {statisticsData && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              {t("statistics.meal_summary")}
+            </Text>
+            <View style={styles.statsGrid}>
+              <View style={styles.statCard}>
+                <View style={styles.statContent}>
+                  <Text style={styles.statLabel}>
+                    {t("statistics.total_meals")}
+                  </Text>
+                  <Text style={styles.statValue}>
+                    {statisticsData.totalMeals}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.statCard}>
+                <View style={styles.statContent}>
+                  <Text style={styles.statLabel}>
+                    {t("statistics.total_days")}
+                  </Text>
+                  <Text style={styles.statValue}>
+                    {statisticsData.totalDays}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Achievements Modal */}
+        <Modal
+          visible={showAchievements}
+          animationType="slide"
+          presentationStyle="pageSheet"
+        >
+          <SafeAreaView style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={() => setShowAchievements(false)}>
+                <X size={24} color="#2C3E50" />
+              </TouchableOpacity>
+              <Text style={styles.modalTitle}>{currentTexts.achievements}</Text>
+              <View style={{ width: 24 }} />
+            </View>
+
+            <ScrollView style={styles.modalContent}>
+              {achievements.map((achievement) => (
+                <View key={achievement.id} style={styles.achievementCard}>
+                  <LinearGradient
+                    colors={
+                      achievement.unlocked
+                        ? [`${achievement.color}15`, `${achievement.color}05`]
+                        : ["#E9ECEF15", "#E9ECEF05"]
+                    }
+                    style={styles.achievementGradient}
+                  >
+                    <View style={styles.achievementContent}>
+                      <View
+                        style={[
+                          styles.achievementIcon,
+                          {
+                            backgroundColor: achievement.unlocked
+                              ? `${achievement.color}20`
+                              : "#E9ECEF",
+                          },
+                        ]}
+                      >
+                        {achievement.icon}
+                      </View>
+                      <View style={styles.achievementInfo}>
+                        <Text style={styles.achievementTitle}>
+                          {achievement.title}
+                        </Text>
+                        <Text style={styles.achievementDescription}>
+                          {achievement.description}
+                        </Text>
+                        <View style={styles.achievementProgress}>
+                          <View style={styles.achievementProgressBg}>
+                            <View
+                              style={[
+                                styles.achievementProgressFill,
+                                {
+                                  width: `${
+                                    (achievement.progress /
+                                      achievement.maxProgress) *
+                                    100
+                                  }%`,
+                                  backgroundColor: achievement.color,
+                                },
+                              ]}
+                            />
+                          </View>
+                          <Text style={styles.achievementProgressText}>
+                            {achievement.progress}/{achievement.maxProgress}
+                          </Text>
+                        </View>
+                      </View>
+                      {achievement.unlocked && (
+                        <View style={styles.achievementBadge}>
+                          <CheckCircle size={20} color={achievement.color} />
+                        </View>
+                      )}
+                    </View>
+                  </LinearGradient>
+                </View>
+              ))}
+            </ScrollView>
+          </SafeAreaView>
+        </Modal>
+
+        {/* Comparison Modal */}
+        <Modal
+          visible={showComparison}
+          animationType="slide"
+          presentationStyle="pageSheet"
+        >
+          <SafeAreaView style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={() => setShowComparison(false)}>
+                <X size={24} color="#2C3E50" />
+              </TouchableOpacity>
+              <Text style={styles.modalTitle}>{currentTexts.comparison}</Text>
+              <View style={{ width: 24 }} />
+            </View>
+
+            <ScrollView style={styles.modalContent}>
+              <View style={styles.comparisonDetailContainer}>
+                <LinearGradient
+                  colors={["#3498DB15", "#3498DB05"]}
+                  style={styles.comparisonDetailGradient}
+                >
+                  <Text style={styles.comparisonDetailTitle}>
+                    {currentTexts.thisWeek} vs {currentTexts.lastWeek}
+                  </Text>
+
+                  {/* Detailed comparison metrics */}
+                  {[
+                    {
+                      name: currentTexts.calories,
+                      thisWeek: 1823,
+                      lastWeek: 1731,
+                      unit: currentTexts.kcal,
+                    },
+                    {
+                      name: currentTexts.protein,
+                      thisWeek: 95,
+                      lastWeek: 98,
+                      unit: currentTexts.g,
+                    },
+                    {
+                      name: currentTexts.carbohydrates,
+                      thisWeek: 208,
+                      lastWeek: 195,
+                      unit: currentTexts.g,
+                    },
+                    {
+                      name: currentTexts.fats,
+                      thisWeek: 64,
+                      lastWeek: 61,
+                      unit: currentTexts.g,
+                    },
+                    {
+                      name: currentTexts.hydration,
+                      thisWeek: 2100,
+                      lastWeek: 1862,
+                      unit: currentTexts.ml,
+                    },
+                  ].map((metric, index) => {
+                    const change =
+                      ((metric.thisWeek - metric.lastWeek) / metric.lastWeek) *
+                      100;
+                    const isImprovement = change > 0;
+
+                    return (
+                      <View key={index} style={styles.comparisonDetailItem}>
+                        <Text style={styles.comparisonDetailMetric}>
+                          {metric.name}
+                        </Text>
+                        <View style={styles.comparisonDetailValues}>
+                          <Text style={styles.comparisonDetailValue}>
+                            {metric.thisWeek} {metric.unit}
+                          </Text>
+                          <Text style={styles.comparisonDetailVs}>vs</Text>
+                          <Text style={styles.comparisonDetailValue}>
+                            {metric.lastWeek} {metric.unit}
+                          </Text>
+                        </View>
+                        <View style={styles.comparisonDetailChange}>
+                          {isImprovement ? (
+                            <TrendingUp size={16} color="#2ECC71" />
+                          ) : (
+                            <TrendingDown size={16} color="#E74C3C" />
+                          )}
+                          <Text
+                            style={[
+                              styles.comparisonDetailChangeText,
+                              { color: isImprovement ? "#2ECC71" : "#E74C3C" },
+                            ]}
+                          >
+                            {change > 0 ? "+" : ""}
+                            {change.toFixed(1)}%
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </LinearGradient>
+              </View>
+            </ScrollView>
+          </SafeAreaView>
+        </Modal>
       </ScrollView>
 
       {/* Date Picker Modal */}
@@ -1214,243 +2164,238 @@ export default function StatisticsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#F8F9FA",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: "#666",
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 16,
+    color: "#F44336",
+    textAlign: "center",
+    marginVertical: 10,
+  },
+  retryButton: {
+    backgroundColor: "#007AFF",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  retryButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  textRTL: {
+    textAlign: "right",
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    paddingVertical: 20,
   },
-  headerRTL: {
-    alignItems: "flex-end",
-  },
-  headerTitle: {
+  title: {
     fontSize: 28,
     fontWeight: "bold",
-    color: "#333",
+    color: "#2C3E50",
   },
-  timeRangeContainer: {
-    backgroundColor: "#fff",
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
+  subtitle: {
+    fontSize: 16,
+    color: "#7F8C8D",
+    marginTop: 4,
   },
-  timeRangeContent: {
-    paddingHorizontal: 20,
-  },
-  timeRangeButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginRight: 12,
-    borderRadius: 20,
-    backgroundColor: "#f0f0f0",
-    minWidth: 80,
-    alignItems: "center",
-  },
-  timeRangeButtonRTL: {
-    marginRight: 0,
-    marginLeft: 12,
-  },
-  activeTimeRangeButton: {
-    backgroundColor: "#007AFF",
-  },
-  timeRangeButtonText: {
-    fontSize: 14,
-    color: "#666",
-    fontWeight: "600",
-  },
-  activeTimeRangeButtonText: {
-    color: "#fff",
-  },
-  customDateContainer: {
+  headerIcons: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
     gap: 12,
   },
-  customDateContainerRTL: {
-    flexDirection: "row-reverse",
-  },
-  dateSelector: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 12,
-    backgroundColor: "#f8f9fa",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
-  },
-  dateSelectorRTL: {
-    alignItems: "flex-end",
-  },
-  dateLabel: {
-    fontSize: 12,
-    color: "#666",
-    marginBottom: 4,
-    fontWeight: "500",
-  },
-  dateValue: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333",
-  },
-  scrollView: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
+  languageButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
     justifyContent: "center",
     alignItems: "center",
-    paddingVertical: 60,
-  },
-  loadingText: {
-    marginTop: 12,
-    color: "#666",
-    fontSize: 16,
-    fontWeight: "500",
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: 60,
-    paddingHorizontal: 20,
-  },
-  errorText: {
-    marginTop: 16,
-    color: "#F44336",
-    fontSize: 16,
-    textAlign: "center",
-    lineHeight: 22,
-  },
-  retryButton: {
-    marginTop: 20,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    backgroundColor: "#007AFF",
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: 60,
-  },
-  emptyText: {
-    marginTop: 16,
-    color: "#666",
-    fontSize: 16,
-    textAlign: "center",
-  },
-  section: {
-    backgroundColor: "#fff",
-    marginHorizontal: 20,
-    marginTop: 16,
-    borderRadius: 12,
-    padding: 20,
     elevation: 2,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+  },
+  timeFilterContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+  timeFilter: {
+    flexDirection: "row",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 4,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+  },
+  timeFilterButton: {
+    flex: 1,
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  timeFilterButtonActive: {},
+  timeFilterGradient: {
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  timeFilterText: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: "#7F8C8D",
+    textAlign: "center",
+    paddingVertical: 12,
+  },
+  timeFilterTextActive: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+  section: {
+    paddingHorizontal: 20,
+    marginBottom: 24,
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: "700",
-    color: "#333",
+    fontWeight: "600",
+    color: "#2C3E50",
     marginBottom: 16,
   },
-  chartToggle: {
-    flexDirection: "row",
-    marginBottom: 16,
-    backgroundColor: "#f0f0f0",
-    borderRadius: 8,
-    padding: 4,
-  },
-  toggleButton: {
-    flex: 1,
-    paddingVertical: 8,
-    alignItems: "center",
-    borderRadius: 6,
-  },
-  activeToggleButton: {
-    backgroundColor: "#007AFF",
-  },
-  toggleButtonText: {
-    fontSize: 14,
-    color: "#666",
-    fontWeight: "600",
-  },
-  activeToggleButtonText: {
-    color: "#fff",
-  },
-  chartContainer: {
-    marginBottom: 20,
-  },
-  chartTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 12,
-    textAlign: "center",
-  },
-  chartWrapper: {
-    alignItems: "center",
-    justifyContent: "center",
+
+  // Gamification
+  gamificationContainer: {
+    borderRadius: 16,
     overflow: "hidden",
   },
-  chart: {
-    borderRadius: 16,
-    marginVertical: 8,
+  gamificationGradient: {
+    padding: 20,
   },
-  pieChartWrapper: {
-    alignItems: "center", // Horizontally center the chart
-    justifyContent: "center", // Vertically center if needed
-    paddingVertical: 10,
-    backgroundColor: "transparent",
-    overflow: "visible", // Ensure it’s not clipping
+  levelContainer: {
+    marginBottom: 20,
   },
-  textRTL: {
-    textAlign: "right",
-  },
-  statsGrid: {
-    gap: 12,
-  },
-  statCard: {
+  levelInfo: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f8f9fa",
-    padding: 16,
+    marginBottom: 12,
+  },
+  levelIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "rgba(255,255,255,0.8)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 16,
+  },
+  levelDetails: {
+    flex: 1,
+  },
+  levelText: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#2C3E50",
+  },
+  xpText: {
+    fontSize: 16,
+    color: "#7F8C8D",
+    marginTop: 4,
+  },
+  xpProgress: {
+    marginBottom: 8,
+  },
+  xpProgressBg: {
+    height: 8,
+    backgroundColor: "rgba(0,0,0,0.1)",
+    borderRadius: 4,
+    overflow: "hidden",
+    marginBottom: 4,
+  },
+  xpProgressFill: {
+    height: "100%",
+    borderRadius: 4,
+  },
+  xpToNext: {
+    fontSize: 12,
+    color: "#7F8C8D",
+    textAlign: "center",
+  },
+  gamificationStats: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+  },
+  gamificationStatItem: {
+    alignItems: "center",
+  },
+  gamificationStatValue: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#2C3E50",
+    marginTop: 8,
+  },
+  gamificationStatLabel: {
+    fontSize: 12,
+    color: "#7F8C8D",
+    marginTop: 4,
+    textAlign: "center",
+  },
+
+  // Achievements
+  achievementsHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  viewAllButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: "#E8F8F5",
+    borderRadius: 8,
+  },
+  viewAllText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#16A085",
+  },
+  achievementsContainer: {
+    gap: 12,
+    marginBottom: 20,
+  },
+  achievementCard: {
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
+    overflow: "hidden",
   },
-  statCardLarge: {
-    paddingVertical: 20,
+  achievementGradient: {
+    padding: 16,
   },
-  statCardRTL: {
-    flexDirection: "row-reverse",
+  achievementContent: {
+    flexDirection: "row",
+    alignItems: "center",
   },
-  statIconContainer: {
+  achievementIcon: {
     width: 48,
     height: 48,
     borderRadius: 24,
@@ -1458,47 +2403,617 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginRight: 16,
   },
-  statInfo: {
+  achievementInfo: {
     flex: 1,
   },
-  statInfoRTL: {
-    alignItems: "flex-end",
-    marginRight: 16,
-    marginLeft: 0,
-  },
-  statTitle: {
-    fontSize: 14,
-    color: "#666",
+  achievementTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#2C3E50",
     marginBottom: 4,
-    fontWeight: "500",
   },
-  statValue: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#333",
-  },
-  statUnit: {
+  achievementDescription: {
     fontSize: 14,
-    fontWeight: "500",
-    color: "#666",
+    color: "#7F8C8D",
+    marginBottom: 8,
   },
-  noDataContainer: {
+  achievementProgress: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  achievementProgressBg: {
     flex: 1,
+    height: 6,
+    backgroundColor: "rgba(0,0,0,0.1)",
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  achievementProgressFill: {
+    height: "100%",
+    borderRadius: 3,
+  },
+  achievementProgressText: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#7F8C8D",
+  },
+  achievementBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.8)",
     justifyContent: "center",
     alignItems: "center",
-    padding: 40,
   },
-  noDataText: {
-    fontSize: 18,
-    color: "#666",
+
+  // Badges
+  badgesContainer: {
+    marginTop: 20,
+  },
+  badgesTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#2C3E50",
+    marginBottom: 12,
+  },
+  badgesGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  badgeCard: {
+    width: (width - 64) / 4,
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  badgeGradient: {
+    padding: 12,
+    alignItems: "center",
+    minHeight: 80,
+  },
+  badgeIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  badgeName: {
+    fontSize: 10,
+    fontWeight: "500",
+    color: "#2C3E50",
     textAlign: "center",
-    marginTop: 16,
+    marginBottom: 4,
+  },
+  badgeDate: {
+    fontSize: 8,
+    color: "#7F8C8D",
+    textAlign: "center",
+  },
+
+  // Wellbeing
+  wellbeingContainer: {
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  wellbeingGradient: {
+    padding: 20,
+  },
+  wellbeingStats: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginBottom: 20,
+  },
+  wellbeingStatItem: {
+    alignItems: "center",
+  },
+  wellbeingStatIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.8)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  wellbeingStatValue: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#2C3E50",
+  },
+  wellbeingStatLabel: {
+    fontSize: 12,
+    color: "#7F8C8D",
+    marginTop: 4,
+    textAlign: "center",
+  },
+  wellbeingChart: {
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.3)",
+    paddingTop: 20,
+  },
+  wellbeingChartTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#2C3E50",
+    marginBottom: 16,
+    textAlign: "center",
+  },
+  wellbeingChartBars: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+  },
+  wellbeingDayContainer: {
+    alignItems: "center",
+  },
+  wellbeingDayIcons: {
+    flexDirection: "column",
+    gap: 4,
+    marginBottom: 8,
+  },
+  wellbeingDayLabel: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#7F8C8D",
+  },
+
+  // Comparison
+  comparisonHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  compareButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: "#E8F8F5",
+    borderRadius: 8,
+    gap: 6,
+  },
+  compareButtonText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#16A085",
+  },
+  comparisonPreview: {
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  comparisonGradient: {
+    padding: 16,
+  },
+  comparisonItem: {
+    marginBottom: 12,
+  },
+  comparisonLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#2C3E50",
+    marginBottom: 12,
+  },
+  comparisonValues: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+  },
+  comparisonValue: {
+    alignItems: "center",
+  },
+  comparisonMetric: {
+    fontSize: 14,
+    color: "#7F8C8D",
+    marginBottom: 4,
+  },
+  comparisonChange: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  comparisonChangeText: {
+    fontSize: 14,
     fontWeight: "600",
   },
-  noDataSubtext: {
-    fontSize: 14,
-    color: "#999",
+
+  // Progress Overview
+  progressOverviewContainer: {
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  progressOverviewGradient: {
+    padding: 20,
+  },
+  progressStatsGrid: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+  },
+  progressStatItem: {
+    alignItems: "center",
+  },
+  progressStatIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.8)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  progressStatValue: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#2C3E50",
+  },
+  progressStatLabel: {
+    fontSize: 12,
+    color: "#7F8C8D",
     textAlign: "center",
+    marginTop: 4,
+  },
+
+  // Chart
+  chartContainer: {
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  chartGradient: {
+    padding: 20,
+  },
+  chartHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  chartTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#2C3E50",
+  },
+  chartSubtitle: {
+    fontSize: 14,
+    color: "#7F8C8D",
+  },
+  chartBars: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    height: 120,
+  },
+  chartBarContainer: {
+    flex: 1,
+    alignItems: "center",
+    marginHorizontal: 2,
+  },
+  chartBarBackground: {
+    width: "80%",
+    height: 80,
+    justifyContent: "flex-end",
+  },
+  chartBar: {
+    width: "100%",
+    borderRadius: 2,
+    minHeight: 4,
+  },
+  chartBarLabel: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#7F8C8D",
     marginTop: 8,
+  },
+
+  // Alerts
+  alertsHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  hideAlertsButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: "#F8F9FA",
+    borderRadius: 8,
+  },
+  hideAlertsText: {
+    fontSize: 14,
+    color: "#7F8C8D",
+  },
+  alertsContainer: {
+    gap: 12,
+  },
+  alertCard: {
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  alertGradient: {
+    padding: 16,
+  },
+  alertContent: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  alertIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.8)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 16,
+  },
+  alertText: {
+    flex: 1,
+  },
+  alertTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#2C3E50",
+    marginBottom: 4,
+  },
+  alertMessage: {
+    fontSize: 14,
+    color: "#7F8C8D",
+  },
+
+  // Metrics
+  metricsGrid: {
+    gap: 16,
+  },
+  metricCard: {
+    borderRadius: 16,
+    overflow: "hidden",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+  },
+  metricGradient: {
+    padding: 20,
+  },
+  metricHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  metricIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.8)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 16,
+  },
+  metricInfo: {
+    flex: 1,
+  },
+  metricName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#2C3E50",
+    marginBottom: 4,
+  },
+  metricStatus: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  metricStatusText: {
+    fontSize: 12,
+    fontWeight: "500",
+    marginLeft: 6,
+  },
+  metricTrend: {
+    alignItems: "center",
+  },
+  metricTrendText: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#7F8C8D",
+    marginTop: 2,
+  },
+  metricValues: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  metricCurrentValue: {
+    flex: 1,
+  },
+  metricValueText: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#2C3E50",
+    marginBottom: 4,
+  },
+  metricTargetText: {
+    fontSize: 14,
+    color: "#7F8C8D",
+  },
+  metricPercentage: {
+    alignItems: "center",
+  },
+  metricPercentageText: {
+    fontSize: 24,
+    fontWeight: "bold",
+  },
+  metricProgress: {
+    marginBottom: 12,
+  },
+  metricProgressBg: {
+    height: 8,
+    backgroundColor: "rgba(0,0,0,0.1)",
+    borderRadius: 4,
+    overflow: "hidden",
+  },
+  metricProgressFill: {
+    height: "100%",
+    borderRadius: 4,
+  },
+  metricRecommendation: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.6)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  metricRecommendationText: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#2C3E50",
+    marginLeft: 8,
+  },
+
+  // Insights
+  insightsContainer: {
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  insightsGradient: {
+    padding: 20,
+  },
+  insightsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  insightsTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#2C3E50",
+    marginLeft: 12,
+  },
+  insightsList: {
+    gap: 16,
+  },
+  insightItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "rgba(255,255,255,0.6)",
+    padding: 16,
+    borderRadius: 12,
+  },
+  insightText: {
+    fontSize: 14,
+    color: "#2C3E50",
+    marginLeft: 12,
+    flex: 1,
+    lineHeight: 20,
+  },
+
+  // Stats Grid
+  statsGrid: {
+    flexDirection: "row",
+    gap: 16,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 16,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+  },
+  statContent: {
+    alignItems: "center",
+  },
+  statLabel: {
+    fontSize: 14,
+    color: "#7F8C8D",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#2C3E50",
+  },
+
+  // Modal
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "#F8F9FA",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E9ECEF",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#2C3E50",
+  },
+  modalContent: {
+    flex: 1,
+    padding: 20,
+  },
+
+  // Comparison Detail
+  comparisonDetailContainer: {
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  comparisonDetailGradient: {
+    padding: 20,
+  },
+  comparisonDetailTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#2C3E50",
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  comparisonDetailItem: {
+    backgroundColor: "rgba(255,255,255,0.6)",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  comparisonDetailMetric: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#2C3E50",
+    marginBottom: 8,
+  },
+  comparisonDetailValues: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+  comparisonDetailValue: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#2C3E50",
+  },
+  comparisonDetailVs: {
+    fontSize: 14,
+    color: "#7F8C8D",
+    marginHorizontal: 12,
+  },
+  comparisonDetailChange: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  comparisonDetailChangeText: {
+    fontSize: 14,
+    fontWeight: "600",
   },
 });

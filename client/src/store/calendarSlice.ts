@@ -56,6 +56,59 @@ interface CalendarStats {
   };
 }
 
+export interface GamificationData {
+  level: number;
+  currentXP: number;
+  totalPoints: number;
+  badges: Badge[];
+  achievements: Achievement[];
+  streaks: {
+    current: number;
+    best: number;
+    daily: number;
+    weekly: number;
+  };
+}
+
+export interface StatisticsData {
+  totalDays: number;
+  goalMetDays: number;
+  averageCompletion: number;
+  bestStreak: number;
+  currentStreak: number;
+  nutritionBreakdown: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fats: number;
+    water: number;
+  };
+  eventCount: number;
+  timeRange: string;
+}
+
+interface Badge {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  rarity: "common" | "rare" | "epic" | "legendary";
+  pointsAwarded: number;
+  earnedDate: string;
+  category: string;
+}
+
+interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  progress: number;
+  maxProgress: number;
+  pointsAwarded: number;
+  unlocked: boolean;
+  category: "streak" | "goal" | "improvement" | "consistency";
+}
+
 interface CalendarState {
   calendarData: Record<string, DayData>;
   statistics: CalendarStats | null;

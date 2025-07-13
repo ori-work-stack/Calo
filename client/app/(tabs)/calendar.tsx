@@ -11,7 +11,10 @@ import {
   ActivityIndicator,
   Dimensions,
   FlatList,
+  I18nManager,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState, AppDispatch } from "../../src/store";
 import {
@@ -22,9 +25,22 @@ import {
   clearError,
 } from "../../src/store/calendarSlice";
 import { Ionicons } from "@expo/vector-icons";
+import {
+  Calendar as CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
+  Target,
+  TrendingUp,
+  TrendingDown,
+  CircleCheck as CheckCircle,
+  Circle as XCircle,
+  Globe,
+  Award,
+  Flame,
+  Scroll,
+} from "lucide-react-native";
 
 const { width } = Dimensions.get("window");
-const CELL_SIZE = (width - 40) / 7; // 7 days per week
 
 interface DayData {
   date: string;
@@ -45,6 +61,14 @@ interface DayData {
     type: string;
     created_at: string;
   }>;
+}
+
+interface MonthStats {
+  totalDays: number;
+  successfulDays: number;
+  averageCompletion: number;
+  bestStreak: number;
+  currentStreak: number;
 }
 
 export default function CalendarScreen() {
@@ -71,6 +95,104 @@ export default function CalendarScreen() {
   const [eventDescription, setEventDescription] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
   const [badges, setBadges] = useState([]);
+  const [language, setLanguage] = useState<"he" | "en">("he");
+
+  const texts = {
+    he: {
+      title: "לוח יעדים",
+      subtitle: "עקוב אחרי ההתקדמות היומית שלך",
+      monthlyStats: "סטטיסטיקות חודשיות",
+      successfulDays: "ימים מוצלחים",
+      averageCompletion: "ממוצע השלמה",
+      bestStreak: "רצף הטוב ביותר",
+      currentStreak: "רצף נוכחי",
+      dayDetails: "פרטי היום",
+      caloriesGoal: "יעד קלוריות",
+      proteinGoal: "יעד חלבון",
+      waterGoal: "יעד מים",
+      consumed: "נצרך",
+      goal: "יעד",
+      deviation: "סטייה",
+      over: "עודף",
+      under: "חסר",
+      goalMet: "יעד הושג!",
+      goalNotMet: "יעד לא הושג",
+      days: "ימים",
+      kcal: 'קק"ל',
+      g: "גר׳",
+      ml: 'מ"ל',
+      today: "היום",
+      selectDay: "בחר יום לצפייה בפרטים",
+      excellent: "מעולה!",
+      good: "טוב!",
+      needsImprovement: "צריך שיפור",
+      monthNames: [
+        "ינואר",
+        "פברואר",
+        "מרץ",
+        "אפריל",
+        "מאי",
+        "יוני",
+        "יולי",
+        "אוגוסט",
+        "ספטמבר",
+        "אוקטובר",
+        "נובמבר",
+        "דצמבר",
+      ],
+      dayNames: ["א", "ב", "ג", "ד", "ה", "ו", "ש"],
+    },
+    en: {
+      title: "Goal Calendar",
+      subtitle: "Track your daily progress",
+      monthlyStats: "Monthly Statistics",
+      successfulDays: "Successful Days",
+      averageCompletion: "Average Completion",
+      bestStreak: "Best Streak",
+      currentStreak: "Current Streak",
+      dayDetails: "Day Details",
+      caloriesGoal: "Calorie Goal",
+      proteinGoal: "Protein Goal",
+      waterGoal: "Water Goal",
+      consumed: "Consumed",
+      goal: "Goal",
+      deviation: "Deviation",
+      over: "Over",
+      under: "Under",
+      goalMet: "Goal Achieved!",
+      goalNotMet: "Goal Not Met",
+      days: "days",
+      kcal: "kcal",
+      g: "g",
+      ml: "ml",
+      today: "Today",
+      selectDay: "Select a day to view details",
+      excellent: "Excellent!",
+      good: "Good!",
+      needsImprovement: "Needs Improvement",
+      monthNames: [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+      ],
+      dayNames: ["S", "M", "T", "W", "T", "F", "S"],
+    },
+  };
+
+  const t = texts[language];
+
+  const toggleLanguage = () => {
+    setLanguage((prev) => (prev === "he" ? "en" : "he"));
+  };
 
   useEffect(() => {
     loadCalendarData();
@@ -144,9 +266,9 @@ export default function CalendarScreen() {
     );
 
     if (caloriesProgress >= 110) return "#8B0000"; // Dark red for overeating
-    if (caloriesProgress >= 100) return "#4CAF50"; // Green for goal achieved
-    if (caloriesProgress >= 70) return "#FF9800"; // Orange for close to goal
-    return "#F44336"; // Red for not achieved
+    if (caloriesProgress >= 100) return "#2ECC71"; // Green for goal achieved
+    if (caloriesProgress >= 70) return "#F39C12"; // Orange for close to goal
+    return "#E74C3C"; // Red for not achieved
   };
 
   const getProgressLabel = (dayData: DayData) => {
@@ -156,9 +278,20 @@ export default function CalendarScreen() {
     );
 
     if (caloriesProgress >= 110) return "Overeating";
-    if (caloriesProgress >= 100) return "Goal Achieved";
+    if (caloriesProgress >= 100) return t.goalMet;
     if (caloriesProgress >= 70) return "Close to Goal";
-    return "Below Goal";
+    return t.goalNotMet;
+  };
+
+  const getDayStatus = (dayData: DayData) => {
+    const caloriesProgress = getProgressPercentage(
+      dayData.calories_actual,
+      dayData.calories_goal
+    );
+
+    if (caloriesProgress >= 100) return t.excellent;
+    if (caloriesProgress >= 80) return t.good;
+    return t.needsImprovement;
   };
 
   const navigateMonth = (direction: number) => {
@@ -190,20 +323,7 @@ export default function CalendarScreen() {
     return years;
   };
 
-  const months = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
-  ];
+  const months = t.monthNames;
 
   const handleDayPress = (dayData: DayData) => {
     setSelectedDay(dayData);
@@ -259,6 +379,60 @@ export default function CalendarScreen() {
     ]);
   };
 
+  const calculateMonthStats = (): MonthStats => {
+    const days = getDaysInMonth().filter((day) => day !== null) as DayData[];
+    const totalDays = days.length;
+    const successfulDays = days.filter(
+      (day) =>
+        getProgressPercentage(day.calories_actual, day.calories_goal) >= 100
+    ).length;
+    const averageCompletion =
+      days.reduce(
+        (sum, day) =>
+          sum + getProgressPercentage(day.calories_actual, day.calories_goal),
+        0
+      ) / totalDays;
+
+    // Calculate streaks
+    let currentStreak = 0;
+    let bestStreak = 0;
+    let tempStreak = 0;
+
+    for (let i = days.length - 1; i >= 0; i--) {
+      const goalMet =
+        getProgressPercentage(days[i].calories_actual, days[i].calories_goal) >=
+        100;
+      if (goalMet) {
+        tempStreak++;
+        if (i === days.length - 1 || currentStreak === 0) {
+          currentStreak = tempStreak;
+        }
+      } else {
+        if (tempStreak > bestStreak) {
+          bestStreak = tempStreak;
+        }
+        tempStreak = 0;
+        if (i === days.length - 1) {
+          currentStreak = 0;
+        }
+      }
+    }
+
+    if (tempStreak > bestStreak) {
+      bestStreak = tempStreak;
+    }
+
+    return {
+      totalDays,
+      successfulDays,
+      averageCompletion,
+      bestStreak,
+      currentStreak,
+    };
+  };
+
+  const monthStats = calculateMonthStats();
+
   const renderDay = (dayData: DayData | null, index: number) => {
     if (!dayData) {
       return <View key={index} style={[styles.dayCell, styles.emptyDay]} />;
@@ -271,19 +445,25 @@ export default function CalendarScreen() {
     );
     const dayColor = getDayColor(dayData);
     const hasEvents = dayData.events.length > 0;
+    const isToday =
+      new Date().toDateString() === new Date(dayData.date).toDateString();
+    const isSelected = selectedDay?.date === dayData.date;
 
     return (
       <TouchableOpacity
         key={dayData.date}
         style={[
           styles.dayCell,
-          { backgroundColor: dayColor },
-          hasEvents && styles.dayWithEvents,
+          styles.dayButton,
+          isToday && styles.todayCell,
+          isSelected && styles.selectedCell,
         ]}
         onPress={() => handleDayPress(dayData)}
         onLongPress={() => handleAddEvent(dayData.date)}
       >
-        <Text style={styles.dayNumber}>{dayNumber}</Text>
+        <View style={[styles.dayIndicator, { backgroundColor: dayColor }]}>
+          <Text style={styles.dayNumber}>{dayNumber}</Text>
+        </View>
         <View style={styles.progressContainer}>
           <View
             style={[
@@ -299,22 +479,17 @@ export default function CalendarScreen() {
             <Text style={styles.eventCount}>{dayData.events.length}</Text>
           </View>
         )}
-        <Text style={styles.caloriesText}>
-          {Math.round(dayData.calories_actual)}cal
-        </Text>
-        <Text style={styles.qualityScore}>Q: {dayData.quality_score}/10</Text>
       </TouchableOpacity>
     );
   };
 
   const renderWeekDays = () => {
-    const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     return (
       <View style={styles.weekDaysContainer}>
-        {weekDays.map((day) => (
-          <Text key={day} style={styles.weekDayText}>
-            {day}
-          </Text>
+        {t.dayNames.map((day, index) => (
+          <View key={index} style={styles.dayHeader}>
+            <Text style={styles.dayHeaderText}>{day}</Text>
+          </View>
         ))}
       </View>
     );
@@ -324,21 +499,32 @@ export default function CalendarScreen() {
     if (!statistics || !statistics.gamificationBadges?.length) return null;
 
     return (
-      <View style={styles.gamificationContainer}>
-        <View style={styles.gamificationHeader}>
-          <Text style={styles.gamificationTitle}>🏆 Recent Achievements</Text>
-          <TouchableOpacity onPress={() => setShowBadgesModal(true)}>
-            <Text style={styles.seeAllText}>See All</Text>
-          </TouchableOpacity>
-        </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {statistics.gamificationBadges.slice(0, 5).map((badge) => (
-            <View key={badge.id} style={styles.badgeItem}>
-              <Text style={styles.badgeIcon}>{badge.icon}</Text>
-              <Text style={styles.badgeName}>{badge.name}</Text>
+      <View style={styles.section}>
+        <View style={styles.gamificationContainer}>
+          <LinearGradient
+            colors={["#16A08515", "#16A08505"]}
+            style={styles.statsGradient}
+          >
+            <View style={styles.gamificationHeader}>
+              <Text style={styles.gamificationTitle}>
+                🏆 Recent Achievements
+              </Text>
+              <TouchableOpacity onPress={() => setShowBadgesModal(true)}>
+                <Text style={styles.seeAllText}>See All</Text>
+              </TouchableOpacity>
             </View>
-          ))}
-        </ScrollView>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {statistics.gamificationBadges.slice(0, 5).map((badge) => (
+                <View key={badge.id} style={styles.badgeItem}>
+                  <View style={styles.badgeIcon}>
+                    <Text style={styles.badgeIconText}>{badge.icon}</Text>
+                  </View>
+                  <Text style={styles.badgeName}>{badge.name}</Text>
+                </View>
+              ))}
+            </ScrollView>
+          </LinearGradient>
+        </View>
       </View>
     );
   };
@@ -347,62 +533,67 @@ export default function CalendarScreen() {
     if (!statistics) return null;
 
     return (
-      <View style={styles.statisticsContainer}>
-        <Text style={styles.motivationalMessage}>
-          {statistics.motivationalMessage}
-        </Text>
-
-        <View style={styles.statsGrid}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{statistics.monthlyProgress}%</Text>
-            <Text style={styles.statLabel}>Monthly Progress</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{statistics.streakDays}</Text>
-            <Text style={styles.statLabel}>Current Streak</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{statistics.totalGoalDays}</Text>
-            <Text style={styles.statLabel}>Goal Days</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>
-              {statistics.improvementPercent > 0 ? "+" : ""}
-              {statistics.improvementPercent}%
-            </Text>
-            <Text style={styles.statLabel}>vs Last Month</Text>
-          </View>
-        </View>
-
-        <View style={styles.averagesGrid}>
-          <View style={styles.averageItem}>
-            <Text style={styles.averageValue}>
-              {statistics.averageCalories}
-            </Text>
-            <Text style={styles.averageLabel}>Avg Calories</Text>
-          </View>
-          <View style={styles.averageItem}>
-            <Text style={styles.averageValue}>
-              {statistics.averageProtein}g
-            </Text>
-            <Text style={styles.averageLabel}>Avg Protein</Text>
-          </View>
-          <View style={styles.averageItem}>
-            <Text style={styles.averageValue}>{statistics.averageWater}ml</Text>
-            <Text style={styles.averageLabel}>Avg Water</Text>
-          </View>
-        </View>
-
-        {statistics.weeklyInsights && (
-          <TouchableOpacity
-            style={styles.insightsButton}
-            onPress={() => setShowInsightsModal(true)}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>{t.monthlyStats}</Text>
+        <View style={styles.statsContainer}>
+          <LinearGradient
+            colors={["#16A08515", "#16A08505"]}
+            style={styles.statsGradient}
           >
-            <Text style={styles.insightsButtonText}>
-              📊 View Weekly Insights
+            <Text style={styles.motivationalMessage}>
+              {statistics.motivationalMessage}
             </Text>
-          </TouchableOpacity>
-        )}
+
+            <View style={styles.statsGrid}>
+              <View style={styles.statItem}>
+                <View style={styles.statIcon}>
+                  <CheckCircle size={20} color="#2ECC71" />
+                </View>
+                <Text style={styles.statValue}>
+                  {monthStats.successfulDays}/{monthStats.totalDays}
+                </Text>
+                <Text style={styles.statLabel}>{t.successfulDays}</Text>
+              </View>
+
+              <View style={styles.statItem}>
+                <View style={styles.statIcon}>
+                  <Target size={20} color="#3498DB" />
+                </View>
+                <Text style={styles.statValue}>
+                  {Math.round(monthStats.averageCompletion)}%
+                </Text>
+                <Text style={styles.statLabel}>{t.averageCompletion}</Text>
+              </View>
+
+              <View style={styles.statItem}>
+                <View style={styles.statIcon}>
+                  <Award size={20} color="#F39C12" />
+                </View>
+                <Text style={styles.statValue}>{monthStats.bestStreak}</Text>
+                <Text style={styles.statLabel}>{t.bestStreak}</Text>
+              </View>
+
+              <View style={styles.statItem}>
+                <View style={styles.statIcon}>
+                  <Flame size={20} color="#E74C3C" />
+                </View>
+                <Text style={styles.statValue}>{monthStats.currentStreak}</Text>
+                <Text style={styles.statLabel}>{t.currentStreak}</Text>
+              </View>
+            </View>
+
+            {statistics.weeklyInsights && (
+              <TouchableOpacity
+                style={styles.insightsButton}
+                onPress={() => setShowInsightsModal(true)}
+              >
+                <Text style={styles.insightsButtonText}>
+                  📊 View Weekly Insights
+                </Text>
+              </TouchableOpacity>
+            )}
+          </LinearGradient>
+        </View>
       </View>
     );
   };
@@ -423,18 +614,21 @@ export default function CalendarScreen() {
             name: "First Week",
             icon: "🏆",
             earned: userStats?.daysTracked >= 7,
+            description: "Complete your first week of tracking",
           },
           {
             id: 2,
             name: "Streak Master",
             icon: "🔥",
             earned: userStats?.currentStreak >= 5,
+            description: "Maintain a 5-day streak",
           },
           {
             id: 3,
             name: "Healthy Choice",
             icon: "🥗",
             earned: userStats?.healthyMealsCount >= 10,
+            description: "Log 10 healthy meals",
           },
         ];
         setBadges(calculatedBadges);
@@ -450,592 +644,467 @@ export default function CalendarScreen() {
   if (isLoading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color="#16A085" />
         <Text style={styles.loadingText}>Loading calendar...</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigateMonth(-1)}>
-          <Ionicons name="chevron-back" size={24} color="#007AFF" />
-        </TouchableOpacity>
+    <SafeAreaView style={styles.container}>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.title}>{t.title}</Text>
+            <Text style={styles.subtitle}>{t.subtitle}</Text>
+          </View>
+          <View style={styles.headerIcons}>
+            <TouchableOpacity
+              style={styles.languageButton}
+              onPress={toggleLanguage}
+            >
+              <Globe size={24} color="#2C3E50" />
+            </TouchableOpacity>
+          </View>
+        </View>
 
-        <View style={styles.dateNavigationContainer}>
+        {/* Statistics */}
+        {renderStatistics()}
+
+        {/* Gamification Section */}
+        {renderGamificationSection()}
+
+        {/* Calendar Navigation */}
+        <View style={styles.calendarHeader}>
           <TouchableOpacity
-            style={styles.monthButton}
-            onPress={() => setShowMonthPicker(true)}
+            style={styles.navButton}
+            onPress={() => navigateMonth(-1)}
           >
-            <Text style={styles.monthTitle}>
-              {currentDate.toLocaleDateString("en-US", { month: "long" })}
+            <ChevronLeft size={24} color="#7F8C8D" />
+          </TouchableOpacity>
+
+          <View style={styles.monthContainer}>
+            <CalendarIcon size={20} color="#16A085" />
+            <Text style={styles.monthText}>
+              {t.monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
             </Text>
-            <Ionicons name="chevron-down" size={16} color="#007AFF" />
-          </TouchableOpacity>
+          </View>
 
           <TouchableOpacity
-            style={styles.yearButton}
-            onPress={() => setShowYearPicker(true)}
+            style={styles.navButton}
+            onPress={() => navigateMonth(1)}
           >
-            <Text style={styles.yearTitle}>{currentDate.getFullYear()}</Text>
-            <Ionicons name="chevron-down" size={16} color="#007AFF" />
+            <ChevronRight size={24} color="#7F8C8D" />
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity onPress={() => navigateMonth(1)}>
-          <Ionicons name="chevron-forward" size={24} color="#007AFF" />
-        </TouchableOpacity>
-      </View>
-
-      {/* Statistics */}
-      {renderStatistics()}
-
-      {/* Gamification Section */}
-      {renderGamificationSection()}
-
-      {/* Calendar */}
-      <ScrollView>
-        <View style={styles.calendarContainer}>
-          {renderWeekDays()}
-          <View style={styles.daysGrid}>
-            {getDaysInMonth().map((dayData, index) =>
-              renderDay(dayData, index)
-            )}
-          </View>
-        </View>
-      </ScrollView>
-
-      {/* Enhanced Legend */}
-      <View style={styles.legendContainer}>
-        <Text style={styles.legendTitle}>Legend</Text>
-        <View style={styles.legendGrid}>
-          <View style={styles.legendItem}>
-            <View
-              style={[styles.legendColor, { backgroundColor: "#4CAF50" }]}
-            />
-            <Text style={styles.legendText}>Goal Achieved (100%+)</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View
-              style={[styles.legendColor, { backgroundColor: "#FF9800" }]}
-            />
-            <Text style={styles.legendText}>Close to Goal (70-99%)</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View
-              style={[styles.legendColor, { backgroundColor: "#F44336" }]}
-            />
-            <Text style={styles.legendText}>Below Goal (&lt;70%)</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View
-              style={[styles.legendColor, { backgroundColor: "#8B0000" }]}
-            />
-            <Text style={styles.legendText}>Overeating (110%+)</Text>
-          </View>
-        </View>
-        <View style={styles.legendNote}>
-          <Text style={styles.legendNoteText}>
-            💡 Tap day for details • Long press to add event • ⭐ = has events
-          </Text>
-        </View>
-      </View>
-
-      {/* Day Detail Modal */}
-      <Modal
-        visible={showDayModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowDayModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <ScrollView>
-              {selectedDay && (
-                <>
-                  <Text style={styles.modalTitle}>
-                    {new Date(selectedDay.date).toLocaleDateString("en-US", {
-                      weekday: "long",
-                      month: "long",
-                      day: "numeric",
-                    })}
-                  </Text>
-
-                  <View style={styles.dayOverview}>
-                    <Text style={styles.dayStatus}>
-                      {getProgressLabel(selectedDay)}
-                    </Text>
-                    <Text style={styles.dayProgress}>
-                      {Math.round(
-                        getProgressPercentage(
-                          selectedDay.calories_actual,
-                          selectedDay.calories_goal
-                        )
-                      )}
-                      % of daily goal
-                    </Text>
-                  </View>
-
-                  <View style={styles.dayDetailGrid}>
-                    <View style={styles.macroItem}>
-                      <Text style={styles.macroLabel}>Calories</Text>
-                      <Text style={styles.macroValue}>
-                        {Math.round(selectedDay.calories_actual)} /{" "}
-                        {selectedDay.calories_goal}
-                      </Text>
-                      <View style={styles.macroProgress}>
-                        <View
-                          style={[
-                            styles.macroProgressBar,
-                            {
-                              width: `${Math.min(
-                                getProgressPercentage(
-                                  selectedDay.calories_actual,
-                                  selectedDay.calories_goal
-                                ),
-                                100
-                              )}%`,
-                              backgroundColor: getDayColor(selectedDay),
-                            },
-                          ]}
-                        />
-                      </View>
-                    </View>
-
-                    <View style={styles.macroItem}>
-                      <Text style={styles.macroLabel}>Protein</Text>
-                      <Text style={styles.macroValue}>
-                        {Math.round(selectedDay.protein_actual)}g /{" "}
-                        {selectedDay.protein_goal}g
-                      </Text>
-                      <View style={styles.macroProgress}>
-                        <View
-                          style={[
-                            styles.macroProgressBar,
-                            {
-                              width: `${Math.min(
-                                getProgressPercentage(
-                                  selectedDay.protein_actual,
-                                  selectedDay.protein_goal
-                                ),
-                                100
-                              )}%`,
-                              backgroundColor: "#2196F3",
-                            },
-                          ]}
-                        />
-                      </View>
-                    </View>
-
-                    <View style={styles.macroItem}>
-                      <Text style={styles.macroLabel}>Carbs</Text>
-                      <Text style={styles.macroValue}>
-                        {Math.round(selectedDay.carbs_actual)}g /{" "}
-                        {selectedDay.carbs_goal}g
-                      </Text>
-                      <View style={styles.macroProgress}>
-                        <View
-                          style={[
-                            styles.macroProgressBar,
-                            {
-                              width: `${Math.min(
-                                getProgressPercentage(
-                                  selectedDay.carbs_actual,
-                                  selectedDay.carbs_goal
-                                ),
-                                100
-                              )}%`,
-                              backgroundColor: "#FF9800",
-                            },
-                          ]}
-                        />
-                      </View>
-                    </View>
-
-                    <View style={styles.macroItem}>
-                      <Text style={styles.macroLabel}>Fat</Text>
-                      <Text style={styles.macroValue}>
-                        {Math.round(selectedDay.fat_actual)}g /{" "}
-                        {selectedDay.fat_goal}g
-                      </Text>
-                      <View style={styles.macroProgress}>
-                        <View
-                          style={[
-                            styles.macroProgressBar,
-                            {
-                              width: `${Math.min(
-                                getProgressPercentage(
-                                  selectedDay.fat_actual,
-                                  selectedDay.fat_goal
-                                ),
-                                100
-                              )}%`,
-                              backgroundColor: "#9C27B0",
-                            },
-                          ]}
-                        />
-                      </View>
-                    </View>
-
-                    <View style={styles.macroItem}>
-                      <Text style={styles.macroLabel}>Water</Text>
-                      <Text style={styles.macroValue}>
-                        {Math.round(selectedDay.water_intake_ml)}ml
-                      </Text>
-                    </View>
-                  </View>
-
-                  {selectedDay.events.length > 0 && (
-                    <View style={styles.eventsSection}>
-                      <Text style={styles.eventsTitle}>Events</Text>
-                      {selectedDay.events.map((event) => (
-                        <View key={event.id} style={styles.eventItem}>
-                          <Ionicons name="calendar" size={16} color="#007AFF" />
-                          <Text style={styles.eventText}>{event.title}</Text>
-                          <TouchableOpacity
-                            style={styles.deleteEventButton}
-                            onPress={() =>
-                              handleDeleteEvent(event.id, selectedDay.date)
-                            }
-                            disabled={isDeletingEvent}
-                          >
-                            <Ionicons name="trash" size={16} color="#F44336" />
-                          </TouchableOpacity>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-                  <View style={styles.modalButtons}>
-                    <TouchableOpacity
-                      style={[styles.modalButton, styles.addEventButton]}
-                      onPress={() => {
-                        setShowDayModal(false);
-                        handleAddEvent(selectedDay.date);
-                      }}
-                    >
-                      <Text style={styles.addEventButtonText}>Add Event</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[styles.modalButton, styles.closeButton]}
-                      onPress={() => setShowDayModal(false)}
-                    >
-                      <Text style={styles.closeButtonText}>Close</Text>
-                    </TouchableOpacity>
-                  </View>
-                </>
+        {/* Calendar */}
+        <View style={styles.section}>
+          <View style={styles.calendarContainer}>
+            {renderWeekDays()}
+            <View style={styles.daysGrid}>
+              {getDaysInMonth().map((dayData, index) =>
+                renderDay(dayData, index)
               )}
-            </ScrollView>
+            </View>
           </View>
         </View>
-      </Modal>
 
-      {/* Enhanced Add Event Modal */}
-      <Modal
-        visible={showEventModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowEventModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add Event</Text>
+        {/* Legend */}
+        <View style={styles.section}>
+          <View style={styles.legendContainer}>
+            <View style={styles.legendItem}>
+              <View
+                style={[styles.legendColor, { backgroundColor: "#2ECC71" }]}
+              />
+              <Text style={styles.legendText}>{t.goalMet}</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View
+                style={[styles.legendColor, { backgroundColor: "#F39C12" }]}
+              />
+              <Text style={styles.legendText}>80-99%</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View
+                style={[styles.legendColor, { backgroundColor: "#E74C3C" }]}
+              />
+              <Text style={styles.legendText}>{"<80%"}</Text>
+            </View>
+          </View>
+        </View>
 
-            <TextInput
-              style={styles.eventInput}
-              placeholder="Event title (e.g., Wedding, Heavy workout, Fasting day)"
-              value={eventTitle}
-              onChangeText={setEventTitle}
-              autoFocus={true}
-            />
-
-            <TextInput
-              style={[styles.eventInput, styles.eventDescriptionInput]}
-              placeholder="Description (optional)"
-              value={eventDescription}
-              onChangeText={setEventDescription}
-              multiline
-              numberOfLines={3}
-            />
-
-            <View style={styles.eventTypeContainer}>
-              <Text style={styles.eventTypeLabel}>Event Type:</Text>
-              <View style={styles.eventTypeButtons}>
-                {[
-                  { key: "general", label: "General", icon: "calendar" },
-                  { key: "workout", label: "Workout", icon: "fitness" },
-                  { key: "social", label: "Social", icon: "people" },
-                  { key: "health", label: "Health", icon: "medical" },
-                  { key: "travel", label: "Travel", icon: "airplane" },
-                  { key: "work", label: "Work", icon: "briefcase" },
-                ].map((type) => (
-                  <TouchableOpacity
-                    key={type.key}
-                    style={[
-                      styles.eventTypeButton,
-                      eventType === type.key && styles.eventTypeButtonActive,
-                    ]}
-                    onPress={() => setEventType(type.key)}
-                  >
-                    <Ionicons
-                      name={type.icon as any}
-                      size={16}
-                      color={eventType === type.key ? "#fff" : "#007AFF"}
-                    />
+        {/* Day Details */}
+        {selectedDay ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{t.dayDetails}</Text>
+            <View style={styles.dayDetailsContainer}>
+              <LinearGradient
+                colors={[
+                  `${getDayColor(selectedDay)}15`,
+                  `${getDayColor(selectedDay)}05`,
+                ]}
+                style={styles.dayDetailsGradient}
+              >
+                <View style={styles.dayDetailsHeader}>
+                  <View style={styles.dayDetailsDate}>
+                    <Text style={styles.dayDetailsDateText}>
+                      {new Date(selectedDay.date).getDate()}
+                    </Text>
+                    <Text style={styles.dayDetailsMonthText}>
+                      {t.monthNames[new Date(selectedDay.date).getMonth()]}
+                    </Text>
+                  </View>
+                  <View style={styles.dayDetailsStatus}>
+                    {getProgressPercentage(
+                      selectedDay.calories_actual,
+                      selectedDay.calories_goal
+                    ) >= 100 ? (
+                      <CheckCircle size={24} color="#2ECC71" />
+                    ) : (
+                      <XCircle size={24} color="#E74C3C" />
+                    )}
                     <Text
                       style={[
-                        styles.eventTypeButtonText,
-                        eventType === type.key &&
-                          styles.eventTypeButtonTextActive,
+                        styles.dayDetailsStatusText,
+                        { color: getDayColor(selectedDay) },
                       ]}
                     >
-                      {type.label}
+                      {getDayStatus(selectedDay)}
                     </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
+                  </View>
+                </View>
 
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setShowEventModal(false)}
-                disabled={isAddingEvent}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
+                <View style={styles.dayDetailsMetrics}>
+                  <View style={styles.metricCard}>
+                    <View style={styles.metricHeader}>
+                      <Flame size={16} color="#E74C3C" />
+                      <Text style={styles.metricTitle}>{t.caloriesGoal}</Text>
+                    </View>
+                    <Text style={styles.metricValue}>
+                      {selectedDay.calories_actual} /{" "}
+                      {selectedDay.calories_goal} {t.kcal}
+                    </Text>
+                    <View style={styles.deviationContainer}>
+                      {selectedDay.calories_actual >
+                      selectedDay.calories_goal ? (
+                        <TrendingUp size={14} color="#E74C3C" />
+                      ) : (
+                        <TrendingDown size={14} color="#3498DB" />
+                      )}
+                      <Text
+                        style={[
+                          styles.deviationValue,
+                          {
+                            color:
+                              selectedDay.calories_actual >
+                              selectedDay.calories_goal
+                                ? "#E74C3C"
+                                : "#3498DB",
+                          },
+                        ]}
+                      >
+                        {Math.abs(
+                          selectedDay.calories_actual -
+                            selectedDay.calories_goal
+                        )}{" "}
+                        {t.kcal}{" "}
+                        {selectedDay.calories_actual > selectedDay.calories_goal
+                          ? t.over
+                          : t.under}
+                      </Text>
+                    </View>
+                  </View>
 
-              <TouchableOpacity
-                style={[styles.modalButton, styles.submitButton]}
-                onPress={submitEvent}
-                disabled={!eventTitle.trim() || isAddingEvent}
-              >
-                {isAddingEvent ? (
-                  <ActivityIndicator color="white" size="small" />
-                ) : (
-                  <Text style={styles.submitButtonText}>Add Event</Text>
+                  <View style={styles.metricCard}>
+                    <View style={styles.metricHeader}>
+                      <Target size={16} color="#9B59B6" />
+                      <Text style={styles.metricTitle}>{t.proteinGoal}</Text>
+                    </View>
+                    <Text style={styles.metricValue}>
+                      {selectedDay.protein_actual} / {selectedDay.protein_goal}{" "}
+                      {t.g}
+                    </Text>
+                    <Text style={styles.metricPercentage}>
+                      {Math.round(
+                        (selectedDay.protein_actual /
+                          selectedDay.protein_goal) *
+                          100
+                      )}
+                      %
+                    </Text>
+                  </View>
+
+                  <View style={styles.metricCard}>
+                    <View style={styles.metricHeader}>
+                      <Target size={16} color="#3498DB" />
+                      <Text style={styles.metricTitle}>{t.waterGoal}</Text>
+                    </View>
+                    <Text style={styles.metricValue}>
+                      {selectedDay.water_intake_ml} {t.ml}
+                    </Text>
+                  </View>
+                </View>
+
+                {selectedDay.events.length > 0 && (
+                  <View style={styles.eventsSection}>
+                    <Text style={styles.eventsTitle}>Events</Text>
+                    {selectedDay.events.map((event) => (
+                      <View key={event.id} style={styles.eventItem}>
+                        <Ionicons name="calendar" size={16} color="#16A085" />
+                        <Text style={styles.eventText}>{event.title}</Text>
+                        <TouchableOpacity
+                          style={styles.deleteEventButton}
+                          onPress={() =>
+                            handleDeleteEvent(event.id, selectedDay.date)
+                          }
+                          disabled={isDeletingEvent}
+                        >
+                          <Ionicons name="trash" size={16} color="#F44336" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
                 )}
-              </TouchableOpacity>
+
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.addEventButton]}
+                    onPress={() => {
+                      setSelectedDay(null);
+                      handleAddEvent(selectedDay.date);
+                    }}
+                  >
+                    <Text style={styles.addEventButtonText}>Add Event</Text>
+                  </TouchableOpacity>
+                </View>
+              </LinearGradient>
             </View>
           </View>
-        </View>
-      </Modal>
-
-      {/* Badges Modal */}
-      <Modal
-        visible={showBadgesModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowBadgesModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.badgesHeader}>
-              <Text style={styles.modalTitle}>🏆 Your Achievements</Text>
-              <TouchableOpacity onPress={() => setShowBadgesModal(false)}>
-                <Ionicons name="close" size={24} color="#666" />
-              </TouchableOpacity>
+        ) : (
+          <View style={styles.section}>
+            <View style={styles.selectDayContainer}>
+              <CalendarIcon size={48} color="#BDC3C7" />
+              <Text style={styles.selectDayText}>{t.selectDay}</Text>
             </View>
+          </View>
+        )}
 
-            <ScrollView style={styles.badgesScrollView}>
-              {badges.map((badge) => (
-                <View key={badge.id} style={styles.badgeDetailItem}>
-                  <Text style={styles.badgeDetailIcon}>{badge.icon}</Text>
-                  <View style={styles.badgeDetailContent}>
-                    <Text style={styles.badgeDetailName}>{badge.name}</Text>
-                    <Text style={styles.badgeDetailDescription}>
-                      {badge.description}
+        {/* Add Event Modal */}
+        <Modal
+          visible={showEventModal}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setShowEventModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <ScrollView>
+                <Text style={styles.modalTitle}>Add Event</Text>
+
+                <TextInput
+                  style={styles.eventInput}
+                  placeholder="Event title (e.g., Wedding, Heavy workout, Fasting day)"
+                  value={eventTitle}
+                  onChangeText={setEventTitle}
+                  autoFocus={true}
+                />
+
+                <TextInput
+                  style={[styles.eventInput, styles.eventDescriptionInput]}
+                  placeholder="Description (optional)"
+                  value={eventDescription}
+                  onChangeText={setEventDescription}
+                  multiline
+                  numberOfLines={3}
+                />
+
+                <View style={styles.eventTypeContainer}>
+                  <Text style={styles.eventTypeLabel}>Event Type:</Text>
+                  <View style={styles.eventTypeButtons}>
+                    {[
+                      { key: "general", label: "General", icon: "calendar" },
+                      { key: "workout", label: "Workout", icon: "fitness" },
+                      { key: "social", label: "Social", icon: "people" },
+                      { key: "health", label: "Health", icon: "medical" },
+                      { key: "travel", label: "Travel", icon: "airplane" },
+                      { key: "work", label: "Work", icon: "briefcase" },
+                    ].map((type) => (
+                      <TouchableOpacity
+                        key={type.key}
+                        style={[
+                          styles.eventTypeButton,
+                          eventType === type.key &&
+                            styles.eventTypeButtonActive,
+                        ]}
+                        onPress={() => setEventType(type.key)}
+                      >
+                        <Ionicons
+                          name={type.icon as any}
+                          size={16}
+                          color={eventType === type.key ? "#fff" : "#16A085"}
+                        />
+                        <Text
+                          style={[
+                            styles.eventTypeButtonText,
+                            eventType === type.key &&
+                              styles.eventTypeButtonTextActive,
+                          ]}
+                        >
+                          {type.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.cancelButton]}
+                    onPress={() => setShowEventModal(false)}
+                    disabled={isAddingEvent}
+                  >
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.submitButton]}
+                    onPress={submitEvent}
+                    disabled={!eventTitle.trim() || isAddingEvent}
+                  >
+                    {isAddingEvent ? (
+                      <ActivityIndicator color="white" size="small" />
+                    ) : (
+                      <Text style={styles.submitButtonText}>Add Event</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Badges Modal */}
+        <Modal
+          visible={showBadgesModal}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setShowBadgesModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.badgesHeader}>
+                <Text style={styles.modalTitle}>🏆 Your Achievements</Text>
+                <TouchableOpacity onPress={() => setShowBadgesModal(false)}>
+                  <Ionicons name="close" size={24} color="#666" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={styles.badgesScrollView}>
+                {badges.map((badge) => (
+                  <View key={badge.id} style={styles.badgeDetailItem}>
+                    <Text style={styles.badgeDetailIcon}>{badge.icon}</Text>
+                    <View style={styles.badgeDetailContent}>
+                      <Text style={styles.badgeDetailName}>{badge.name}</Text>
+                      <Text style={styles.badgeDetailDescription}>
+                        {badge.description}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Weekly Insights Modal */}
+        <Modal
+          visible={showInsightsModal}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setShowInsightsModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.insightsHeader}>
+                <Text style={styles.modalTitle}>📊 Weekly Insights</Text>
+                <TouchableOpacity onPress={() => setShowInsightsModal(false)}>
+                  <Ionicons name="close" size={24} color="#666" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={styles.insightsScrollView}>
+                {statistics?.weeklyInsights?.bestWeekDetails && (
+                  <View style={styles.insightCard}>
+                    <Text style={styles.insightCardTitle}>🎯 Best Week</Text>
+                    <Text style={styles.insightCardSubtitle}>
+                      {statistics.weeklyInsights.bestWeekDetails.weekStart} to{" "}
+                      {statistics.weeklyInsights.bestWeekDetails.weekEnd}
                     </Text>
+                    <Text style={styles.insightCardValue}>
+                      {Math.round(
+                        statistics.weeklyInsights.bestWeekDetails
+                          .averageProgress
+                      )}
+                      % average progress
+                    </Text>
+                    <View style={styles.insightHighlights}>
+                      {statistics.weeklyInsights.bestWeekDetails.highlights.map(
+                        (highlight, index) => (
+                          <Text key={index} style={styles.insightHighlight}>
+                            ✅ {highlight}
+                          </Text>
+                        )
+                      )}
+                    </View>
                   </View>
-                </View>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+                )}
 
-      {/* Weekly Insights Modal */}
-      <Modal
-        visible={showInsightsModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowInsightsModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.insightsHeader}>
-              <Text style={styles.modalTitle}>📊 Weekly Insights</Text>
-              <TouchableOpacity onPress={() => setShowInsightsModal(false)}>
-                <Ionicons name="close" size={24} color="#666" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.insightsScrollView}>
-              {statistics?.weeklyInsights.bestWeekDetails && (
-                <View style={styles.insightCard}>
-                  <Text style={styles.insightCardTitle}>🎯 Best Week</Text>
-                  <Text style={styles.insightCardSubtitle}>
-                    {statistics.weeklyInsights.bestWeekDetails.weekStart} to{" "}
-                    {statistics.weeklyInsights.bestWeekDetails.weekEnd}
-                  </Text>
-                  <Text style={styles.insightCardValue}>
-                    {Math.round(
-                      statistics.weeklyInsights.bestWeekDetails.averageProgress
-                    )}
-                    % average progress
-                  </Text>
-                  <View style={styles.insightHighlights}>
-                    {statistics.weeklyInsights.bestWeekDetails.highlights.map(
-                      (highlight, index) => (
-                        <Text key={index} style={styles.insightHighlight}>
-                          ✅ {highlight}
-                        </Text>
-                      )
-                    )}
+                {statistics?.weeklyInsights?.challengingWeekDetails && (
+                  <View style={styles.insightCard}>
+                    <Text style={styles.insightCardTitle}>
+                      💪 Most Challenging Week
+                    </Text>
+                    <Text style={styles.insightCardSubtitle}>
+                      {
+                        statistics.weeklyInsights.challengingWeekDetails
+                          .weekStart
+                      }{" "}
+                      to{" "}
+                      {statistics.weeklyInsights.challengingWeekDetails.weekEnd}
+                    </Text>
+                    <Text style={styles.insightCardValue}>
+                      {Math.round(
+                        statistics.weeklyInsights.challengingWeekDetails
+                          .averageProgress
+                      )}
+                      % average progress
+                    </Text>
+                    <View style={styles.insightChallenges}>
+                      {statistics.weeklyInsights.challengingWeekDetails.challenges.map(
+                        (challenge, index) => (
+                          <Text key={index} style={styles.insightChallenge}>
+                            🔍 {challenge}
+                          </Text>
+                        )
+                      )}
+                    </View>
                   </View>
-                </View>
-              )}
-
-              {statistics?.weeklyInsights.challengingWeekDetails && (
-                <View style={styles.insightCard}>
-                  <Text style={styles.insightCardTitle}>
-                    💪 Most Challenging Week
-                  </Text>
-                  <Text style={styles.insightCardSubtitle}>
-                    {statistics.weeklyInsights.challengingWeekDetails.weekStart}{" "}
-                    to{" "}
-                    {statistics.weeklyInsights.challengingWeekDetails.weekEnd}
-                  </Text>
-                  <Text style={styles.insightCardValue}>
-                    {Math.round(
-                      statistics.weeklyInsights.challengingWeekDetails
-                        .averageProgress
-                    )}
-                    % average progress
-                  </Text>
-                  <View style={styles.insightChallenges}>
-                    {statistics.weeklyInsights.challengingWeekDetails.challenges.map(
-                      (challenge, index) => (
-                        <Text key={index} style={styles.insightChallenge}>
-                          🔍 {challenge}
-                        </Text>
-                      )
-                    )}
-                  </View>
-                </View>
-              )}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Month Picker Modal */}
-      <Modal
-        visible={showMonthPicker}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowMonthPicker(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.pickerModalContent}>
-            <View style={styles.pickerHeader}>
-              <Text style={styles.pickerTitle}>Select Month</Text>
-              <TouchableOpacity onPress={() => setShowMonthPicker(false)}>
-                <Ionicons name="close" size={24} color="#666" />
-              </TouchableOpacity>
+                )}
+              </ScrollView>
             </View>
-
-            <FlatList
-              data={months}
-              keyExtractor={(item, index) => index.toString()}
-              renderItem={({ item, index }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.pickerItem,
-                    currentDate.getMonth() === index &&
-                      styles.selectedPickerItem,
-                  ]}
-                  onPress={() => handleMonthSelect(index)}
-                >
-                  <Text
-                    style={[
-                      styles.pickerItemText,
-                      currentDate.getMonth() === index &&
-                        styles.selectedPickerItemText,
-                    ]}
-                  >
-                    {item}
-                  </Text>
-                </TouchableOpacity>
-              )}
-              showsVerticalScrollIndicator={false}
-            />
           </View>
-        </View>
-      </Modal>
-
-      {/* Year Picker Modal */}
-      <Modal
-        visible={showYearPicker}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowYearPicker(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.pickerModalContent}>
-            <View style={styles.pickerHeader}>
-              <Text style={styles.pickerTitle}>Select Year</Text>
-              <TouchableOpacity onPress={() => setShowYearPicker(false)}>
-                <Ionicons name="close" size={24} color="#666" />
-              </TouchableOpacity>
-            </View>
-
-            <FlatList
-              data={generateYearRange()}
-              keyExtractor={(item) => item.toString()}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.pickerItem,
-                    currentDate.getFullYear() === item &&
-                      styles.selectedPickerItem,
-                  ]}
-                  onPress={() => handleYearSelect(item)}
-                >
-                  <Text
-                    style={[
-                      styles.pickerItemText,
-                      currentDate.getFullYear() === item &&
-                        styles.selectedPickerItemText,
-                    ]}
-                  >
-                    {item}
-                  </Text>
-                </TouchableOpacity>
-              )}
-              showsVerticalScrollIndicator={false}
-              getItemLayout={(data, index) => ({
-                length: 50,
-                offset: 50 * index,
-                index,
-              })}
-              initialScrollIndex={generateYearRange().findIndex(
-                (year) => year === currentDate.getFullYear()
-              )}
-            />
-          </View>
-        </View>
-      </Modal>
-    </ScrollView>
+        </Modal>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#F8F9FA",
   },
   centered: {
     flex: 1,
@@ -1051,166 +1120,91 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 20,
-    backgroundColor: "white",
+    paddingHorizontal: 20,
+    paddingVertical: 20,
   },
-  dateNavigationContainer: {
+  title: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: "#2C3E50",
+  },
+  subtitle: {
+    fontSize: 16,
+    color: "#7F8C8D",
+    marginTop: 4,
+  },
+  headerIcons: {
     flexDirection: "row",
-    alignItems: "center",
     gap: 12,
   },
-  monthButton: {
-    flexDirection: "row",
+  languageButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
+    justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: "#f8f9fa",
-    borderRadius: 8,
-    gap: 4,
-  },
-  yearButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: "#f8f9fa",
-    borderRadius: 8,
-    gap: 4,
-  },
-  monthTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#333",
-  },
-  yearTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#333",
-  },
-  pickerModalContent: {
-    backgroundColor: "white",
-    marginHorizontal: 30,
-    marginVertical: 100,
-    borderRadius: 16,
-    maxHeight: "70%",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  pickerHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
-  },
-  pickerTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#333",
-  },
-  pickerItem: {
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
-  },
-  selectedPickerItem: {
-    backgroundColor: "#007AFF",
-  },
-  pickerItemText: {
-    fontSize: 16,
-    color: "#333",
-    textAlign: "center",
-  },
-  selectedPickerItemText: {
-    color: "#fff",
-    fontWeight: "600",
-  },
-  statisticsContainer: {
-    backgroundColor: "white",
-    margin: 15,
-    padding: 20,
-    borderRadius: 12,
+    elevation: 2,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 3,
+  },
+  section: {
+    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#2C3E50",
+    marginBottom: 16,
+  },
+  statsContainer: {
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  statsGradient: {
+    padding: 20,
   },
   motivationalMessage: {
     fontSize: 18,
     fontWeight: "600",
     textAlign: "center",
-    color: "#007AFF",
-    marginBottom: 15,
+    color: "#16A085",
+    marginBottom: 20,
   },
   statsGrid: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
+    justifyContent: "space-around",
     marginBottom: 15,
   },
   statItem: {
-    width: "48%",
     alignItems: "center",
-    marginBottom: 10,
+  },
+  statIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.8)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 8,
   },
   statValue: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: "bold",
-    color: "#333",
+    color: "#2C3E50",
   },
   statLabel: {
     fontSize: 12,
-    color: "#666",
+    color: "#7F8C8D",
     textAlign: "center",
-  },
-  averagesGrid: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    marginBottom: 15,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: "#f0f0f0",
-  },
-  averageItem: {
-    alignItems: "center",
-  },
-  averageValue: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#333",
-  },
-  averageLabel: {
-    fontSize: 11,
-    color: "#666",
-  },
-  insightsButton: {
-    backgroundColor: "#f8f9fa",
-    padding: 12,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 10,
-  },
-  insightsButtonText: {
-    color: "#007AFF",
-    fontSize: 14,
-    fontWeight: "600",
+    marginTop: 4,
   },
   gamificationContainer: {
-    backgroundColor: "white",
-    margin: 15,
-    padding: 20,
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderRadius: 16,
+    overflow: "hidden",
   },
   gamificationHeader: {
     flexDirection: "row",
@@ -1221,10 +1215,10 @@ const styles = StyleSheet.create({
   gamificationTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#333",
+    color: "#2C3E50",
   },
   seeAllText: {
-    color: "#007AFF",
+    color: "#16A085",
     fontSize: 14,
     fontWeight: "500",
   },
@@ -1234,76 +1228,138 @@ const styles = StyleSheet.create({
     minWidth: 60,
   },
   badgeIcon: {
-    fontSize: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.8)",
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 5,
+  },
+  badgeIconText: {
+    fontSize: 20,
   },
   badgeName: {
     fontSize: 12,
     color: "#666",
     textAlign: "center",
   },
-  calendarContainer: {
-    backgroundColor: "white",
-    margin: 15,
-    borderRadius: 12,
-    padding: 15,
+  calendarHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  navButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 2,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 4,
-    elevation: 3,
+  },
+  monthContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 20,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+  },
+  monthText: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#2C3E50",
+    marginLeft: 8,
+  },
+  calendarContainer: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 16,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
   },
   weekDaysContainer: {
     flexDirection: "row",
     justifyContent: "space-around",
     marginBottom: 10,
   },
-  weekDayText: {
-    fontSize: 12,
+  dayHeader: {
+    width: (width - 72) / 7,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  dayHeaderText: {
+    fontSize: 14,
     fontWeight: "600",
-    color: "#666",
-    width: CELL_SIZE,
-    textAlign: "center",
+    color: "#7F8C8D",
   },
   daysGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
   },
   dayCell: {
-    width: CELL_SIZE,
-    height: CELL_SIZE,
-    padding: 1,
-    margin: 1,
-    borderRadius: 50,
+    width: (width - 72) / 7,
+    height: 60,
+    justifyContent: "center",
     alignItems: "center",
-    justifyContent: "space-between",
+    marginBottom: 5,
   },
   emptyDay: {
     backgroundColor: "transparent",
   },
-  dayWithEvents: {
-    borderWidth: 2,
-    borderColor: "#FFD700",
+  dayButton: {
+    borderRadius: 8,
+  },
+  todayCell: {
+    backgroundColor: "#E8F8F5",
+  },
+  selectedCell: {
+    backgroundColor: "#16A08520",
+  },
+  dayIndicator: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 2,
   },
   dayNumber: {
-    fontSize: 12,
-    fontWeight: "bold",
-    color: "white",
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#FFFFFF",
   },
   progressContainer: {
     width: "80%",
     height: 4,
-    backgroundColor: "rgba(255,255,255,0.3)",
+    backgroundColor: "rgba(0,0,0,0.1)",
     borderRadius: 2,
+    marginBottom: 2,
   },
   progressBar: {
     height: "100%",
-    backgroundColor: "rgba(255,255,255,0.8)",
+    backgroundColor: "#16A085",
     borderRadius: 2,
   },
   progressText: {
     fontSize: 8,
-    color: "white",
+    color: "#666",
     fontWeight: "600",
   },
   eventIndicator: {
@@ -1318,64 +1374,139 @@ const styles = StyleSheet.create({
     color: "#FFD700",
     marginLeft: 2,
   },
-  caloriesText: {
-    fontSize: 8,
-    color: "white",
-  },
-  qualityScore: {
-    fontSize: 7,
-    color: "white",
-    fontWeight: "600",
-  },
   legendContainer: {
-    backgroundColor: "white",
-    margin: 15,
-    padding: 15,
+    flexDirection: "row",
+    justifyContent: "space-around",
+    backgroundColor: "#FFFFFF",
+    padding: 16,
     borderRadius: 12,
+    elevation: 2,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 4,
-    elevation: 3,
-  },
-  legendTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    marginBottom: 10,
-    color: "#333",
-  },
-  legendGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
   },
   legendItem: {
     flexDirection: "row",
     alignItems: "center",
-    width: "48%",
-    marginBottom: 8,
   },
   legendColor: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
     marginRight: 8,
   },
   legendText: {
     fontSize: 12,
-    color: "#666",
+    color: "#7F8C8D",
   },
-  legendNote: {
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: "#f0f0f0",
+  dayDetailsContainer: {
+    borderRadius: 16,
+    overflow: "hidden",
   },
-  legendNoteText: {
-    fontSize: 12,
-    color: "#666",
+  dayDetailsGradient: {
+    padding: 20,
+  },
+  dayDetailsHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  dayDetailsDate: {
+    alignItems: "center",
+  },
+  dayDetailsDateText: {
+    fontSize: 32,
+    fontWeight: "bold",
+    color: "#2C3E50",
+  },
+  dayDetailsMonthText: {
+    fontSize: 14,
+    color: "#7F8C8D",
+  },
+  dayDetailsStatus: {
+    alignItems: "center",
+  },
+  dayDetailsStatusText: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginTop: 4,
+  },
+  dayDetailsMetrics: {
+    gap: 16,
+  },
+  metricCard: {
+    backgroundColor: "rgba(255,255,255,0.8)",
+    padding: 16,
+    borderRadius: 12,
+  },
+  metricHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  metricTitle: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#2C3E50",
+    marginLeft: 8,
+  },
+  metricValue: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#2C3E50",
+    marginBottom: 4,
+  },
+  metricPercentage: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#16A085",
+  },
+  deviationContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  deviationValue: {
+    fontSize: 14,
+    fontWeight: "500",
+    marginLeft: 4,
+  },
+  selectDayContainer: {
+    alignItems: "center",
+    paddingVertical: 40,
+  },
+  selectDayText: {
+    fontSize: 16,
+    color: "#7F8C8D",
+    marginTop: 16,
     textAlign: "center",
-    lineHeight: 16,
+  },
+  eventsSection: {
+    marginTop: 20,
+  },
+  eventsTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#2C3E50",
+    marginBottom: 10,
+  },
+  eventItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 10,
+    backgroundColor: "rgba(255,255,255,0.9)",
+    borderRadius: 8,
+    marginBottom: 5,
+  },
+  eventText: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 14,
+    color: "#333",
+  },
+  deleteEventButton: {
+    padding: 5,
   },
   modalOverlay: {
     flex: 1,
@@ -1397,87 +1528,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: "center",
     color: "#333",
-  },
-  dayOverview: {
-    backgroundColor: "#f8f9fa",
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 15,
-    alignItems: "center",
-  },
-  dayStatus: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 5,
-  },
-  dayProgress: {
-    fontSize: 14,
-    color: "#666",
-  },
-  dayDetailGrid: {
-    marginBottom: 20,
-  },
-  macroItem: {
-    marginBottom: 15,
-  },
-  macroLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 5,
-  },
-  macroValue: {
-    fontSize: 16,
-    color: "#007AFF",
-    marginBottom: 5,
-  },
-  macroProgress: {
-    width: "100%",
-    height: 6,
-    backgroundColor: "#f0f0f0",
-    borderRadius: 3,
-  },
-  macroProgressBar: {
-    height: "100%",
-    borderRadius: 3,
-  },
-  dayStats: {
-    backgroundColor: "#f8f9fa",
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 15,
-  },
-  dayStatsText: {
-    fontSize: 14,
-    color: "#666",
-    marginBottom: 5,
-  },
-  eventsSection: {
-    marginBottom: 20,
-  },
-  eventsTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 10,
-  },
-  eventItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 10,
-    backgroundColor: "#f0f8ff",
-    borderRadius: 8,
-    marginBottom: 5,
-  },
-  eventText: {
-    flex: 1,
-    marginLeft: 8,
-    fontSize: 14,
-    color: "#333",
-  },
-  deleteEventButton: {
-    padding: 5,
   },
   eventInput: {
     borderWidth: 1,
@@ -1510,18 +1560,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 10,
     borderWidth: 1,
-    borderColor: "#007AFF",
+    borderColor: "#16A085",
     borderRadius: 8,
     backgroundColor: "white",
     minWidth: 100,
   },
   eventTypeButtonActive: {
-    backgroundColor: "#007AFF",
+    backgroundColor: "#16A085",
   },
   eventTypeButtonText: {
     marginLeft: 5,
     fontSize: 12,
-    color: "#007AFF",
+    color: "#16A085",
   },
   eventTypeButtonTextActive: {
     color: "white",
@@ -1539,20 +1589,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 5,
   },
   addEventButton: {
-    backgroundColor: "#007AFF",
+    backgroundColor: "#16A085",
   },
   addEventButtonText: {
     color: "white",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  closeButton: {
-    backgroundColor: "#f8f9fa",
-    borderWidth: 1,
-    borderColor: "#ddd",
-  },
-  closeButtonText: {
-    color: "#333",
     fontSize: 16,
     fontWeight: "bold",
   },
@@ -1567,7 +1607,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   submitButton: {
-    backgroundColor: "#007AFF",
+    backgroundColor: "#16A085",
   },
   submitButtonText: {
     color: "white",
@@ -1607,11 +1647,6 @@ const styles = StyleSheet.create({
   badgeDetailDescription: {
     fontSize: 14,
     color: "#666",
-    marginBottom: 5,
-  },
-  badgeDetailDate: {
-    fontSize: 12,
-    color: "#999",
   },
   insightsHeader: {
     flexDirection: "row",
@@ -1642,7 +1677,7 @@ const styles = StyleSheet.create({
   insightCardValue: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#007AFF",
+    color: "#16A085",
     marginBottom: 10,
   },
   insightHighlights: {
@@ -1660,5 +1695,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#FF9800",
     marginBottom: 5,
+  },
+  insightsButton: {
+    backgroundColor: "rgba(255,255,255,0.8)",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 10,
+  },
+  insightsButtonText: {
+    color: "#16A085",
+    fontSize: 14,
+    fontWeight: "600",
   },
 });
