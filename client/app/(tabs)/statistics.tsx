@@ -1450,4 +1450,23 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: "#666",
   },
+  noDataContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 40,
+  },
+  noDataText: {
+    fontSize: 18,
+    color: "#666",
+    textAlign: "center",
+    marginTop: 16,
+    fontWeight: "600",
+  },
+  noDataSubtext: {
+    fontSize: 14,
+    color: "#999",
+    textAlign: "center",
+    marginTop: 8,
+  },
 });

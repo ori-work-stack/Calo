@@ -26,6 +26,9 @@ model User {
   meals                      Meal[]
   nutritionPlans             NutritionPlan[]
   payments                   SubscriptionPayment[]
+  email_verified             Boolean               @default(false)
+  email_verification_code    String?
+  email_verification_expires DateTime?
 
   connectedDevices  ConnectedDevice[]
   activitySummaries DailyActivitySummary[]

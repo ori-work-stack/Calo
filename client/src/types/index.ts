@@ -66,6 +66,7 @@ export type MealAnalysisData = z.infer<typeof MealAnalysisSchema>;
 // ✅ Manual Interfaces - Updated to match Prisma schema
 //
 export interface User {
+  email_verified: any;
   user_id: string;
   email: string;
   name?: string;

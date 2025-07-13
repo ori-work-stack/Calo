@@ -78,48 +78,54 @@ export default function PaymentPlan() {
   const { user } = useSelector((state: RootState) => state.auth);
 
   const handlePlanSelection = async (planId: PlanType) => {
+    // Prevent multiple simultaneous requests
+    if (isLoading) return;
+
     try {
       setIsLoading(true);
       setSelectedPlan(planId);
 
+      // Check if user is authenticated
+      if (!user) {
+        throw new Error("User not authenticated");
+      }
+
+      console.log("🔄 Updating subscription to:", planId);
       const response = await userAPI.updateSubscription(planId);
-      console.log(response);
+      console.log("✅ Subscription update response:", response);
 
       if (!response.success) {
         throw new Error(response.error || "Failed to update subscription");
       }
 
+      // Update Redux state
       dispatch({
         type: "auth/updateSubscription",
         payload: { subscription_type: planId },
       });
 
+      // Add small delay to prevent re-render conflicts
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      // Navigate based on plan type
       if (planId === "FREE") {
-        // Reset state BEFORE navigation for FREE plan
-        setIsLoading(false);
-        setSelectedPlan(null);
-        router.push("/(tabs)");
-        return; // Exit early to avoid finally block
+        router.replace("/(tabs)");
       } else {
-        // Reset state BEFORE navigation for premium plans too
-        setIsLoading(false);
-        setSelectedPlan(null);
-        router.push("/questionnaire");
-        return; // Exit early to avoid finally block
+        router.replace("/questionnaire");
       }
     } catch (error: any) {
       console.error("Plan selection error:", error);
       Alert.alert("שגיאה", error.message || "נכשל בעדכון התוכנית");
+    } finally {
       setIsLoading(false);
       setSelectedPlan(null);
     }
-    // Remove the finally block entirely since we handle state reset above
   };
 
   const handleGoBack = () => {
     router.push("/signup");
   };
-  
+
   const renderPlan = (plan: Plan) => (
     <View
       key={plan.id}

@@ -13,7 +13,7 @@ import { Link, router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { useLanguage } from "@/src/i18n/context/LanguageContext";
 import { useDispatch, useSelector } from "react-redux";
-import { signUp } from "@/src/store/authSlice";
+import { signUp, verifyEmail } from "@/src/store/authSlice";
 import { RootState, AppDispatch } from "@/src/store";
 import LanguageSelector from "@/components/LanguageSelector";
 
@@ -51,6 +51,8 @@ export default function SignUpScreen() {
     }
 
     try {
+      console.log("🔄 Starting signup process...");
+
       const result = await dispatch(
         signUp({
           email,
@@ -60,11 +62,35 @@ export default function SignUpScreen() {
         })
       ).unwrap();
 
+      console.log("✅ Signup result:", result);
+
       if (result.success) {
-        router.replace("/questionnaire");
+        // Show success message
+        Alert.alert(
+          "Account Created!",
+          result.message || "Please check your email for verification code",
+          [
+            {
+              text: "OK",
+              onPress: () => {
+                // Always go to email verification page after successful signup
+                router.push({
+                  pathname: "/(auth)/email-verification",
+                  params: { email },
+                });
+              },
+            },
+          ]
+        );
+      } else {
+        throw new Error(result.error || "Failed to create account");
       }
     } catch (error: any) {
-      Alert.alert(t("common.error"), error || "Failed to create account");
+      console.error("💥 Signup error in component:", error);
+      Alert.alert(
+        t("common.error"),
+        error.message || error || "Failed to create account"
+      );
     }
   };
 

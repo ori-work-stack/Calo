@@ -28,9 +28,15 @@ export default function AIChatScreen() {
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState<"he" | "en">("he");
   const scrollViewRef = useRef<ScrollView>(null);
   const slideAnim = useRef(new Animated.Value(0)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
+
+  const languageOptions = [
+    { key: "he", label: "עברית", flag: "🇮🇱" },
+    { key: "en", label: "English", flag: "🇺🇸" },
+  ];
 
   useEffect(() => {
     loadChatHistory();
@@ -113,7 +119,10 @@ export default function AIChatScreen() {
     setIsLoading(true);
 
     try {
-      const response = await chatAPI.sendMessage(userMessage.content, "hebrew");
+      const response = await chatAPI.sendMessage(
+        userMessage.content,
+        selectedLanguage
+      );
 
       if (response.success && response.data) {
         const aiMessage: ChatMessage = {
@@ -133,7 +142,10 @@ export default function AIChatScreen() {
       const errorMessage: ChatMessage = {
         id: `error-${Date.now()}`,
         type: "ai",
-        content: "מצטער, אני לא זמין כרגע. אנא נסה שוב מאוחר יותר.",
+        content:
+          selectedLanguage === "he"
+            ? "מצטער, אני לא זמין כרגע. אנא נסה שוב מאוחר יותר."
+            : "Sorry, I'm not available right now. Please try again later.",
         timestamp: new Date(),
       };
 
@@ -144,21 +156,30 @@ export default function AIChatScreen() {
   };
 
   const clearHistory = () => {
-    Alert.alert("מחיקת היסטוריה", "האם אתה בטוח שברצונך למחוק את כל השיחה?", [
-      { text: "ביטול", style: "cancel" },
-      {
-        text: "מחק",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await chatAPI.clearHistory();
-            setMessages([]);
-          } catch (error) {
-            console.error("Failed to clear history:", error);
-          }
+    Alert.alert(
+      selectedLanguage === "he" ? "מחיקת היסטוריה" : "Clear History",
+      selectedLanguage === "he"
+        ? "האם אתה בטוח שברצונך למחוק את כל השיחה?"
+        : "Are you sure you want to delete the entire conversation?",
+      [
+        {
+          text: selectedLanguage === "he" ? "ביטול" : "Cancel",
+          style: "cancel",
         },
-      },
-    ]);
+        {
+          text: selectedLanguage === "he" ? "מחק" : "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await chatAPI.clearHistory();
+              setMessages([]);
+            } catch (error) {
+              console.error("Failed to clear history:", error);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const scrollToBottom = () => {
@@ -200,9 +221,26 @@ export default function AIChatScreen() {
               <View style={styles.aiIndicator}>
                 <Text style={styles.aiIndicatorText}>AI</Text>
               </View>
-              <Text style={styles.headerTitle}>יועץ תזונה</Text>
+              <Text style={styles.headerTitle}>
+                {selectedLanguage === "he" ? "יועץ תזונה" : "Nutrition Advisor"}
+              </Text>
             </View>
             <View style={styles.headerRight}>
+              <View style={styles.languageSelector}>
+                {languageOptions.map((lang) => (
+                  <TouchableOpacity
+                    key={lang.key}
+                    style={[
+                      styles.languageButton,
+                      selectedLanguage === lang.key &&
+                        styles.languageButtonActive,
+                    ]}
+                    onPress={() => setSelectedLanguage(lang.key as "he" | "en")}
+                  >
+                    <Text style={styles.languageFlag}>{lang.flag}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
               <TouchableOpacity
                 style={styles.headerButton}
                 onPress={clearHistory}
@@ -219,7 +257,10 @@ export default function AIChatScreen() {
           <View style={styles.warning}>
             <Ionicons name="information-circle" size={16} color="#f39c12" />
             <Text style={styles.warningText}>
-              ⚠️ זהו ייעוץ כללי ולא תחליף לייעוץ רפואי מוסמך
+              ⚠️{" "}
+              {selectedLanguage === "he"
+                ? "זהו ייעוץ כללי ולא תחליף לייעוץ רפואי מוסמך"
+                : "This is general advice and not a substitute for qualified medical advice"}
             </Text>
           </View>
 
@@ -231,18 +272,38 @@ export default function AIChatScreen() {
           >
             {messages.length === 0 && (
               <View style={styles.welcomeContainer}>
-                <Text style={styles.welcomeTitle}>שלום! 👋</Text>
+                <Text style={styles.welcomeTitle}>
+                  {selectedLanguage === "he" ? "שלום! 👋" : "Hello! 👋"}
+                </Text>
                 <Text style={styles.welcomeText}>
-                  אני יועץ התזונה הדיגיטלי שלך. אתה יכול לשאול אותי על:
+                  {selectedLanguage === "he"
+                    ? "אני יועץ התזונה הדיגיטלי שלך. אתה יכול לשאול אותי על:"
+                    : "I'm your digital nutrition advisor. You can ask me about:"}
                 </Text>
                 <View style={styles.examplesList}>
                   <Text style={styles.exampleItem}>
-                    • ערכים תזונתיים של מזונות
+                    •{" "}
+                    {selectedLanguage === "he"
+                      ? "ערכים תזונתיים של מזונות"
+                      : "Nutritional values ​​of food"}
                   </Text>
-                  <Text style={styles.exampleItem}>• המלצות לארוחות</Text>
-                  <Text style={styles.exampleItem}>• טיפים לבישול בריא</Text>
                   <Text style={styles.exampleItem}>
-                    • בירורים תזונתיים כלליים
+                    •{" "}
+                    {selectedLanguage === "he"
+                      ? "המלצות לארוחות"
+                      : "Meal recommendations"}
+                  </Text>
+                  <Text style={styles.exampleItem}>
+                    •{" "}
+                    {selectedLanguage === "he"
+                      ? "טיפים לבישול בריא"
+                      : "Tips for healthy cooking"}
+                  </Text>
+                  <Text style={styles.exampleItem}>
+                    •{" "}
+                    {selectedLanguage === "he"
+                      ? "בירורים תזונתיים כלליים"
+                      : "General nutritional inquiries"}
                   </Text>
                 </View>
               </View>
@@ -269,10 +330,13 @@ export default function AIChatScreen() {
                   {message.content}
                 </Text>
                 <Text style={styles.messageTime}>
-                  {message.timestamp.toLocaleTimeString("he-IL", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
+                  {message.timestamp.toLocaleTimeString(
+                    selectedLanguage === "he" ? "he-IL" : "en-US",
+                    {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    }
+                  )}
                 </Text>
               </View>
             ))}
@@ -294,11 +358,15 @@ export default function AIChatScreen() {
               style={styles.textInput}
               value={inputText}
               onChangeText={setInputText}
-              placeholder="שאל שאלה תזונתית..."
+              placeholder={
+                selectedLanguage === "he"
+                  ? "שאל שאלה תזונתית..."
+                  : "Ask a nutritional question..."
+              }
               multiline
               maxLength={500}
               editable={!isLoading}
-              textAlign="right"
+              textAlign={selectedLanguage === "he" ? "right" : "left"}
             />
             <TouchableOpacity
               style={[
@@ -493,5 +561,24 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     opacity: 0.5,
+  },
+  placeholder: {
+    width: 40,
+  },
+  languageSelector: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  languageButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: "#f0f0f0",
+  },
+  languageButtonActive: {
+    backgroundColor: "#007AFF",
+  },
+  languageFlag: {
+    fontSize: 16,
   },
 });

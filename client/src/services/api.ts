@@ -2,6 +2,7 @@ import axios from "axios";
 import { SignInData, SignUpData, MealAnalysisData, Meal } from "../types";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
+import { store } from "../store";
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 // Get the correct API URL based on platform
 const getApiBaseUrl = () => {
@@ -320,30 +321,32 @@ export const authAPI = {
     try {
       console.log("📝 Attempting sign up...");
       console.log("🌐 API URL:", `${API_BASE_URL}/auth/signup`);
+      console.log("📧 Email:", data.email);
 
       const response = await api.post("/auth/signup", data);
 
-      // Store token for mobile only (web uses cookies)
-      if (
-        Platform.OS !== "web" &&
-        response.data.success &&
-        response.data.token
-      ) {
-        await storeAuthToken(response.data.token);
-        console.log("✅ Sign up successful, token stored securely for mobile");
-      } else if (Platform.OS === "web") {
-        console.log("✅ Sign up successful, cookie set by server for web");
+      console.log("✅ Signup API response:", response.data);
+
+      // Don't store token during signup - user needs to verify email first
+      if (response.data.success) {
+        console.log("✅ Sign up successful - email verification required");
       }
 
       return response.data;
     } catch (error: any) {
       console.error("💥 Sign up error:", error);
+      console.error("💥 Error response:", error.response?.data);
 
       // Provide more specific error messages
       if (error.code === "NETWORK_ERROR" || error.message === "Network Error") {
         throw new Error(
           "Cannot connect to server. Please check your internet connection and ensure the server is running."
         );
+      }
+
+      // Return the specific error from the server
+      if (error.response?.data?.error) {
+        throw new Error(error.response.data.error);
       }
 
       throw error;
@@ -362,6 +365,44 @@ export const authAPI = {
       console.error("💥 Sign out error:", error);
       // Even if server call fails, clear local storage
       await clearAuthToken();
+      throw error;
+    }
+  },
+
+  verifyEmail: async (email: string, code: string) => {
+    try {
+      console.log("🔑 Attempting email verification...");
+      console.log("🌐 API URL:", `${API_BASE_URL}/auth/verify-email`);
+
+      const response = await api.post("/auth/verify-email", { email, code });
+
+      // Store token for mobile only (web uses cookies)
+      if (
+        Platform.OS !== "web" &&
+        response.data.success &&
+        response.data.token
+      ) {
+        await storeAuthToken(response.data.token);
+        console.log(
+          "✅ Email verification successful, token stored securely for mobile"
+        );
+      } else if (Platform.OS === "web") {
+        console.log(
+          "✅ Email verification successful, cookie set by server for web"
+        );
+      }
+
+      return response.data;
+    } catch (error: any) {
+      console.error("💥 Email verification error:", error);
+
+      // Provide more specific error messages
+      if (error.code === "NETWORK_ERROR" || error.message === "Network Error") {
+        throw new Error(
+          "Cannot connect to server. Please check your internet connection and ensure the server is running."
+        );
+      }
+
       throw error;
     }
   },
@@ -874,8 +915,63 @@ export const calendarAPI = {
   },
 };
 
-// NEW USER API METHODS
 export const userAPI = {
+  verifyEmail: async (
+    email: string,
+    code: string
+  ): Promise<{
+    success: boolean;
+    user?: any;
+    token?: string;
+    error?: string;
+  }> => {
+    try {
+      console.log("🔄 Verifying email:", email);
+      const response = await api.post("/auth/verify-email", {
+        email,
+        code,
+      });
+      console.log("✅ verifyEmail response:", response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error("💥 verifyEmail error:", error);
+      const errMsg =
+        error.response?.data?.error ||
+        error.message ||
+        "Failed to verify email";
+      return { success: false, error: errMsg };
+    }
+  },
+
+  updateSubscription: async (subscriptionType: string) => {
+    // Optimized with minimal logging
+    const token = await getAuthToken();
+
+    if (!token) {
+      throw new Error("Missing or invalid authorization");
+    }
+
+    try {
+      const response = await api.put("/user/subscription", {
+        subscription_type: subscriptionType,
+      });
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        // Silent token cleanup on auth error
+        try {
+          const SecureStore = require("expo-secure-store");
+          await SecureStore.deleteItemAsync("auth_token_secure");
+          const AsyncStorage =
+            require("@react-native-async-storage/async-storage").default;
+          await AsyncStorage.removeItem("auth_token");
+          store.dispatch({ type: "auth/forceSignOut" });
+        } catch {}
+      }
+      throw error;
+    }
+  },
+
   getGlobalStatistics: async () => {
     try {
       console.log("📊 Making get global statistics API request...");
@@ -915,10 +1011,22 @@ export const userAPI = {
     const response = await api.delete("/user/delete");
     return response.data;
   },
-
-  updateSubscription: async (subscription_type: string) => {
-    const response = await api.put("/user/subscription", { subscription_type });
-    return response.data;
+  resendVerificationCode: async (
+    email: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      console.log("🔄 Resending verification code:", email);
+      const response = await api.post("/auth/resend-verification", { email });
+      console.log("✅ resendVerificationCode response:", response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error("💥 resendVerificationCode error:", error);
+      const errMsg =
+        error.response?.data?.error ||
+        error.message ||
+        "Failed to resend verification code";
+      return { success: false, error: errMsg };
+    }
   },
 };
 

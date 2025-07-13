@@ -165,7 +165,7 @@ const REGULAR_DRINKS = [
   "משקאות דיאט",
 ];
 
-export default function QuestionnaireScreen() {
+const Questionnaire = React.memo(() => {
   const dispatch = useDispatch<AppDispatch>();
   const { user } = useSelector((state: RootState) => state.auth);
   const { isSaving, error } = useSelector(
@@ -984,7 +984,7 @@ export default function QuestionnaireScreen() {
         מידע על השגרה היומית שלך יעזור לבניית תוכנית מעשית
       </Text>
 
-      <View style={styles.inputGroup}>
+      <View style={styles<replit_final_file>} style={styles.inputGroup}>
         <Text style={styles.inputLabel}>כמה שעות שינה בלילה?</Text>
         <TextInput
           style={styles.textInput}
@@ -1537,51 +1537,87 @@ export default function QuestionnaireScreen() {
     loadExistingData();
   }, []);
 
-  const canProceed = () => {
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+
+  const validateCurrentStep = () => {
+    const errors: string[] = [];
+
     switch (currentStep) {
       case 1:
-        return (
-          formData.age &&
-          parseInt(formData.age) > 0 &&
-          formData.gender &&
-          formData.gender.trim() !== "" &&
-          formData.height_cm &&
-          parseFloat(formData.height_cm) > 0 &&
-          formData.weight_kg &&
-          parseFloat(formData.weight_kg) > 0
-        );
+        if (!formData.age || parseInt(formData.age) <= 0) {
+          errors.push("גיל נדרש");
+        }
+        if (!formData.gender || formData.gender.trim() === "") {
+          errors.push("מגדר נדרש");
+        }
+        if (!formData.height_cm || parseFloat(formData.height_cm) <= 0) {
+          errors.push("גובה נדרש");
+        }
+        if (!formData.weight_kg || parseFloat(formData.weight_kg) <= 0) {
+          errors.push("משקל נדרש");
+        }
+        break;
       case 2:
-        return (
-          formData.main_goal &&
-          formData.main_goal.trim() !== "" &&
-          formData.commitment_level &&
-          formData.commitment_level.trim() !== ""
-        );
+        if (!formData.main_goal || formData.main_goal.trim() === "") {
+          errors.push("מטרה עיקרית נדרשת");
+        }
+        if (
+          !formData.commitment_level ||
+          formData.commitment_level.trim() === ""
+        ) {
+          errors.push("רמת מחויבות נדרשת");
+        }
+        break;
       case 3:
-        return (
-          formData.physical_activity_level &&
-          formData.physical_activity_level.trim() !== "" &&
-          formData.sport_frequency &&
-          formData.sport_frequency.trim() !== ""
-        );
+        if (
+          !formData.physical_activity_level ||
+          formData.physical_activity_level.trim() === ""
+        ) {
+          errors.push("רמת פעילות גופנית נדרשת");
+        }
+        if (
+          !formData.sport_frequency ||
+          formData.sport_frequency.trim() === ""
+        ) {
+          errors.push("תדירות ספורט נדרשת");
+        }
+        break;
       case 4:
-        return true; // Health step - all optional
+        // Health step - all optional
+        break;
       case 5:
-        return (
-          formData.cooking_preference &&
-          formData.cooking_preference.trim() !== "" &&
-          formData.available_cooking_methods &&
-          formData.available_cooking_methods.length > 0
-        );
+        if (
+          !formData.cooking_preference ||
+          formData.cooking_preference.trim() === ""
+        ) {
+          errors.push("העדפת בישול נדרשת");
+        }
+        if (
+          !formData.available_cooking_methods ||
+          formData.available_cooking_methods.length === 0
+        ) {
+          errors.push("נדרש לבחור לפחות אמצעי בישול אחד");
+        }
+        break;
       case 6:
-        return formData.dietary_style && formData.dietary_style.trim() !== "";
+        if (!formData.dietary_style || formData.dietary_style.trim() === "") {
+          errors.push("סגנון תזונה נדרש");
+        }
+        break;
       case 7:
-        return true; // Lifestyle step - all optional
+        // Lifestyle step - all optional
+        break;
       case 8:
-        return true; // Preferences step - all optional
-      default:
-        return true;
+        // Preferences step - all optional
+        break;
     }
+
+    setValidationErrors(errors);
+    return errors.length === 0;
+  };
+
+  const canProceed = () => {
+    return validateCurrentStep();
   };
 
   const handleBack = () => {
@@ -1623,8 +1659,18 @@ export default function QuestionnaireScreen() {
               styles.nextButton,
               !canProceed() && styles.nextButtonDisabled,
             ]}
-            onPress={() => setCurrentStep(currentStep + 1)}
-            disabled={!canProceed()}
+            onPress={() => {
+              if (validateCurrentStep()) {
+                setCurrentStep(currentStep + 1);
+              } else {
+                Alert.alert(
+                  "שדות חסרים",
+                  "אנא מלא את השדות הנדרשים:\n• " +
+                    validationErrors.join("\n• "),
+                  [{ text: "הבנתי" }]
+                );
+              }
+            }}
           >
             <Text style={styles.nextButtonText}>המשך</Text>
             <Ionicons name="arrow-forward" size={20} color="white" />
@@ -1668,7 +1714,7 @@ export default function QuestionnaireScreen() {
       </Modal>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {
@@ -2006,3 +2052,5 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
+
+export default Questionnaire;

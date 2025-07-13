@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 import { prisma } from "../lib/database";
 import { SignUpInput, SignInInput } from "../types/auth";
 
@@ -16,6 +17,8 @@ const userSelectFields = {
   ai_requests_count: true,
   ai_requests_reset_at: true,
   created_at: true,
+  email_verified: true,
+  is_questionnaire_completed: true,
 };
 
 function generateToken(payload: object) {
@@ -33,18 +36,48 @@ export class AuthService {
     const { email, name, password, birth_date } = data;
 
     const existingUser = await prisma.user.findFirst({
-      where: { OR: [{ email }] },
+      where: { email },
+      select: {
+        email_verified: true,
+        email: true,
+        name: true,
+      },
     });
 
     if (existingUser) {
-      throw new Error(
-        existingUser.email === email
-          ? "Email already registered"
-          : "Username already taken"
-      );
+      if (existingUser.email_verified) {
+        throw new Error(
+          "Email already registered and verified. Please sign in instead."
+        );
+      } else {
+        // User exists but email not verified - resend verification code
+        const emailVerificationCode = crypto
+          .randomInt(100000, 999999)
+          .toString();
+
+        await prisma.user.update({
+          where: { email },
+          data: {
+            email_verification_code: emailVerificationCode,
+            email_verification_expires: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes
+          },
+        });
+
+        await this.sendVerificationEmail(
+          email,
+          emailVerificationCode,
+          existingUser.name || name
+        );
+
+        return {
+          user: { email, name: existingUser.name || name },
+          needsEmailVerification: true,
+        };
+      }
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
+    const emailVerificationCode = crypto.randomInt(100000, 999999).toString();
 
     const user = await prisma.user.create({
       data: {
@@ -55,25 +88,146 @@ export class AuthService {
         birth_date: new Date(),
         ai_requests_count: 0,
         ai_requests_reset_at: new Date(),
+        email_verified: false,
+        email_verification_code: emailVerificationCode,
+        email_verification_expires: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes
       },
-      select: userSelectFields,
+      select: {
+        ...userSelectFields,
+        email_verified: true,
+        email_verification_code: true,
+      },
     });
+
+    // Send verification email
+    await this.sendVerificationEmail(email, emailVerificationCode, name);
 
     if (process.env.NODE_ENV !== "production") {
       console.log("✅ Created user:", user);
     }
 
-    const token = generateToken({ user_id: user.user_id, email: user.email });
+    // Don't include sensitive data in response
+    const { email_verification_code, ...userResponse } = user;
+    return { user: userResponse, needsEmailVerification: true };
+  }
+
+  static async sendVerificationEmail(
+    email: string,
+    code: string,
+    name: string
+  ) {
+    try {
+      const nodemailer = require("nodemailer");
+
+      // Create transporter using Gmail SMTP
+      const transporter = nodemailer.createTransporter({
+        service: "gmail",
+        auth: {
+          user: process.env.EMAIL_USER, // Your Gmail address
+          pass: process.env.EMAIL_PASSWORD, // Your Gmail app password
+        },
+      });
+
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: email,
+        subject: "Email Verification - NutriApp",
+        html: `
+          <div style="max-width: 600px; margin: 0 auto; padding: 20px; font-family: Arial, sans-serif;">
+            <h2 style="color: #007AFF; text-align: center;">Email Verification</h2>
+            <p>Hello <strong>${name}</strong>,</p>
+            <p>Thank you for signing up! Please use the verification code below to verify your email address:</p>
+            <div style="text-align: center; margin: 30px 0;">
+              <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #007AFF; background: #f5f5f5; padding: 15px 20px; border-radius: 8px; display: inline-block;">${code}</span>
+            </div>
+            <p><strong>This code expires in 15 minutes.</strong></p>
+            <p>If you didn't create an account with us, please ignore this email.</p>
+            <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
+            <p style="color: #666; font-size: 12px; text-align: center;">NutriApp - Your Personal Nutrition Assistant</p>
+          </div>
+        `,
+      };
+
+      await transporter.sendMail(mailOptions);
+      console.log(`✅ Verification email sent to ${email}`);
+
+      // Still log to console for development
+      if (process.env.NODE_ENV !== "production") {
+        console.log(`📧 Verification email for ${email}`);
+        console.log(`👤 Name: ${name}`);
+        console.log(`🔑 Verification Code: ${code}`);
+        console.log(`⏰ Code expires in 15 minutes`);
+      }
+
+      return true;
+    } catch (error) {
+      console.error("❌ Failed to send verification email:", error);
+
+      // Fallback to console logging if email fails
+      console.log(`📧 FALLBACK - Verification email for ${email}`);
+      console.log(`👤 Name: ${name}`);
+      console.log(`🔑 Verification Code: ${code}`);
+      console.log(`⏰ Code expires in 15 minutes`);
+
+      // Don't throw error - let the signup continue even if email fails
+      return true;
+    }
+  }
+
+  static async verifyEmail(email: string, code: string) {
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: {
+        ...userSelectFields,
+        email_verified: true,
+        email_verification_code: true,
+        email_verification_expires: true,
+      },
+    });
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    if (user.email_verified) {
+      throw new Error("Email already verified");
+    }
+
+    if (
+      !user.email_verification_expires ||
+      user.email_verification_expires < new Date()
+    ) {
+      throw new Error("Verification code expired");
+    }
+
+    if (user.email_verification_code !== code) {
+      throw new Error("Invalid verification code");
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { email },
+      data: {
+        email_verified: true,
+        email_verification_code: null,
+        email_verification_expires: null,
+      },
+      select: userSelectFields,
+    });
+
+    const token = generateToken({
+      user_id: updatedUser.user_id,
+      email: updatedUser.email,
+    });
 
     await prisma.session.create({
       data: {
-        user_id: user.user_id,
+        user_id: updatedUser.user_id,
         token,
         expiresAt: getSessionExpiryDate(),
       },
     });
 
-    return { user, token };
+    return { user: updatedUser, token };
   }
 
   static async signIn(data: SignInInput) {

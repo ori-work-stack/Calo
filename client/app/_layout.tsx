@@ -43,49 +43,64 @@ function AppContent() {
     }
   }, [loaded]);
 
-  // 🎯 Auth + Subscription Routing
+  // 🎯 Auth + Subscription Routing - Fixed to prevent re-renders
   useEffect(() => {
-    const inAuthGroup = segments[0] === "(auth)";
-    const inTabsGroup = segments[0] === "(tabs)";
-    const onPaymentPlan = segments.some(
-      (segment) => segment === "payment-plan"
-    );
-    const onQuestionnaire = segments.some(
-      (segment) => segment === "questionnaire"
-    );
+    if (!loaded) return;
 
+    const currentPath = segments[0];
+    const inAuthGroup = currentPath === "(auth)";
+    const inTabsGroup = currentPath === "(tabs)";
+    const onPaymentPlan = currentPath === "payment-plan";
+    const onQuestionnaire = currentPath === "questionnaire";
+    const onEmailVerification =
+      inAuthGroup && segments[1] === "email-verification";
+
+    // Not authenticated - go to signin
     if (!isAuthenticated || !user) {
-      if (!inAuthGroup) {
+      if (!inAuthGroup && !onEmailVerification && !onPaymentPlan) {
         router.replace("/(auth)/signin");
       }
       return;
     }
 
-    if (!user.subscription_type && !onPaymentPlan) {
-      router.replace("/payment-plan");
+    // Email not verified - go to verification
+    if (user.email_verified === false) {
+      if (!onEmailVerification) {
+        router.replace(`/(auth)/email-verification?email=${user.email}`);
+      }
       return;
     }
 
-    if (
-      user.subscription_type &&
-      ["PREMIUM", "GOLD"].includes(user.subscription_type) &&
-      !user.is_questionnaire_completed &&
-      !onQuestionnaire &&
-      !onPaymentPlan
-    ) {
-      router.replace("/questionnaire");
+    // No subscription - go to payment plan
+    if (!user.subscription_type) {
+      if (!onPaymentPlan) {
+        router.replace("/payment-plan");
+      }
       return;
     }
 
+    // Premium/Gold without questionnaire - go to questionnaire
     if (
-      user.subscription_type &&
       ["PREMIUM", "GOLD"].includes(user.subscription_type) &&
-      user.is_questionnaire_completed &&
-      !inTabsGroup
+      !user.is_questionnaire_completed
     ) {
+      if (!onQuestionnaire) {
+        router.replace("/questionnaire");
+      }
+      return;
+    }
+
+    // All checks passed - go to main app
+    if (!inTabsGroup) {
       router.replace("/(tabs)");
     }
-  }, [isAuthenticated, user, segments, router]);
+  }, [
+    loaded,
+    isAuthenticated,
+    user?.email_verified,
+    user?.subscription_type,
+    user?.is_questionnaire_completed,
+  ]);
 
   // ✅ DO CONDITIONAL RETURN *AFTER* ALL HOOKS
   if (!loaded) {

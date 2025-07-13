@@ -1,29 +1,39 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Image,
+  Alert,
+  RefreshControl,
   Dimensions,
   ActivityIndicator,
+  Image,
 } from "react-native";
-import { useDispatch, useSelector } from "react-redux";
-import { RootState, AppDispatch } from "../../src/store";
+import { useSelector } from "react-redux";
+import { router } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
+import { api } from "@/src/services/api";
+import { RootState } from "@/src/store";
+import FloatingChatButton from "@/components/FloatingChatButton";
+import { useDispatch } from "react-redux";
 import { fetchMeals } from "../../src/store/mealSlice";
 import { Meal } from "../../src/types";
-import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import FloatingChatButton from "../../components/FloatingChatButton";
 import { useTranslation } from "react-i18next";
 import { useLanguage } from "@/src/i18n/context/LanguageContext";
 
-export default function HomeScreen() {
-  const dispatch = useDispatch<AppDispatch>();
+const HomeScreen = React.memo(() => {
+  const dispatch = useDispatch();
   const { meals, isLoading } = useSelector((state: RootState) => state.meal);
   const { user } = useSelector((state: RootState) => state.auth);
   const [recentMeals, setRecentMeals] = useState<Meal[]>([]);
+  const [todaysMeals, setTodaysMeals] = useState<any>([]);
+  const [recommendedMenu, setRecommendedMenu] = useState<any>(null);
+  const [userStats, setUserStats] = useState<any>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [isDataLoading, setIsLoading] = useState(false);
   const { t } = useTranslation();
   const { isRTL } = useLanguage();
 
@@ -40,6 +50,102 @@ export default function HomeScreen() {
       setRecentMeals(sortedMeals.slice(0, 3));
     }
   }, [meals]);
+
+  const loadUserStats = async () => {
+    try {
+      console.log("🏠 Loading user stats...");
+      const response = await api.get("/statistics/summary");
+      console.log("🏠 User stats response:", response.data);
+
+      if (response.data.success) {
+        setUserStats(response.data.data);
+      } else {
+        console.warn("🏠 Failed to load user stats:", response.data.error);
+      }
+    } catch (error) {
+      console.error("🏠 Error loading user stats:", error);
+      setUserStats(null);
+    }
+  };
+
+  const loadTodaysMeals = async () => {
+    try {
+      console.log("🏠 Loading today's meals...");
+      const today = new Date().toISOString().split("T")[0];
+      const response = await api.get(`/nutrition/meals`, {
+        params: { date: today },
+      });
+      console.log("🏠 Today's meals response:", response.data);
+
+      if (response.data.success) {
+        setTodaysMeals(response.data.data || []);
+      } else {
+        console.warn("🏠 Failed to load today's meals:", response.data.error);
+        setTodaysMeals([]);
+      }
+    } catch (error) {
+      console.error("🏠 Error loading today's meals:", error);
+      setTodaysMeals([]);
+    }
+  };
+
+  const loadRecommendedMenu = async () => {
+    try {
+      console.log("🏠 Loading recommended menu...");
+      const today = new Date().toISOString().split("T")[0];
+      const response = await api.get(`/recommended-menu/${today}`);
+      console.log("🏠 Recommended menu response:", response.data);
+
+      if (response.data.success) {
+        setRecommendedMenu(response.data.data);
+      } else {
+        console.warn(
+          "🏠 Failed to load recommended menu:",
+          response.data.error
+        );
+        setRecommendedMenu(null);
+      }
+    } catch (error) {
+      console.error("🏠 Error loading recommended menu:", error);
+      setRecommendedMenu(null);
+    }
+  };
+
+  useEffect(() => {
+    if (!user) return;
+
+    const loadData = async () => {
+      if (isDataLoading) return; // Prevent duplicate loads
+
+      try {
+        setIsLoading(true);
+        console.log("🏠 Loading home page data...");
+
+        // Load data in parallel for better performance
+        await Promise.allSettled([
+          loadUserStats(),
+          loadTodaysMeals(),
+          loadRecommendedMenu(),
+        ]);
+      } catch (error) {
+        console.error("🏠 Error loading home data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, [user?.user_id]); // Only depend on user ID to prevent unnecessary reloads
+
+  // Refresh data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (user && !isDataLoading) {
+        console.log("🏠 Screen focused, refreshing data...");
+        Promise.allSettled([loadUserStats(), loadTodaysMeals()]);
+      }
+    }, [user?.user_id, isDataLoading])
+  );
 
   const QuickActionButton = ({
     icon,
@@ -86,13 +192,13 @@ export default function HomeScreen() {
             <QuickActionButton
               icon="camera"
               title={t("home.scan_meal")}
-              onPress={() => router.push("/(tabs)/camera")}
+              onPress={() => router.push("/(tabs)/food-scanner")}
               color="#4CAF50"
             />
             <QuickActionButton
               icon="add-circle"
               title={t("home.add_meal")}
-              onPress={() => router.push("/(tabs)/meals")}
+              onPress={() => router.push("/(tabs)/camera")}
               color="#FF9800"
             />
             <QuickActionButton
@@ -113,7 +219,7 @@ export default function HomeScreen() {
             ]}
           >
             <Text style={styles.sectionTitle}>{t("home.recent_meals")}</Text>
-            <TouchableOpacity onPress={() => router.push("/(tabs)/meals")}>
+            <TouchableOpacity onPress={() => router.push("/(tabs)/history")}>
               <Text style={styles.viewAllText}>{t("common.view_all")}</Text>
             </TouchableOpacity>
           </View>
@@ -217,7 +323,9 @@ export default function HomeScreen() {
       <FloatingChatButton />
     </View>
   );
-}
+});
+
+export default HomeScreen;
 
 const styles = StyleSheet.create({
   container: {
