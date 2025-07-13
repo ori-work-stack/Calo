@@ -258,7 +258,6 @@ export class NutritionService {
             updatedAnalysis.cookingMethod || existingMeal.cooking_method,
           health_risk_notes:
             updatedAnalysis.healthNotes || existingMeal.health_risk_notes,
-          ts,
 
           // Preserve detailed nutrition fields if not provided in update
           saturated_fats_g:

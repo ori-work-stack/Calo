@@ -21,28 +21,32 @@ interface DynamicListInputProps {
 export const DynamicListInput: React.FC<DynamicListInputProps> = ({
   label,
   placeholder,
-  value,
+  value = [], // Ensure value is an array by default
   onValueChange,
   maxItems = 10,
   style,
 }) => {
   const [inputText, setInputText] = useState("");
 
+  // Defensive programming - ensure value is always an array and onValueChange is a function
+  const safeValue = Array.isArray(value) ? value : [];
+  const safeOnValueChange = onValueChange || (() => {});
+
   const addItem = () => {
     const trimmedText = inputText.trim();
     if (
       trimmedText &&
-      !value.includes(trimmedText) &&
-      value.length < maxItems
+      !safeValue.includes(trimmedText) &&
+      safeValue.length < maxItems
     ) {
-      onValueChange([...value, trimmedText]);
+      safeOnValueChange([...safeValue, trimmedText]);
       setInputText("");
     }
   };
 
   const removeItem = (index: number) => {
-    const newValue = value.filter((_, i) => i !== index);
-    onValueChange(newValue);
+    const newValue = safeValue.filter((_, i) => i !== index);
+    safeOnValueChange(newValue);
   };
 
   return (
@@ -64,19 +68,19 @@ export const DynamicListInput: React.FC<DynamicListInputProps> = ({
             !inputText.trim() && styles.addButtonDisabled,
           ]}
           onPress={addItem}
-          disabled={!inputText.trim() || value.length >= maxItems}
+          disabled={!inputText.trim() || safeValue.length >= maxItems}
         >
           <Ionicons name="add" size={20} color="white" />
         </TouchableOpacity>
       </View>
 
-      {value.length > 0 && (
+      {safeValue.length > 0 && (
         <ScrollView
           style={styles.listContainer}
           showsVerticalScrollIndicator={false}
         >
-          {Array.isArray(value) &&
-            value.map((item, index) => (
+          {Array.isArray(safeValue) &&
+            safeValue.map((item, index) => (
               <View key={index} style={styles.listItem}>
                 <Text style={styles.listItemText}>{item}</Text>
                 <TouchableOpacity
@@ -90,9 +94,9 @@ export const DynamicListInput: React.FC<DynamicListInputProps> = ({
         </ScrollView>
       )}
 
-      {value.length > 0 && (
+      {safeValue.length > 0 && (
         <Text style={styles.countText}>
-          {value.length} {value.length === 1 ? "item" : "items"} added
+          {safeValue.length} {safeValue.length === 1 ? "item" : "items"} added
         </Text>
       )}
     </View>

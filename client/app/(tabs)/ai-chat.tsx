@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { chatAPI } from "../../src/services/api";
+import { useTranslation } from "react-i18next";
 
 interface ChatMessage {
   id: string;
@@ -32,6 +33,7 @@ export default function AIChatScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
   const slideAnim = useRef(new Animated.Value(0)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
+  const { t, i18n } = useTranslation();
 
   const languageOptions = [
     { key: "he", label: "עברית", flag: "🇮🇱" },

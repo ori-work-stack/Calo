@@ -36,7 +36,7 @@ export const fetchQuestionnaire = createAsyncThunk(
 export const saveQuestionnaire = createAsyncThunk(
   "questionnaire/save",
   async (
-    questionnaireData: QuestionnaireData,
+    questionnaireData: QuestionnaireData & { isEditMode?: boolean },
     { rejectWithValue, dispatch }
   ) => {
     try {
@@ -44,8 +44,10 @@ export const saveQuestionnaire = createAsyncThunk(
         questionnaireData
       );
 
-      // Update auth slice to mark questionnaire as completed
-      dispatch(setQuestionnaireCompleted());
+      // Only update questionnaire completion status if not in edit mode
+      if (!questionnaireData.isEditMode) {
+        dispatch(setQuestionnaireCompleted());
+      }
 
       return response.data?.questionnaire || response.data;
     } catch (error: any) {

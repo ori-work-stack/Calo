@@ -123,6 +123,16 @@ router.post("/", authenticateToken, async (req: AuthRequest, res) => {
       questionnaireData.fasting_hours = null;
     }
 
+    // Handle legacy fields that might come as arrays
+    if (Array.isArray(questionnaireData.meal_timing_restrictions)) {
+      questionnaireData.meal_timing_restrictions =
+        questionnaireData.meal_timing_restrictions.join(", ");
+    }
+    if (Array.isArray(questionnaireData.notifications_preference)) {
+      questionnaireData.notifications_preference =
+        questionnaireData.notifications_preference.join(", ");
+    }
+
     // Array fields that should be arrays in Prisma
     questionnaireData.additional_personal_info = sanitizeStringArray(
       questionnaireData.additional_personal_info
@@ -446,25 +456,31 @@ router.post("/", authenticateToken, async (req: AuthRequest, res) => {
     // Send response immediately
     res.json({
       success: true,
-      message: "Questionnaire saved successfully",
+      message: existingQuestionnaire
+        ? "Questionnaire updated successfully"
+        : "Questionnaire saved successfully",
       data: {
         questionnaire: savedQuestionnaire,
         is_questionnaire_completed: true,
       },
     });
 
-    // Generate initial recommended menu in background (non-blocking)
-    setImmediate(async () => {
-      try {
-        const { RecommendedMenuService } = await import(
-          "../services/recommendedMenu"
-        );
-        await RecommendedMenuService.generatePersonalizedMenu({ userId });
-        console.log("✅ Initial menu generated successfully in background");
-      } catch (error) {
-        console.log("⚠️ Background menu generation failed:", error);
-      }
-    });
+    // Generate initial recommended menu in background (non-blocking) - only for new questionnaires
+    if (!existingQuestionnaire) {
+      setImmediate(async () => {
+        try {
+          const { RecommendedMenuService } = await import(
+            "../services/recommendedMenu"
+          );
+          await RecommendedMenuService.generatePersonalizedMenu({ userId });
+          console.log("✅ Initial menu generated successfully in background");
+        } catch (error) {
+          console.log("⚠️ Background menu generation failed:", error);
+        }
+      });
+    } else {
+      console.log("ℹ️ Skipping menu generation for questionnaire update");
+    }
   } catch (error) {
     console.error("💥 Questionnaire save error:", error);
     res.status(500).json({

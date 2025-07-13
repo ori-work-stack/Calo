@@ -445,6 +445,38 @@ export default function StatisticsScreen() {
     return pieData.filter((item) => item.population > 0);
   };
 
+  const renderChart = (data: any) => {
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      return (
+        <View style={styles.noDataContainer}>
+          <Ionicons name="bar-chart-outline" size={48} color="#ccc" />
+          <Text style={styles.noDataText}>No data available</Text>
+        </View>
+      );
+    }
+
+    const chartData = {
+      labels: data.map((_, index) => `Day ${index + 1}`),
+      datasets: [
+        {
+          data: data.map((item) => item?.value || 0),
+          color: (opacity = 1) => `rgba(0, 122, 255, ${opacity})`,
+          strokeWidth: 2,
+        },
+      ],
+    };
+
+    return (
+      <LineChart
+        data={chartData}
+        width={width - 40}
+        height={220}
+        chartConfig={chartConfig}
+        bezier
+      />
+    );
+  };
+
   // Stat Card Component
   const StatCard = React.memo(
     ({

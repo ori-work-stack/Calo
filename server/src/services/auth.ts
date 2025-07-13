@@ -117,39 +117,54 @@ export class AuthService {
     name: string
   ) {
     try {
+      console.log("📧 EMAIL_USER:", process.env.EMAIL_USER);
+      console.log(
+        "🔑 EMAIL_PASSWORD:",
+        process.env.EMAIL_PASSWORD
+          ? `✅ Loaded (${process.env.EMAIL_PASSWORD.length} chars)`
+          : "❌ Missing"
+      );
+      console.log("🔑 EMAIL_PASSWORD value:", process.env.EMAIL_PASSWORD); // Temporary debug
       const nodemailer = require("nodemailer");
 
-      // Create transporter using Gmail SMTP
-      const transporter = nodemailer.createTransporter({
-        service: "gmail",
+      // Fixed: createTransport (not createTransporter)
+      const transporter = nodemailer.createTransport({
+        host: "smtp.gmail.com",
+        port: 587,
+        secure: false,
         auth: {
-          user: process.env.EMAIL_USER, // Your Gmail address
-          pass: process.env.EMAIL_PASSWORD, // Your Gmail app password
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASSWORD,
         },
       });
+      // Test the connection
+      console.log("🔍 Testing email connection...");
+      await transporter.verify();
+      console.log("✅ Email connection verified");
 
       const mailOptions = {
-        from: process.env.EMAIL_USER,
+        from: `"NutriApp" <${process.env.EMAIL_USER}>`,
         to: email,
         subject: "Email Verification - NutriApp",
         html: `
-          <div style="max-width: 600px; margin: 0 auto; padding: 20px; font-family: Arial, sans-serif;">
-            <h2 style="color: #007AFF; text-align: center;">Email Verification</h2>
-            <p>Hello <strong>${name}</strong>,</p>
-            <p>Thank you for signing up! Please use the verification code below to verify your email address:</p>
-            <div style="text-align: center; margin: 30px 0;">
-              <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #007AFF; background: #f5f5f5; padding: 15px 20px; border-radius: 8px; display: inline-block;">${code}</span>
-            </div>
-            <p><strong>This code expires in 15 minutes.</strong></p>
-            <p>If you didn't create an account with us, please ignore this email.</p>
-            <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
-            <p style="color: #666; font-size: 12px; text-align: center;">NutriApp - Your Personal Nutrition Assistant</p>
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px; font-family: Arial, sans-serif;">
+          <h2 style="color: #007AFF; text-align: center;">Email Verification</h2>
+          <p>Hello <strong>${name}</strong>,</p>
+          <p>Thank you for signing up! Please use the verification code below to verify your email address:</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #007AFF; background: #f5f5f5; padding: 15px 20px; border-radius: 8px; display: inline-block;">${code}</span>
           </div>
-        `,
+          <p><strong>This code expires in 15 minutes.</strong></p>
+          <p>If you didn't create an account with us, please ignore this email.</p>
+          <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
+          <p style="color: #666; font-size: 12px; text-align: center;">NutriApp - Your Personal Nutrition Assistant</p>
+        </div>
+      `,
       };
 
-      await transporter.sendMail(mailOptions);
+      const result = await transporter.sendMail(mailOptions);
       console.log(`✅ Verification email sent to ${email}`);
+      console.log("📧 Message ID:", result.messageId);
 
       // Still log to console for development
       if (process.env.NODE_ENV !== "production") {
@@ -160,8 +175,17 @@ export class AuthService {
       }
 
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error("❌ Failed to send verification email:", error);
+
+      // More detailed error logging
+      if (error.code === "EAUTH") {
+        console.error(
+          "🔐 Authentication failed - check your email credentials"
+        );
+      } else if (error.code === "ECONNECTION") {
+        console.error("🌐 Connection failed - check your internet connection");
+      }
 
       // Fallback to console logging if email fails
       console.log(`📧 FALLBACK - Verification email for ${email}`);

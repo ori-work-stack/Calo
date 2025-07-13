@@ -36,6 +36,7 @@ const HomeScreen = React.memo(() => {
   const [isDataLoading, setIsLoading] = useState(false);
   const { t } = useTranslation();
   const { isRTL } = useLanguage();
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     dispatch(fetchMeals());
@@ -170,6 +171,32 @@ const HomeScreen = React.memo(() => {
       <Text style={[styles.quickActionText, { color }]}>{title}</Text>
     </TouchableOpacity>
   );
+
+  useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        setLoading(true);
+        // Add debounced data loading
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        // Load user data, meal plans, etc.
+      } catch (error) {
+        console.error("Failed to load data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadInitialData();
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -441,5 +468,15 @@ const styles = StyleSheet.create({
   },
   loader: {
     marginTop: 20,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: "#666",
   },
 });

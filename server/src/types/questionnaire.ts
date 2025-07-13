@@ -1,4 +1,3 @@
-
 import { z } from "zod";
 
 export const questionnaireSchema = z.object({
@@ -6,16 +5,22 @@ export const questionnaireSchema = z.object({
   age: z
     .union([z.number(), z.string()])
     .transform((val) => (typeof val === "string" ? parseInt(val) : val))
-    .refine((val) => val > 0 && val < 150, { message: "Age must be between 1 and 149" }),
+    .refine((val) => val > 0 && val < 150, {
+      message: "Age must be between 1 and 149",
+    }),
   gender: z.string().min(1, "Gender is required"),
   height_cm: z
     .union([z.number(), z.string()])
     .transform((val) => (typeof val === "string" ? parseFloat(val) : val))
-    .refine((val) => val > 0 && val < 300, { message: "Height must be between 1 and 299 cm" }),
+    .refine((val) => val > 0 && val < 300, {
+      message: "Height must be between 1 and 299 cm",
+    }),
   weight_kg: z
     .union([z.number(), z.string()])
     .transform((val) => (typeof val === "string" ? parseFloat(val) : val))
-    .refine((val) => val > 0 && val < 1000, { message: "Weight must be between 1 and 999 kg" }),
+    .refine((val) => val > 0 && val < 1000, {
+      message: "Weight must be between 1 and 999 kg",
+    }),
   target_weight_kg: z
     .union([z.number(), z.string()])
     .optional()
@@ -33,7 +38,7 @@ export const questionnaireSchema = z.object({
   // Goals - main_goal is required enum
   main_goal: z.enum([
     "WEIGHT_LOSS",
-    "WEIGHT_MAINTENANCE", 
+    "WEIGHT_MAINTENANCE",
     "WEIGHT_GAIN",
     "GENERAL_HEALTH",
     "MEDICAL_CONDITION",
@@ -60,7 +65,7 @@ export const questionnaireSchema = z.object({
   sport_frequency: z.enum([
     "NONE",
     "ONCE_A_WEEK",
-    "TWO_TO_THREE", 
+    "TWO_TO_THREE",
     "FOUR_TO_FIVE",
     "MORE_THAN_FIVE",
   ]),
@@ -79,18 +84,22 @@ export const questionnaireSchema = z.object({
   // Health
   medical_conditions: z.array(z.string()).default([]),
   medical_conditions_text: z.array(z.string()).default([]),
-  medications: z.union([z.array(z.string()), z.string()]).transform((val) => 
-    typeof val === "string" ? [val] : val
-  ).default([]),
-  health_goals: z.union([z.array(z.string()), z.string()]).transform((val) => 
-    typeof val === "string" ? [val] : val
-  ).default([]),
-  functional_issues: z.union([z.array(z.string()), z.string()]).transform((val) => 
-    typeof val === "string" ? [val] : val
-  ).default([]),
-  food_related_medical_issues: z.union([z.array(z.string()), z.string()]).transform((val) => 
-    typeof val === "string" ? [val] : val
-  ).default([]),
+  medications: z
+    .union([z.array(z.string()), z.string()])
+    .transform((val) => (typeof val === "string" ? [val] : val))
+    .default([]),
+  health_goals: z
+    .union([z.array(z.string()), z.string()])
+    .transform((val) => (typeof val === "string" ? [val] : val))
+    .default([]),
+  functional_issues: z
+    .union([z.array(z.string()), z.string()])
+    .transform((val) => (typeof val === "string" ? [val] : val))
+    .default([]),
+  food_related_medical_issues: z
+    .union([z.array(z.string()), z.string()])
+    .transform((val) => (typeof val === "string" ? [val] : val))
+    .default([]),
 
   // Means and conditions
   meals_per_day: z
@@ -116,12 +125,14 @@ export const questionnaireSchema = z.object({
   allergies_text: z.array(z.string()).default([]),
   dietary_style: z.string(),
   meal_texture_preference: z.array(z.string()).default([]),
-  disliked_foods: z.union([z.array(z.string()), z.string()]).transform((val) => 
-    typeof val === "string" ? [val] : val
-  ).default([]),
-  liked_foods: z.union([z.array(z.string()), z.string()]).transform((val) => 
-    typeof val === "string" ? [val] : val
-  ).default([]),
+  disliked_foods: z
+    .union([z.array(z.string()), z.string()])
+    .transform((val) => (typeof val === "string" ? [val] : val))
+    .default([]),
+  liked_foods: z
+    .union([z.array(z.string()), z.string()])
+    .transform((val) => (typeof val === "string" ? [val] : val))
+    .default([]),
   regular_drinks: z.array(z.string()).default([]),
   intermittent_fasting: z.boolean().optional(),
   fasting_hours: z.string().optional().nullable(),
@@ -131,12 +142,18 @@ export const questionnaireSchema = z.object({
 
   // Legacy fields for compatibility
   program_duration: z.string().optional(),
-  meal_timing_restrictions: z.string().optional(),
+  meal_timing_restrictions: z
+    .union([z.string(), z.array(z.string())])
+    .transform((val) => (Array.isArray(val) ? val.join(", ") : val))
+    .optional(),
   dietary_restrictions: z.array(z.string()).default([]),
   willingness_to_follow: z.boolean().optional(),
   upcoming_events: z.array(z.string()).default([]),
   upload_frequency: z.string().optional(),
-  notifications_preference: z.string().optional(),
+  notifications_preference: z
+    .union([z.string(), z.array(z.string())])
+    .transform((val) => (Array.isArray(val) ? val.join(", ") : val))
+    .optional(),
   personalized_tips: z.boolean().optional(),
   health_metrics_integration: z.boolean().optional(),
   family_medical_history: z.array(z.string()).default([]),

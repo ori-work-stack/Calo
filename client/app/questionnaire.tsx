@@ -11,9 +11,13 @@ import {
   Modal,
 } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { RootState, AppDispatch } from "@/src/store";
-import { saveQuestionnaire, clearError } from "@/src/store/questionnaireSlice";
+import {
+  saveQuestionnaire,
+  fetchQuestionnaire,
+  clearError,
+} from "@/src/store/questionnaireSlice";
 import { Ionicons } from "@expo/vector-icons";
 import { DynamicListInput } from "@/components/DynamicListInputs";
 
@@ -168,12 +172,18 @@ const REGULAR_DRINKS = [
 export default function QuestionnaireScreen() {
   const dispatch = useDispatch<AppDispatch>();
   const { user } = useSelector((state: RootState) => state.auth);
-  const { isSaving, error } = useSelector(
+  const { questionnaire, isSaving, isLoading, error } = useSelector(
     (state: RootState) => state.questionnaire
   );
+  const searchParams = useLocalSearchParams();
+
+  // Check if we're in editing mode
+  const isEditMode =
+    searchParams?.mode === "edit" || user?.is_questionnaire_completed;
 
   const [currentStep, setCurrentStep] = useState(1);
   const [showTip, setShowTip] = useState("");
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   const totalSteps = 8;
   const progressPercentage = (currentStep / totalSteps) * 100;
@@ -249,6 +259,166 @@ export default function QuestionnaireScreen() {
     sleep_hours_per_night: "",
   });
 
+  // Load existing questionnaire data if in edit mode
+  useEffect(() => {
+    const loadQuestionnaireData = async () => {
+      if (isEditMode && !dataLoaded) {
+        try {
+          await dispatch(fetchQuestionnaire());
+        } catch (error) {
+          console.error("Failed to fetch questionnaire:", error);
+        }
+      }
+    };
+
+    loadQuestionnaireData();
+  }, [dispatch, isEditMode, dataLoaded]);
+
+  // Map questionnaire data to form when available
+  useEffect(() => {
+    if (questionnaire && !dataLoaded) {
+      console.log("📋 Mapping questionnaire data to form:", questionnaire);
+
+      // Helper function to safely convert values
+      const safeString = (value: any) => value?.toString() || "";
+      const safeArray = (value: any) => {
+        if (Array.isArray(value)) return value;
+        if (typeof value === "string") {
+          if (value.trim() === "" || value.toLowerCase() === "none") return [];
+          try {
+            return JSON.parse(value);
+          } catch {
+            return value
+              .split(",")
+              .map((item) => item.trim())
+              .filter((item) => item && item.toLowerCase() !== "none");
+          }
+        }
+        return [];
+      };
+      const safeBoolean = (value: any) => Boolean(value);
+
+      // Parse meal_times if it's a string
+      const parseMealTimes = (mealTimes: any) => {
+        if (Array.isArray(mealTimes)) return mealTimes;
+        if (typeof mealTimes === "string") {
+          return mealTimes
+            .split(",")
+            .map((time) => time.trim())
+            .filter((time) => time);
+        }
+        return [];
+      };
+
+      const mappedData: QuestionnaireData = {
+        // Personal data
+        age: safeString(questionnaire.age),
+        gender: safeString(questionnaire.gender),
+        height_cm: safeString(questionnaire.height_cm),
+        weight_kg: safeString(questionnaire.weight_kg),
+        target_weight_kg: safeString(questionnaire.target_weight_kg),
+        body_fat_percentage: safeString(questionnaire.body_fat_percentage),
+        additional_personal_info: safeArray(
+          questionnaire.additional_personal_info
+        ),
+
+        // Goals
+        main_goal: safeString(questionnaire.main_goal),
+        main_goal_text: safeArray(questionnaire.main_goal_text),
+        specific_goal: safeArray(questionnaire.specific_goal),
+        goal_timeframe_days: safeString(questionnaire.goal_timeframe_days),
+        commitment_level: safeString(questionnaire.commitment_level),
+        most_important_outcome: safeArray(questionnaire.most_important_outcome),
+        special_personal_goal: safeArray(questionnaire.special_personal_goal),
+
+        // Physical activity
+        physical_activity_level: safeString(
+          questionnaire.physical_activity_level
+        ),
+        sport_frequency: safeString(questionnaire.sport_frequency),
+        sport_types: safeArray(questionnaire.sport_types),
+        sport_duration_min: safeString(questionnaire.sport_duration_min),
+        workout_times: safeArray(questionnaire.workout_times),
+        uses_fitness_devices: safeBoolean(questionnaire.uses_fitness_devices),
+        fitness_device_type: safeArray(questionnaire.fitness_device_type),
+        additional_activity_info: safeArray(
+          questionnaire.additional_activity_info
+        ),
+
+        // Health
+        medical_conditions: safeArray(questionnaire.medical_conditions),
+        medical_conditions_text: safeArray(
+          questionnaire.medical_conditions_text
+        ),
+        medications: safeArray(questionnaire.medications),
+        health_goals: safeArray(questionnaire.health_goals),
+        functional_issues: safeArray(questionnaire.functional_issues),
+        food_related_medical_issues: safeArray(
+          questionnaire.food_related_medical_issues
+        ),
+
+        // Means and conditions
+        meals_per_day: safeString(questionnaire.meals_per_day) || "3",
+        snacks_between_meals: safeBoolean(questionnaire.snacks_between_meals),
+        meal_times: parseMealTimes(questionnaire.meal_times),
+        cooking_preference: safeString(questionnaire.cooking_preference),
+        available_cooking_methods: safeArray(
+          questionnaire.available_cooking_methods
+        ),
+        daily_food_budget: safeString(questionnaire.daily_food_budget),
+        shopping_method: safeArray(questionnaire.shopping_method),
+        daily_cooking_time: safeString(questionnaire.daily_cooking_time),
+
+        // Dietary preferences and restrictions
+        kosher: safeBoolean(questionnaire.kosher),
+        allergies: safeArray(questionnaire.allergies),
+        allergies_text: safeArray(questionnaire.allergies_text),
+        dietary_style: safeString(questionnaire.dietary_style),
+        meal_texture_preference: safeArray(
+          questionnaire.meal_texture_preference
+        ),
+        disliked_foods: safeArray(questionnaire.disliked_foods),
+        liked_foods: safeArray(questionnaire.liked_foods),
+        regular_drinks: safeArray(questionnaire.regular_drinks),
+        intermittent_fasting: safeBoolean(questionnaire.intermittent_fasting),
+        fasting_hours: safeString(questionnaire.fasting_hours),
+
+        // Additional
+        past_diet_difficulties: safeArray(questionnaire.past_diet_difficulties),
+
+        // Additional schema fields
+        program_duration: safeString(questionnaire.program_duration),
+        meal_timing_restrictions: safeArray(
+          questionnaire.meal_timing_restrictions
+        ),
+        dietary_restrictions: safeArray(questionnaire.dietary_restrictions),
+        willingness_to_follow:
+          questionnaire.willingness_to_follow !== undefined
+            ? safeBoolean(questionnaire.willingness_to_follow)
+            : true,
+        upcoming_events: safeArray(questionnaire.upcoming_events),
+        upload_frequency: safeString(questionnaire.upload_frequency),
+        notifications_preference: safeArray(
+          questionnaire.notifications_preference
+        ),
+        personalized_tips:
+          questionnaire.personalized_tips !== undefined
+            ? safeBoolean(questionnaire.personalized_tips)
+            : true,
+        health_metrics_integration: safeBoolean(
+          questionnaire.health_metrics_integration
+        ),
+        family_medical_history: safeArray(questionnaire.family_medical_history),
+        smoking_status: safeString(questionnaire.smoking_status),
+        sleep_hours_per_night: safeString(questionnaire.sleep_hours_per_night),
+      };
+
+      setFormData(mappedData);
+      setDataLoaded(true);
+      console.log("✅ Form data mapped successfully");
+    }
+  }, [questionnaire, dataLoaded]);
+
   const handleArrayToggle = (
     array: string[],
     item: string,
@@ -268,20 +438,39 @@ export default function QuestionnaireScreen() {
         return;
       }
 
-      // Send raw formData as it matches QuestionnaireData type
-      const result = await dispatch(saveQuestionnaire(formData));
+      console.log("💾 Submitting questionnaire data:", formData);
+
+      // For edit mode, we want to preserve the questionnaire completion status
+      const dataToSubmit = {
+        ...formData,
+        // Ensure we preserve the questionnaire completion status in edit mode
+        isEditMode: isEditMode,
+      };
+
+      const result = await dispatch(saveQuestionnaire(dataToSubmit));
 
       if (saveQuestionnaire.fulfilled.match(result)) {
-        Alert.alert(
-          "הצלחה!",
-          "השאלון נשמר בהצלחה. אנחנו כעת בונים עבורך תוכנית תזונה מותאמת אישית.",
-          [
+        if (isEditMode) {
+          // In edit mode, show success message and navigate back to profile
+          Alert.alert("הצלחה!", "הנתונים שלך עודכנו בהצלחה", [
             {
-              text: "המשך",
-              onPress: () => router.replace("/(tabs)"),
+              text: "חזור לפרופיל",
+              onPress: () => router.replace("/(tabs)/profile"),
             },
-          ]
-        );
+          ]);
+        } else {
+          // In initial completion mode, show the original message
+          Alert.alert(
+            "הצלחה!",
+            "השאלון נשמר בהצלחה. אנחנו כעת בונים עבורך תוכנית תזונה מותאמת אישית.",
+            [
+              {
+                text: "המשך",
+                onPress: () => router.replace("/(tabs)"),
+              },
+            ]
+          );
+        }
       }
     } catch (error) {
       Alert.alert("שגיאה", "אירעה שגיאה בשמירת השאלון");
@@ -1365,96 +1554,6 @@ export default function QuestionnaireScreen() {
     }
   };
 
-  // Load existing questionnaire data
-  useEffect(() => {
-    const loadExistingData = async () => {
-      try {
-        // const token = await AsyncStorage.getItem("token");
-        // if (!token) return;
-
-        // const response = await api.get("/questionnaire");
-        // if (response.data.success && response.data.data) {
-        //   const existingData = response.data.data;
-        const existingData = {
-          age: "30",
-          gender: "male",
-          height_cm: "180",
-          weight_kg: "80",
-          target_weight_kg: "75",
-          body_fat_percentage: "20",
-          additional_personal_info: "None",
-          main_goal: "WEIGHT_LOSS",
-          main_goal_text: "",
-          specific_goal: "Lose 5 kg",
-          goal_timeframe_days: "90",
-          commitment_level: "moderate",
-          most_important_outcome: "health",
-          special_personal_goal: "",
-          physical_activity_level: "moderate",
-          sport_frequency: "2-3 times a week",
-          sport_types: ["running", "swimming"],
-          sport_duration_min: "60",
-          workout_times: "evening",
-          uses_fitness_devices: true,
-          fitness_device_type: "smartwatch",
-          additional_activity_info: "",
-          medical_conditions: ["none"],
-          medical_conditions_text: "",
-          medications: "None",
-          health_goals: "Lower cholesterol",
-          functional_issues: "None",
-          food_related_medical_issues: "None",
-          meals_per_day: "3",
-          snacks_between_meals: false,
-          meal_times: "8:00, 12:00, 18:00",
-          cooking_preference: "easy",
-          available_cooking_methods: ["oven", "stove"],
-          daily_food_budget: "100",
-          shopping_method: "supermarket",
-          daily_cooking_time: "30",
-          kosher: false,
-          allergies: ["none"],
-          allergies_text: "",
-          dietary_style: "mediterranean",
-          meal_texture_preference: "normal",
-          disliked_foods: "olives",
-          liked_foods: "chicken",
-          regular_drinks: ["water", "coffee"],
-          intermittent_fasting: false,
-          fasting_hours: "",
-          past_diet_difficulties: [],
-        };
-
-        // Convert numeric fields to strings for form compatibility
-        const formattedData = {
-          ...existingData,
-          age: existingData.age?.toString() || "",
-          height_cm: existingData.height_cm?.toString() || "",
-          weight_kg: existingData.weight_kg?.toString() || "",
-          target_weight_kg: existingData.target_weight_kg?.toString() || "",
-          body_fat_percentage:
-            existingData.body_fat_percentage?.toString() || "",
-          goal_timeframe_days:
-            existingData.goal_timeframe_days?.toString() || "",
-          sport_duration_min: existingData.sport_duration_min?.toString() || "",
-          meals_per_day: existingData.meals_per_day?.toString() || "",
-          daily_food_budget: existingData.daily_food_budget?.toString() || "",
-        };
-
-        setFormData(formattedData);
-        console.log("✅ Existing questionnaire data loaded");
-        //  }
-      } catch (error) {
-        console.log(
-          "⚠️ No existing questionnaire found or error loading:",
-          error
-        );
-      }
-    };
-
-    loadExistingData();
-  }, []);
-
   const canProceed = () => {
     switch (currentStep) {
       case 1:
@@ -1470,10 +1569,24 @@ export default function QuestionnaireScreen() {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
     } else {
-      // Navigate to sibling page "payment-plan"
-      router.replace("/payment-plan");
+      // Navigate based on edit mode
+      if (isEditMode) {
+        router.replace("/(tabs)/profile");
+      } else {
+        router.replace("/payment-plan");
+      }
     }
   };
+
+  // Show loading while fetching data in edit mode
+  if (isEditMode && (isLoading || !dataLoaded)) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>טוען נתונים...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -1481,7 +1594,9 @@ export default function QuestionnaireScreen() {
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
           <Ionicons name="arrow-back" size={24} color="#007AFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>בניית תוכנית אישית</Text>
+        <Text style={styles.headerTitle}>
+          {isEditMode ? "עריכת נתונים אישיים" : "בניית תוכנית אישית"}
+        </Text>
         <View style={styles.placeholder} />
       </View>
 
@@ -1521,7 +1636,9 @@ export default function QuestionnaireScreen() {
               <ActivityIndicator color="white" />
             ) : (
               <>
-                <Text style={styles.finishButtonText}>צור תוכנית אישית</Text>
+                <Text style={styles.finishButtonText}>
+                  {isEditMode ? "שמור שינויים" : "צור תוכנית אישית"}
+                </Text>
                 <Ionicons name="checkmark" size={20} color="white" />
               </>
             )}
@@ -1556,6 +1673,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f8f9fa",
+  },
+  loadingContainer: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: "#666",
   },
   containerRTL: {
     direction: "rtl",

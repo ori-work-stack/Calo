@@ -112,7 +112,7 @@ export default function ProfileScreen() {
       case "privacy":
         return <PrivacySettings onClose={() => setActiveSection(null)} />;
       case "personalData":
-        router.push("/questionnaire");
+        router.push("/questionnaire?mode=edit");
         return;
       default:
         return null;

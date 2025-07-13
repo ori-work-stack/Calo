@@ -52,7 +52,7 @@ export class OpenAIService {
 
       console.log("🧹 Cleaned OpenAI response");
       return cleanedContent;
-    } catch (error) {
+    } catch (error: any) {
       console.error("💥 OpenAI API error:", error);
       if (error.code === "insufficient_quota") {
         throw new Error(
@@ -988,4 +988,47 @@ Language for response: ${language}`;
         "Generated as a healthy alternative that meets your nutritional needs",
     };
   }
+}
+
+export async function generateDailyMenu(
+  userPreferences: any,
+  previousMeals: any[] = []
+) {
+  // Create variation context from previous meals
+  const recentMeals = previousMeals.slice(-7); // Last 7 days
+  const usedIngredients = recentMeals.flatMap((meal) => meal.ingredients || []);
+  const usedCuisines = recentMeals.map((meal) => meal.cuisine).filter(Boolean);
+
+  const prompt = `Generate a diverse daily menu for a user with the following preferences:
+${JSON.stringify(userPreferences)}
+
+IMPORTANT VARIATION REQUIREMENTS:
+- Avoid repeating these recent ingredients: ${usedIngredients.join(", ")}
+- Avoid these recent cuisines: ${usedCuisines.join(", ")}
+- Create meals with at least 80% different ingredients from recent meals
+- Use diverse cooking methods (grilled, baked, steamed, raw, etc.)
+- Include variety in protein sources, vegetables, and grains
+- Consider seasonal ingredients and international cuisines
+
+Please provide breakfast, lunch, and dinner with detailed ingredients and nutritional information.`;
+
+  const response = await openai?.chat.completions.create({
+    model: "gpt-3.5-turbo",
+    messages: [{ role: "user", content: prompt }],
+    temperature: 0.9, // Increase creativity
+  });
+
+  if (!response) {
+    console.error("OpenAI API error: No response received.");
+    return "Fallback menu: Salad for lunch, Pasta for dinner";
+  }
+
+  const content = response.choices[0]?.message?.content;
+
+  if (!content) {
+    console.error("OpenAI API error: Empty response content.");
+    return "Fallback menu: Salad for lunch, Pasta for dinner";
+  }
+
+  return content;
 }

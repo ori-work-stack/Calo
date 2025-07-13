@@ -70,6 +70,7 @@ export default function CalendarScreen() {
   const [eventType, setEventType] = useState("general");
   const [eventDescription, setEventDescription] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
+  const [badges, setBadges] = useState([]);
 
   useEffect(() => {
     loadCalendarData();
@@ -406,6 +407,46 @@ export default function CalendarScreen() {
     );
   };
 
+  useEffect(() => {
+    const loadBadges = async () => {
+      try {
+        // Simulate fetching user achievements
+        const userStats = {
+          daysTracked: 10,
+          currentStreak: 7,
+          healthyMealsCount: 12,
+        };
+
+        const calculatedBadges = [
+          {
+            id: 1,
+            name: "First Week",
+            icon: "🏆",
+            earned: userStats?.daysTracked >= 7,
+          },
+          {
+            id: 2,
+            name: "Streak Master",
+            icon: "🔥",
+            earned: userStats?.currentStreak >= 5,
+          },
+          {
+            id: 3,
+            name: "Healthy Choice",
+            icon: "🥗",
+            earned: userStats?.healthyMealsCount >= 10,
+          },
+        ];
+        setBadges(calculatedBadges);
+      } catch (error) {
+        console.error("Failed to load badges:", error);
+        setBadges([]);
+      }
+    };
+
+    loadBadges();
+  }, []);
+
   if (isLoading) {
     return (
       <View style={styles.centered}>
@@ -455,12 +496,16 @@ export default function CalendarScreen() {
       {renderGamificationSection()}
 
       {/* Calendar */}
-      <View style={styles.calendarContainer}>
-        {renderWeekDays()}
-        <View style={styles.daysGrid}>
-          {getDaysInMonth().map((dayData, index) => renderDay(dayData, index))}
+      <ScrollView>
+        <View style={styles.calendarContainer}>
+          {renderWeekDays()}
+          <View style={styles.daysGrid}>
+            {getDaysInMonth().map((dayData, index) =>
+              renderDay(dayData, index)
+            )}
+          </View>
         </View>
-      </View>
+      </ScrollView>
 
       {/* Enhanced Legend */}
       <View style={styles.legendContainer}>
@@ -795,17 +840,13 @@ export default function CalendarScreen() {
             </View>
 
             <ScrollView style={styles.badgesScrollView}>
-              {statistics?.gamificationBadges.map((badge) => (
+              {badges.map((badge) => (
                 <View key={badge.id} style={styles.badgeDetailItem}>
                   <Text style={styles.badgeDetailIcon}>{badge.icon}</Text>
                   <View style={styles.badgeDetailContent}>
                     <Text style={styles.badgeDetailName}>{badge.name}</Text>
                     <Text style={styles.badgeDetailDescription}>
                       {badge.description}
-                    </Text>
-                    <Text style={styles.badgeDetailDate}>
-                      Achieved:{" "}
-                      {new Date(badge.achieved_at).toLocaleDateString()}
                     </Text>
                   </View>
                 </View>
@@ -1231,9 +1272,9 @@ const styles = StyleSheet.create({
   dayCell: {
     width: CELL_SIZE,
     height: CELL_SIZE,
-    padding: 4,
+    padding: 1,
     margin: 1,
-    borderRadius: 8,
+    borderRadius: 50,
     alignItems: "center",
     justifyContent: "space-between",
   },
