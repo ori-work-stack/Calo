@@ -140,7 +140,7 @@ export class AuthService {
       // Test the connection
       console.log("🔍 Testing email connection...");
       await transporter.verify();
-      console.log("✅ Email connection verified");
+      console.log("✅ Email connection verified", transporter);
 
       const mailOptions = {
         from: `"NutriApp" <${process.env.EMAIL_USER}>`,
@@ -176,7 +176,7 @@ export class AuthService {
 
       return true;
     } catch (error: any) {
-      console.error("❌ Failed to send verification email:", error);
+      console.error("❌ Failed to send verification email:", error, { email });
 
       // More detailed error logging
       if (error.code === "EAUTH") {
