@@ -1,0 +1,104 @@
+[33me646ffc[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m stats trying
+[33m989449d[m working
+[33mba51340[m stats revemp
+[33m52a2fd4[m email workds
+[33mcbaccbe[m email
+[33m5ffdd00[m quest update
+[33m6d4ee1e[m fixed
+[33m8433a6a[m errors
+[33m8a2a3cf[m recommended
+[33m368bb92[m check
+[33m0b37937[m working menu
+[33mef0ed21[m menu
+[33m3916b7b[m prisma
+[33ma80849a[m calendar
+[33mf434ff0[m stats almost
+[33mb880ed2[m stats
+[33m5a427e2[m stats
+[33m648255d[m fixing2
+[33meab443d[m fixing
+[33m8b46bed[m barcode list
+[33ma288a60[m push
+[33m92b593d[m i18n
+[33m935d290[m lang
+[33ma3ec58c[m working
+[33m86a4c9f[m reccomended
+[33mdc351fa[m questionnire-almost-working
+[33m9252f16[m questionnaire
+[33m55c1df0[m fixes full with new ai chat and barcode
+[33m941ad55[m fixing meal
+[33m13fe020[m profile
+[33meb2544c[m proifle,quet,payment-not-real
+[33m1eb8711[m gallery
+[33ma3163f0[m fixing errors
+[33m0b0ac4e[m types for server
+[33mdbf1fc4[m meal menu problem
+[33mb271bd7[m menu
+[33maf3ce35[m check
+[33mffe7279[m meal planer with ai not fully working
+[33m357686c[m query
+[33m2d15edc[m query-almost
+[33mfc2cefd[m start-tanstack
+[33m4c33bb7[m stats work
+[33mae9e804[m stats
+[33mec0081e[m path70
+[33m3afd10f[m devices
+[33mefe55f8[m store-secure
+[33m3d8ef56[m fixes of auth
+[33md1d42ad[m 2.7 morning
+[33md673053[m fixes
+[33maea721b[m keychain
+[33m1ca9ada[m keychain
+[33m958da08[m Updated schema.prisma
+[33m2895010[m Updated schema.prisma
+[33mef95050[m Fix Prisma schema and database connection issues
+[33mb6728b4[m Updated package.json
+[33mbcd2802[m Fix Prisma schema error and database connection
+[33m9b21cec[m Fix Prisma OpenSSL warnings and database connection
+[33m8456a0c[m Fix Prisma database connection configuration
+[33m3dbf30f[m Fix signup validation schema mismatch
+[33m0922c9b[m Fix numeric field validation in signup form
+[33ma585409[m Fix signup errors and schema mismatch
+[33m2ce76f4[m Fix database URL configuration for Prisma
+[33m7b3adf7[m Fix Prisma WebContainer compatibility
+[33md708ed4[m Complete project fixes with update meal functionality
+[33m16b6b4d[m Fix Project Types and Consistency
+[33mcc4cd4b[m Added .gitignore
+[33md8b9022[m fixes
+[33m34ebb8f[m Assistant checkpoint: Fix base64 image handling for OpenAI
+[33m1641546[m Checkpoint before assistant change: Fix the problem where image uploads fail due to a server error
+[33m8685be5[m Assistant checkpoint: Fix deprecated OpenAI model
+[33m7de37d1[m Checkpoint before assistant change: Report error when analyzing a meal, notifying user of internal issues
+[33m45d549f[m Assistant checkpoint: Fix token storage key mismatch in mobile app
+[33m624699c[m Checkpoint before assistant change: Fix issue preventing users from uploading and analyzing meals correctly
+[33ma75c745[m Assistant checkpoint: Fix TypeScript errors and field mappings
+[33m0e8ad5e[m Assistant checkpoint: Fix router middleware, schema, and field mismatches
+[33mebf29be[m Checkpoint before assistant change: Enable users to analyze meal nutrition using images and track daily intake
+[33m58c791f[m Assistant checkpoint: Fixed duplicate types, server routes, API calls, and base64 handling
+[33m5f8a2b0[m Checkpoint before assistant change: Improve image processing and fix errors when analyzing user photos
+[33mc2afe2c[m Checkpoint before assistant change: Improve reliability of the meal analysis feature for a better user experience
+[33mcdf6bcd[m Assistant checkpoint: Fix image processing and API communication issues
+[33m6d95b3c[m Checkpoint before assistant change: Improve image processing and data transfer to the backend server
+[33ma527c9e[m camera
+[33md909dff[m remove
+[33m4e175eb[m Assistant checkpoint: Fix environment loading and database setup
+[33mc7e6e0a[m Checkpoint before assistant change: Update core libraries to improve performance and ensure compatibility
+[33m9139c99[m Assistant checkpoint: Fix environment and dependencies for export
+[33m92af3b5[m Assistant checkpoint: Fix dependencies, types, and clean folder structure
+[33ma8ad7ec[m Checkpoint before assistant change: Track files that should not be committed across both the app and the server
+[33m265fb48[m Assistant checkpoint: Created complete nutrition tracker with Expo mobile app and fixed server
+[33m058aa79[m Checkpoint before assistant change: Migrate backend codebase to a new architecture with enhanced features
+[33m90361b8[m Add .env files to gitignore
+[33m4d219a6[m Resolve merge conflicts: removed prisma client generated files
+[33m55470f6[m Delete node_modules directory
+[33mc325311[m newnew
+[33m5b8e6a4[m new
+[33m96520e4[m Assistant checkpoint: Migrated from Neon to Supabase PostgreSQL
+[33m5ddb24a[m withapi
+[33m58c0d08[m Assistant checkpoint: Create request functions and complete user API
+[33m925a9a7[m Assistant checkpoint: Created frontend API client structure
+[33mf0c568d[m Checkpoint before assistant change: Refine project setup for improved performance and compatibility
+[33m44f6b9b[m hello
+[33md6f6b96[m Delete README.md
+[33mccd340b[m hello
+[33me72045d[m first commit
