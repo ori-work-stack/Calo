@@ -64,6 +64,7 @@ import { nutritionAPI } from "../../src/services/api";
 import { useStatistics } from "../../hooks/useQueries";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import AccessibilityButton from "@/components/AccessibilityButton";
+import LanguageToolbar from "@/components/LanguageToolbar";
 
 const { width } = Dimensions.get("window");
 
@@ -926,7 +927,11 @@ export default function StatisticsScreen() {
   const [weeklyData, setWeeklyData] = useState<ProgressData[]>([]);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [badges, setBadges] = useState<Badge[]>([]);
-
+  const helpContent = {
+    title: "סטטיסטיקות תזונה",
+    description:
+      "כאן תוכל לראות את הנתונים התזונתיים שלך לאורך זמן. בחר תקופה שונה כדי לראות נתונים מפורטים על הצריכה הקלורית, חלבונים, פחמימות ושומנים. הנתונים מבוססים על הארוחות שצילמת והעלית למערכת.",
+  };
   // Update dependent data when statistics change
   useEffect(() => {
     if (statisticsData) {
@@ -1274,7 +1279,7 @@ export default function StatisticsScreen() {
       <View style={styles.errorContainer}>
         <AlertTriangle size={48} color="#F44336" />
         <Text style={[styles.errorText, isRTL && styles.textRTL]}>{error}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={loadStatistics}>
+        <TouchableOpacity style={styles.retryButton}>
           <Text style={styles.retryButtonText}>{t("common.retry")}</Text>
         </TouchableOpacity>
       </View>
@@ -1283,6 +1288,7 @@ export default function StatisticsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <LanguageToolbar helpContent={helpContent} />
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={

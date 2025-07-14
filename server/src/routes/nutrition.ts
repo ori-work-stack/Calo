@@ -52,7 +52,7 @@ router.post("/analyze", async (req: AuthRequest, res) => {
       language: z.string().default("english"),
       date: z.string().optional(),
       updateText: z.string().optional(),
-    }); 
+    });
 
     const validatedData = analysisSchema.parse({
       imageBase64,
@@ -600,5 +600,97 @@ router.get("/meals/:meal_id", authenticateToken, async (req, res) => {
     });
   }
 });
+
+// PUT /api/nutrition/meals/:id - Update meal
+router.put("/meals/:id", authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const mealId = parseInt(req.params.id);
+    const userId = req.user.user_id;
+    const updates = req.body;
+
+    // Verify meal belongs to user
+    const existingMeal = await prisma.meal.findFirst({
+      where: {
+        meal_id: mealId,
+        user_id: userId,
+      },
+    });
+
+    if (!existingMeal) {
+      return res.status(404).json({
+        success: false,
+        error: "Meal not found",
+      });
+    }
+
+    // Update meal
+    const updatedMeal = await prisma.meal.update({
+      where: { meal_id: mealId },
+      data: {
+        ...updates,
+        updated_at: new Date(),
+      },
+    });
+
+    console.log("✅ Meal updated successfully:", mealId);
+
+    res.json({
+      success: true,
+      message: "Meal updated successfully",
+      data: updatedMeal,
+    });
+  } catch (error) {
+    console.error("💥 Error updating meal:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to update meal",
+    });
+  }
+});
+
+// DELETE /api/nutrition/meals/:id - Delete meal
+router.delete(
+  "/meals/:id",
+  authenticateToken,
+  async (req: AuthRequest, res) => {
+    try {
+      const mealId = parseInt(req.params.id);
+      const userId = req.user.user_id;
+
+      // Verify meal belongs to user
+      const existingMeal = await prisma.meal.findFirst({
+        where: {
+          meal_id: mealId,
+          user_id: userId,
+        },
+      });
+
+      if (!existingMeal) {
+        return res.status(404).json({
+          success: false,
+          error: "Meal not found",
+        });
+      }
+
+      // Delete meal
+      await prisma.meal.delete({
+        where: { meal_id: mealId },
+      });
+
+      console.log("✅ Meal deleted successfully:", mealId);
+
+      res.json({
+        success: true,
+        message: "Meal deleted successfully",
+      });
+    } catch (error) {
+      console.error("💥 Error deleting meal:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to delete meal",
+      });
+    }
+  }
+);
 
 export { router as nutritionRoutes };

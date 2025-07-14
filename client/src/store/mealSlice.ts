@@ -716,6 +716,25 @@ const mealSlice = createSlice({
   },
 });
 
+// Add meal deletion thunk
+export const deleteMeal = createAsyncThunk(
+  "meals/delete",
+  async (mealId: number, { rejectWithValue, dispatch }) => {
+    try {
+      await nutritionAPI.deleteMeal(mealId);
+
+      // Refresh all meal-related data after deletion
+      dispatch(fetchMeals());
+
+      return mealId;
+    } catch (error: any) {
+      return rejectWithValue(
+        error.response?.data?.error || error.message || "Failed to delete meal"
+      );
+    }
+  }
+);
+
 export const {
   clearError,
   clearPendingMeal,

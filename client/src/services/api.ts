@@ -1366,3 +1366,21 @@ export const foodScannerAPI = {
     }
   },
 };
+// Adding meal update and delete methods to the mealAPI object.
+export const mealAPI = {
+  uploadMeal: (formData: FormData) =>
+    api.post("/nutrition/upload", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }),
+
+  getMeals: () => api.get("/nutrition/meals"),
+
+  getMealById: (mealId: number) => api.get(`/nutrition/meals/${mealId}`),
+
+  updateMeal: (mealId: number, updates: any) =>
+    api.put(`/nutrition/meals/${mealId}`, updates),
+
+  deleteMeal: (mealId: number) => api.delete(`/nutrition/meals/${mealId}`),
+};

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -27,7 +27,8 @@ import { Meal } from "../../src/types";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { useRTLStyles } from "../../hooks/useRTLStyle";
-import { TooltipBubble } from "@/components/TooltipBubble";
+import TooltipBubble from "@/components/TooltipBubble";
+import { useMealDataRefresh } from "@/hooks/useMealDataRefresh";
 
 interface MealWithFeedback extends Meal {
   userRating?: number;
@@ -46,16 +47,14 @@ interface ExpandedMealData {
 }
 
 export default function HistoryScreen() {
-  const { t } = useTranslation();
+  const [selectedFilter, setSelectedFilter] = useState("all");
   const dispatch = useDispatch<AppDispatch>();
-  const {
-    meals,
-    isLoading,
-    isSavingFeedback,
-    isTogglingFavorite,
-    isDuplicating,
-    isUpdating,
-  } = useSelector((state: RootState) => state.meal);
+  const { meals, isLoading } = useSelector((state: RootState) => state.meal);
+  const { isSavingFeedback, isTogglingFavorite, isDuplicating, isUpdating } =
+    useSelector((state: RootState) => state.meal);
+  const { refreshAllMealData } = useMealDataRefresh();
+
+  const { t } = useTranslation();
 
   const [filteredMeals, setFilteredMeals] = useState<MealWithFeedback[]>([]);
   const [expandedMeals, setExpandedMeals] = useState<ExpandedMealData>({});
@@ -938,6 +937,11 @@ export default function HistoryScreen() {
   const onRefresh = () => {
     dispatch(fetchMeals());
   };
+  const helpContent = {
+    title: "היסטוריית ארוחות",
+    description:
+      "כאן תוכל לראות את כל הארוחות שצילמת והעלית. ניתן לסנן לפי סוג ארוחה או תאריך. לחץ על ארוחה כדי לראות פרטים נוספים או לערוך אותה.",
+  };
 
   if (isLoading && filteredMeals.length === 0) {
     return (
@@ -952,6 +956,8 @@ export default function HistoryScreen() {
 
   return (
     <View style={styles.container}>
+      <LanguageToolbar helpContent={helpContent} />
+
       {/* Search and Filter Header */}
       <View style={styles.header}>
         <Ionicons name="search" size={20} color="#666" />

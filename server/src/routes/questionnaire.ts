@@ -134,9 +134,33 @@ router.post("/", authenticateToken, async (req: AuthRequest, res) => {
       questionnaireData.meal_timing_restrictions =
         questionnaireData.meal_timing_restrictions.join(", ");
     }
-    if (Array.isArray(questionnaireData.notifications_preference)) {
-      questionnaireData.notifications_preference =
-        questionnaireData.notifications_preference.join(", ");
+
+    // Handle notifications_preference - must be enum value or null
+    if (questionnaireData.notifications_preference) {
+      const validNotificationPrefs = ["DAILY", "WEEKLY", "NONE"];
+      let prefValue = questionnaireData.notifications_preference;
+
+      // If it's an array, take the first value
+      if (Array.isArray(prefValue)) {
+        prefValue = prefValue[0];
+      }
+
+      // Normalize the value
+      if (typeof prefValue === "string") {
+        const upperValue = prefValue.toUpperCase();
+        if (validNotificationPrefs.includes(upperValue)) {
+          questionnaireData.notifications_preference = upperValue as
+            | "DAILY"
+            | "WEEKLY"
+            | "NONE";
+        } else {
+          questionnaireData.notifications_preference = null;
+        }
+      } else {
+        questionnaireData.notifications_preference = null;
+      }
+    } else {
+      questionnaireData.notifications_preference = null;
     }
 
     // Array fields that should be arrays in Prisma

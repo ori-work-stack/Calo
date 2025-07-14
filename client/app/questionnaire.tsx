@@ -85,17 +85,17 @@ interface QuestionnaireData {
 
   // Additional schema fields
   program_duration?: string;
-  meal_timing_restrictions?: string[];
+  meal_timing_restrictions?: string;
   dietary_restrictions?: string[];
   willingness_to_follow?: boolean;
   upcoming_events?: string[];
   upload_frequency?: string;
-  notifications_preference?: string[];
+  notifications_preference?: "DAILY" | "WEEKLY" | "NONE" | null;
   personalized_tips?: boolean;
   health_metrics_integration?: boolean;
   family_medical_history?: string[];
-  smoking_status?: string;
-  sleep_hours_per_night?: string | null;
+  smoking_status?: "YES" | "NO" | null;
+  sleep_hours_per_night?: number | null;
 }
 
 const MAIN_GOALS = [
@@ -245,16 +245,16 @@ export default function QuestionnaireScreen() {
 
     // Additional schema fields
     program_duration: "MEDIUM_TERM",
-    meal_timing_restrictions: [],
+    meal_timing_restrictions: "",
     dietary_restrictions: [],
     willingness_to_follow: true,
     upcoming_events: [],
     upload_frequency: "",
-    notifications_preference: [],
+    notifications_preference: null,
     personalized_tips: true,
     health_metrics_integration: false,
     family_medical_history: [],
-    smoking_status: "",
+    smoking_status: null,
     sleep_hours_per_night: null,
   });
 
@@ -387,7 +387,7 @@ export default function QuestionnaireScreen() {
 
         // Additional schema fields
         program_duration: safeString(questionnaire.program_duration),
-        meal_timing_restrictions: safeArray(
+        meal_timing_restrictions: safeString(
           questionnaire.meal_timing_restrictions
         ),
         dietary_restrictions: safeArray(questionnaire.dietary_restrictions),
@@ -397,9 +397,11 @@ export default function QuestionnaireScreen() {
             : true,
         upcoming_events: safeArray(questionnaire.upcoming_events),
         upload_frequency: safeString(questionnaire.upload_frequency),
-        notifications_preference: safeArray(
-          questionnaire.notifications_preference
-        ),
+        notifications_preference: questionnaire.notifications_preference as
+          | "DAILY"
+          | "WEEKLY"
+          | "NONE"
+          | null,
         personalized_tips:
           questionnaire.personalized_tips !== undefined
             ? safeBoolean(questionnaire.personalized_tips)
@@ -408,8 +410,10 @@ export default function QuestionnaireScreen() {
           questionnaire.health_metrics_integration
         ),
         family_medical_history: safeArray(questionnaire.family_medical_history),
-        smoking_status: safeString(questionnaire.smoking_status),
-        sleep_hours_per_night: safeString(questionnaire.sleep_hours_per_night),
+        smoking_status: questionnaire.smoking_status as "YES" | "NO" | null,
+        sleep_hours_per_night: questionnaire.sleep_hours_per_night as
+          | number
+          | null,
       };
 
       setFormData(mappedData);
@@ -436,8 +440,19 @@ export default function QuestionnaireScreen() {
   const handleSubmit = async () => {
     try {
       // Validate required fields
-      if (!formData.age || !formData.gender || !formData.main_goal) {
-        Alert.alert("שגיאה", "אנא מלא את כל השדות הנדרשים");
+      if (
+        !formData.age ||
+        !formData.gender ||
+        !formData.height_cm ||
+        !formData.weight_kg ||
+        !formData.main_goal ||
+        !formData.commitment_level ||
+        !formData.physical_activity_level ||
+        !formData.sport_frequency ||
+        !formData.cooking_preference ||
+        !formData.dietary_style
+      ) {
+        Alert.alert("שגיאה", "אנא מלא את כל השדות הנדרשים בכל השלבים");
         return;
       }
 
@@ -459,10 +474,19 @@ export default function QuestionnaireScreen() {
         cleanFormData.daily_food_budget = null;
       if (cleanFormData.daily_cooking_time === "")
         cleanFormData.daily_cooking_time = null;
-      if (cleanFormData.sleep_hours_per_night === "")
-        cleanFormData.sleep_hours_per_night = null;
       if (cleanFormData.fasting_hours === "")
         cleanFormData.fasting_hours = null;
+
+      // Convert sleep_hours_per_night from string to number
+      if (
+        cleanFormData.sleep_hours_per_night === "" ||
+        cleanFormData.sleep_hours_per_night === null
+      ) {
+        cleanFormData.sleep_hours_per_night = null;
+      } else if (typeof cleanFormData.sleep_hours_per_night === "string") {
+        const parsed = parseFloat(cleanFormData.sleep_hours_per_night);
+        cleanFormData.sleep_hours_per_night = isNaN(parsed) ? null : parsed;
+      }
 
       // For edit mode, we want to preserve the questionnaire completion status
       const dataToSubmit = {
@@ -1136,26 +1160,32 @@ export default function QuestionnaireScreen() {
       <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>סטטוס עישון</Text>
         <View style={styles.optionGroup}>
-          {["לא מעשן", "מעשן", "מעשן לשעבר", "עישון חברתי"].map((status) => (
+          {[
+            { label: "לא מעשן", value: "NO" },
+            { label: "מעשן", value: "YES" },
+          ].map((status) => (
             <TouchableOpacity
-              key={status}
+              key={status.value}
               style={[
                 styles.optionButton,
-                formData.smoking_status === status &&
+                formData.smoking_status === status.value &&
                   styles.optionButtonSelected,
               ]}
               onPress={() =>
-                setFormData({ ...formData, smoking_status: status })
+                setFormData({
+                  ...formData,
+                  smoking_status: status.value as "YES" | "NO",
+                })
               }
             >
               <Text
                 style={[
                   styles.optionText,
-                  formData.smoking_status === status &&
+                  formData.smoking_status === status.value &&
                     styles.optionTextSelected,
                 ]}
               >
-                {status}
+                {status.label}
               </Text>
             </TouchableOpacity>
           ))}
@@ -1179,22 +1209,18 @@ export default function QuestionnaireScreen() {
         maxItems={10}
       />
 
-      <DynamicListInput
-        label="הגבלות זמן ארוחות"
-        placeholder="הוסף הגבלת זמן (לדוגמה: לא יכול לאכול לפני 9:00)..."
-        initialItems={
-          Array.isArray(formData.meal_timing_restrictions)
-            ? formData.meal_timing_restrictions
-            : []
-        }
-        onItemsChange={(value: string[]) =>
-          setFormData({
-            ...formData,
-            meal_timing_restrictions: Array.isArray(value) ? value : [value],
-          })
-        }
-        maxItems={8}
-      />
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>הגבלות זמן ארוחות</Text>
+        <TextInput
+          style={styles.textInput}
+          value={formData.meal_timing_restrictions || ""}
+          onChangeText={(text) =>
+            setFormData({ ...formData, meal_timing_restrictions: text })
+          }
+          placeholder="לדוגמה: לא יכול לאכול לפני 9:00"
+          multiline
+        />
+      </View>
     </View>
   );
 
@@ -1334,22 +1360,44 @@ export default function QuestionnaireScreen() {
         maxItems={10}
       />
 
-      <DynamicListInput
-        label="העדפות התראות"
-        placeholder="הוסף העדפת התראה (לדוגמה: בוקר, ערב)..."
-        initialItems={
-          Array.isArray(formData.notifications_preference)
-            ? formData.notifications_preference
-            : []
-        }
-        onItemsChange={(value: string[]) =>
-          setFormData({
-            ...formData,
-            notifications_preference: Array.isArray(value) ? value : [value],
-          })
-        }
-        maxItems={5}
-      />
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>העדפות התראות</Text>
+        <View style={styles.optionGroup}>
+          {[
+            { label: "יומי", value: "DAILY" },
+            { label: "שבועי", value: "WEEKLY" },
+            { label: "ללא", value: "NONE" },
+          ].map((pref) => (
+            <TouchableOpacity
+              key={pref.value}
+              style={[
+                styles.optionButton,
+                formData.notifications_preference === pref.value &&
+                  styles.optionButtonSelected,
+              ]}
+              onPress={() =>
+                setFormData({
+                  ...formData,
+                  notifications_preference: pref.value as
+                    | "DAILY"
+                    | "WEEKLY"
+                    | "NONE",
+                })
+              }
+            >
+              <Text
+                style={[
+                  styles.optionText,
+                  formData.notifications_preference === pref.value &&
+                    styles.optionTextSelected,
+                ]}
+              >
+                {pref.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
 
       <DynamicListInput
         label="אירועים קרובים"
@@ -1588,9 +1636,29 @@ export default function QuestionnaireScreen() {
   const canProceed = () => {
     switch (currentStep) {
       case 1:
-        return formData.age && formData.gender;
+        return (
+          formData.age &&
+          formData.gender &&
+          formData.height_cm &&
+          formData.weight_kg
+        );
       case 2:
-        return formData.main_goal;
+        return formData.main_goal && formData.commitment_level;
+      case 3:
+        return formData.physical_activity_level && formData.sport_frequency;
+      case 4:
+        return true; // Health step - only dynamic inputs
+      case 5:
+        return (
+          formData.cooking_preference &&
+          formData.available_cooking_methods.length > 0
+        );
+      case 6:
+        return formData.dietary_style;
+      case 7:
+        return true; // Lifestyle step - only dynamic inputs
+      case 8:
+        return true; // Preferences step - only dynamic inputs
       default:
         return true;
     }
