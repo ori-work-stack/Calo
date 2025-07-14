@@ -1,10 +1,9 @@
 import React, { useState, useRef } from "react";
+import { View, Dimensions } from "react-native";
 import {
-  View,
-  Dimensions,
   PanGestureHandler,
   PanGestureHandlerGestureEvent,
-} from "react-native";
+} from "react-native-gesture-handler";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -13,55 +12,64 @@ import Animated, {
   runOnJS,
 } from "react-native-reanimated";
 
-interface SwipeableScreensProps {
-  screens: React.ReactNode[];
-  currentIndex: number;
-  onIndexChange: (index: number) => void;
-}
-
 const { width: screenWidth } = Dimensions.get("window");
 
-export const SwipeableScreens: React.FC<SwipeableScreensProps> = ({
+interface SwipeableScreensProps {
+  screens: React.ReactNode[];
+  initialIndex?: number;
+  onIndexChange?: (index: number) => void;
+}
+
+export default function SwipeableScreens({
   screens,
-  currentIndex,
+  initialIndex = 0,
   onIndexChange,
-}) => {
-  const translateX = useSharedValue(-currentIndex * screenWidth);
+}: SwipeableScreensProps) {
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const translateX = useSharedValue(-initialIndex * screenWidth);
 
-  const gestureHandler =
-    useAnimatedGestureHandler<PanGestureHandlerGestureEvent>({
-      onStart: (_, context) => {
-        context.startX = translateX.value;
-      },
-      onActive: (event, context) => {
-        translateX.value = context.startX + event.translationX;
-      },
-      onEnd: (event) => {
-        const shouldMoveToNext =
-          event.translationX < -screenWidth / 3 &&
-          currentIndex < screens.length - 1;
-        const shouldMoveToPrevious =
-          event.translationX > screenWidth / 3 && currentIndex > 0;
+  const updateIndex = (newIndex: number) => {
+    setCurrentIndex(newIndex);
+    onIndexChange?.(newIndex);
+  };
 
-        if (shouldMoveToNext) {
-          translateX.value = withSpring(-(currentIndex + 1) * screenWidth);
-          runOnJS(onIndexChange)(currentIndex + 1);
-        } else if (shouldMoveToPrevious) {
-          translateX.value = withSpring(-(currentIndex - 1) * screenWidth);
-          runOnJS(onIndexChange)(currentIndex - 1);
-        } else {
-          translateX.value = withSpring(-currentIndex * screenWidth);
-        }
-      },
-    });
+  const gestureHandler = useAnimatedGestureHandler<
+    PanGestureHandlerGestureEvent,
+    { startX: number }
+  >({
+    onStart: (_, context) => {
+      context.startX = translateX.value;
+    },
+    onActive: (event, context) => {
+      translateX.value = context.startX + event.translationX;
+    },
+    onEnd: (event) => {
+      const shouldGoToNext =
+        event.translationX < -screenWidth / 3 && event.velocityX < 0;
+      const shouldGoToPrevious =
+        event.translationX > screenWidth / 3 && event.velocityX > 0;
 
-  React.useEffect(() => {
-    translateX.value = withSpring(-currentIndex * screenWidth);
-  }, [currentIndex]);
+      let newIndex = currentIndex;
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
-  }));
+      if (shouldGoToNext && currentIndex < screens.length - 1) {
+        newIndex = currentIndex + 1;
+      } else if (shouldGoToPrevious && currentIndex > 0) {
+        newIndex = currentIndex - 1;
+      }
+
+      translateX.value = withSpring(-newIndex * screenWidth);
+
+      if (newIndex !== currentIndex) {
+        runOnJS(updateIndex)(newIndex);
+      }
+    },
+  });
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateX: translateX.value }],
+    };
+  });
 
   return (
     <View style={{ flex: 1, overflow: "hidden" }}>
@@ -69,14 +77,15 @@ export const SwipeableScreens: React.FC<SwipeableScreensProps> = ({
         <Animated.View
           style={[
             {
+              flex: 1,
               flexDirection: "row",
-              width: screens.length * screenWidth,
+              width: screenWidth * screens.length,
             },
             animatedStyle,
           ]}
         >
           {screens.map((screen, index) => (
-            <View key={index} style={{ width: screenWidth }}>
+            <View key={index} style={{ width: screenWidth, flex: 1 }}>
               {screen}
             </View>
           ))}
@@ -84,4 +93,4 @@ export const SwipeableScreens: React.FC<SwipeableScreensProps> = ({
       </PanGestureHandler>
     </View>
   );
-};
+}

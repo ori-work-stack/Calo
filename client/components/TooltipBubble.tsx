@@ -10,135 +10,231 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 interface TooltipBubbleProps {
   message: string;
-  pageKey: string;
-  position?: "top" | "bottom" | "center";
-  persistent?: boolean;
-  showDelay?: number;
+  position: "top" | "bottom" | "left" | "right";
+  isVisible: boolean;
+  onClose: () => void;
+  targetRef?: React.RefObject<any>;
+  storageKey?: string;
 }
 
-export const TooltipBubble: React.FC<TooltipBubbleProps> = ({
+export default function TooltipBubble({
   message,
-  pageKey,
   position = "top",
-  persistent = false,
-  showDelay = 1000,
-}) => {
-  const [isVisible, setIsVisible] = useState(false);
-  const [isDismissed, setIsDismissed] = useState(false);
-  const fadeAnim = new Animated.Value(0);
+  isVisible,
+  onClose,
+  storageKey,
+}: TooltipBubbleProps) {
+  const [opacity] = useState(new Animated.Value(0));
+  const [scale] = useState(new Animated.Value(0));
+  const [shouldShow, setShouldShow] = useState(false);
 
   useEffect(() => {
-    const checkDismissalStatus = async () => {
-      if (!persistent) {
-        try {
-          const dismissed = await AsyncStorage.getItem(
-            `tooltip_dismissed_${pageKey}`
-          );
-          if (dismissed === "true") {
-            setIsDismissed(true);
-            return;
-          }
-        } catch (error) {
-          console.log("Error checking tooltip dismissal:", error);
-        }
-      }
+    checkStorageAndShow();
+  }, []);
 
-      // Show tooltip after delay
-      const timer = setTimeout(() => {
-        setIsVisible(true);
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }).start();
-      }, showDelay);
+  useEffect(() => {
+    if (isVisible && shouldShow) {
+      showTooltip();
+    } else {
+      hideTooltip();
+    }
+  }, [isVisible, shouldShow]);
 
-      return () => clearTimeout(timer);
-    };
-
-    checkDismissalStatus();
-  }, [pageKey, persistent, showDelay]);
-
-  const handleDismiss = async () => {
-    Animated.timing(fadeAnim, {
-      toValue: 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start(() => {
-      setIsVisible(false);
-    });
-
-    if (!persistent) {
+  const checkStorageAndShow = async () => {
+    if (storageKey) {
       try {
-        await AsyncStorage.setItem(`tooltip_dismissed_${pageKey}`, "true");
+        const hasShown = await AsyncStorage.getItem(storageKey);
+        if (!hasShown) {
+          setShouldShow(true);
+        }
       } catch (error) {
-        console.log("Error saving tooltip dismissal:", error);
+        console.error("Error checking tooltip storage:", error);
+        setShouldShow(true);
       }
+    } else {
+      setShouldShow(true);
     }
   };
 
-  if (!isVisible || isDismissed) {
+  const showTooltip = () => {
+    Animated.parallel([
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scale, {
+        toValue: 1,
+        tension: 100,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const hideTooltip = () => {
+    Animated.parallel([
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scale, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const handleClose = async () => {
+    if (storageKey) {
+      try {
+        await AsyncStorage.setItem(storageKey, "true");
+      } catch (error) {
+        console.error("Error saving tooltip state:", error);
+      }
+    }
+    onClose();
+  };
+
+  if (!isVisible || !shouldShow) {
     return null;
   }
 
-  const getPositionStyle = () => {
+  const getArrowStyle = () => {
     switch (position) {
       case "top":
-        return { top: 50 };
+        return styles.arrowBottom;
       case "bottom":
-        return { bottom: 50 };
-      case "center":
-        return { top: "50%", marginTop: -25 };
+        return styles.arrowTop;
+      case "left":
+        return styles.arrowRight;
+      case "right":
+        return styles.arrowLeft;
       default:
-        return { top: 50 };
+        return styles.arrowBottom;
     }
   };
 
   return (
     <Animated.View
-      style={[styles.container, getPositionStyle(), { opacity: fadeAnim }]}
+      style={[
+        styles.tooltip,
+        styles[position],
+        {
+          opacity,
+          transform: [{ scale }],
+        },
+      ]}
     >
-      <View style={styles.tooltip}>
-        <Text style={styles.text}>{message}</Text>
-        <TouchableOpacity onPress={handleDismiss} style={styles.closeButton}>
+      <View style={styles.bubble}>
+        <Text style={styles.message}>{message}</Text>
+        <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
           <Text style={styles.closeText}>×</Text>
         </TouchableOpacity>
       </View>
+      <View style={[styles.arrow, getArrowStyle()]} />
     </Animated.View>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  container: {
-    position: "absolute",
-    left: 20,
-    right: 20,
-    zIndex: 1000,
-  },
   tooltip: {
+    position: "absolute",
+    zIndex: 1000,
+    maxWidth: 250,
+  },
+  top: {
+    bottom: "100%",
+    marginBottom: 8,
+  },
+  bottom: {
+    top: "100%",
+    marginTop: 8,
+  },
+  left: {
+    right: "100%",
+    marginRight: 8,
+  },
+  right: {
+    left: "100%",
+    marginLeft: 8,
+  },
+  bubble: {
     backgroundColor: "#333",
-    padding: 12,
     borderRadius: 8,
+    padding: 12,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
   },
-  text: {
-    color: "#fff",
+  message: {
+    color: "white",
     fontSize: 14,
     flex: 1,
   },
   closeButton: {
-    marginLeft: 10,
-    padding: 5,
+    marginLeft: 8,
+    padding: 4,
   },
   closeText: {
-    color: "#fff",
+    color: "white",
     fontSize: 18,
     fontWeight: "bold",
+  },
+  arrow: {
+    position: "absolute",
+    width: 0,
+    height: 0,
+  },
+  arrowTop: {
+    top: -6,
+    left: "50%",
+    marginLeft: -6,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderBottomWidth: 6,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderBottomColor: "#333",
+  },
+  arrowBottom: {
+    bottom: -6,
+    left: "50%",
+    marginLeft: -6,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 6,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderTopColor: "#333",
+  },
+  arrowLeft: {
+    left: -6,
+    top: "50%",
+    marginTop: -6,
+    borderTopWidth: 6,
+    borderBottomWidth: 6,
+    borderRightWidth: 6,
+    borderTopColor: "transparent",
+    borderBottomColor: "transparent",
+    borderRightColor: "#333",
+  },
+  arrowRight: {
+    right: -6,
+    top: "50%",
+    marginTop: -6,
+    borderTopWidth: 6,
+    borderBottomWidth: 6,
+    borderLeftWidth: 6,
+    borderTopColor: "transparent",
+    borderBottomColor: "transparent",
+    borderLeftColor: "#333",
   },
 });

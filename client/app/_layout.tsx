@@ -41,13 +41,6 @@ function AppContent() {
   const [navigationAttempts, setNavigationAttempts] = useState(0);
   const [lastNavigationKey, setLastNavigationKey] = useState("");
 
-  // Reset navigation attempts when user changes
-  useEffect(() => {
-    setNavigationAttempts(0);
-    setIsNavigating(false);
-    setLastNavigationKey("");
-  }, [isAuthenticated, user?.email]);
-
   // 🎯 Splash hide
   useEffect(() => {
     if (loaded) {
@@ -55,17 +48,9 @@ function AppContent() {
     }
   }, [loaded]);
 
-  // 🎯 Auth + Subscription Routing - Stable navigation logic
+  // 🎯 Auth + Subscription Routing - Simplified and stable
   useEffect(() => {
     if (!loaded) return;
-
-    // Create a unique key for this navigation state
-    const navigationKey = `${isAuthenticated}-${user?.email_verified}-${user?.subscription_type}-${user?.is_questionnaire_completed}`;
-
-    // Skip if we've already processed this exact state
-    if (navigationKey === lastNavigationKey) {
-      return;
-    }
 
     const currentPath = segments[0];
     const inAuthGroup = currentPath === "(auth)";
@@ -75,79 +60,64 @@ function AppContent() {
     const onEmailVerification =
       inAuthGroup && segments[1] === "email-verification";
 
-    console.log("Navigation effect triggered:", {
-      loaded,
-      isAuthenticated,
-      user: user?.email,
-      currentPath,
-      userEmailVerified: user?.email_verified,
-      userSubscriptionType: user?.subscription_type,
-      userQuestionnaireCompleted: user?.is_questionnaire_completed,
-      navigationKey,
-      lastNavigationKey,
-    });
+    // Create navigation state key
+    const authState = isAuthenticated ? "auth" : "noauth";
+    const emailState = user?.email_verified ? "verified" : "unverified";
+    const subState = user?.subscription_type || "nosub";
+    const questState = user?.is_questionnaire_completed
+      ? "complete"
+      : "incomplete";
+    const navigationKey = `${authState}-${emailState}-${subState}-${questState}-${currentPath}`;
 
-    // Update the last navigation key
+    // Prevent navigation loops
+    if (navigationKey === lastNavigationKey) {
+      return;
+    }
+
     setLastNavigationKey(navigationKey);
 
-    // Not authenticated - go to signin
+    // Navigation logic without causing re-renders
     if (!isAuthenticated || !user) {
-      if (!inAuthGroup && !onEmailVerification && !onPaymentPlan) {
-        console.log("Navigating to signin - not authenticated");
+      if (!inAuthGroup) {
         router.replace("/(auth)/signin");
       }
       return;
     }
 
-    // Email not verified - go to verification
-    if (user.email_verified === false) {
-      if (!onEmailVerification) {
-        console.log("Navigating to email verification - email not verified");
-        router.replace(`/(auth)/email-verification?email=${user.email}`);
-      }
+    if (user.email_verified === false && !onEmailVerification) {
+      router.replace(`/(auth)/email-verification?email=${user.email}`);
       return;
     }
 
-    // No subscription - go to payment plan
-    if (!user.subscription_type) {
-      if (!onPaymentPlan) {
-        console.log("Navigating to payment plan - no subscription");
-        router.replace("/payment-plan");
-      }
+    if (!user.subscription_type && !onPaymentPlan) {
+      router.replace("/payment-plan");
       return;
     }
 
-    // Premium/Gold without questionnaire - go to questionnaire
     if (
       ["PREMIUM", "GOLD"].includes(user.subscription_type) &&
-      !user.is_questionnaire_completed
+      !user.is_questionnaire_completed &&
+      !onQuestionnaire
     ) {
-      if (!onQuestionnaire) {
-        console.log(
-          "Navigating to questionnaire - premium/gold without questionnaire"
-        );
-        router.replace("/questionnaire");
-      }
+      router.replace("/questionnaire");
       return;
     }
 
-    // All checks passed - already on main app, no need to navigate
-    if (inTabsGroup) {
-      console.log("Already on main app - no navigation needed");
-      return;
+    if (
+      !inTabsGroup &&
+      isAuthenticated &&
+      user.email_verified &&
+      user.subscription_type
+    ) {
+      router.replace("/(tabs)");
     }
-
-    // Navigate to main app only if not already there
-    console.log("Navigating to main app - all checks passed");
-    router.replace("/(tabs)");
   }, [
     loaded,
     isAuthenticated,
     user?.email_verified,
     user?.subscription_type,
     user?.is_questionnaire_completed,
-    lastNavigationKey,
-    // Removed segments from dependencies to prevent infinite loops
+    segments,
   ]);
 
   // ✅ DO CONDITIONAL RETURN *AFTER* ALL HOOKS

@@ -1,9 +1,11 @@
 import { useRouter } from "expo-router";
-import Animated, {
+import {
   useAnimatedGestureHandler,
   useSharedValue,
   runOnJS,
+  withSpring,
 } from "react-native-reanimated";
+import { PanGestureHandlerGestureEvent } from "react-native-gesture-handler";
 
 export const useSwipeNavigation = () => {
   const router = useRouter();
@@ -13,7 +15,10 @@ export const useSwipeNavigation = () => {
     router.push("/(tabs)/camera");
   };
 
-  const gestureHandler = useAnimatedGestureHandler({
+  const gestureHandler = useAnimatedGestureHandler<
+    PanGestureHandlerGestureEvent,
+    { startX: number }
+  >({
     onStart: (_, context) => {
       context.startX = translateX.value;
     },
@@ -25,7 +30,7 @@ export const useSwipeNavigation = () => {
       if (event.translationX > 100 && event.velocityX > 0) {
         runOnJS(navigateToCamera)();
       }
-      translateX.value = 0;
+      translateX.value = withSpring(0);
     },
   });
 

@@ -9,161 +9,144 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
-interface DynamicListInputProps {
-  label: string;
+interface DynamicListInputsProps {
+  title: string;
   placeholder: string;
-  value: string[];
-  onValueChange: (value: string[]) => void;
+  onItemsChange: (items: string[]) => void;
+  initialItems?: string[];
   maxItems?: number;
-  style?: any;
 }
 
-export const DynamicListInput: React.FC<DynamicListInputProps> = ({
-  label,
+export default function DynamicListInputs({
+  title,
   placeholder,
-  value = [], // Ensure value is an array by default
-  onValueChange,
+  onItemsChange,
+  initialItems = [],
   maxItems = 10,
-  style,
-}) => {
-  const [inputText, setInputText] = useState("");
-
-  // Defensive programming - ensure value is always an array and onValueChange is a function
-  const safeValue = Array.isArray(value) ? value : [];
-  const safeOnValueChange = onValueChange || (() => {});
+}: DynamicListInputsProps) {
+  const [items, setItems] = useState<string[]>(initialItems);
+  const [inputValue, setInputValue] = useState("");
 
   const addItem = () => {
-    const trimmedText = inputText.trim();
-    if (
-      trimmedText &&
-      !safeValue.includes(trimmedText) &&
-      safeValue.length < maxItems
-    ) {
-      safeOnValueChange([...safeValue, trimmedText]);
-      setInputText("");
+    if (inputValue.trim() && items.length < maxItems) {
+      const newItems = [...items, inputValue.trim()];
+      setItems(newItems);
+      setInputValue("");
+      onItemsChange(newItems);
     }
   };
 
   const removeItem = (index: number) => {
-    const newValue = safeValue.filter((_, i) => i !== index);
-    safeOnValueChange(newValue);
+    const newItems = items.filter((_, i) => i !== index);
+    setItems(newItems);
+    onItemsChange(newItems);
+  };
+
+  const updateItem = (index: number, value: string) => {
+    const newItems = [...items];
+    newItems[index] = value;
+    setItems(newItems);
+    onItemsChange(newItems);
   };
 
   return (
-    <View style={[styles.container, style]}>
-      <Text style={styles.label}>{label}</Text>
+    <View style={styles.container}>
+      <Text style={styles.title}>{title}</Text>
 
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.textInput}
-          value={inputText}
-          onChangeText={setInputText}
-          placeholder={placeholder}
-          onSubmitEditing={addItem}
-          returnKeyType="done"
-        />
-        <TouchableOpacity
-          style={[
-            styles.addButton,
-            !inputText.trim() && styles.addButtonDisabled,
-          ]}
-          onPress={addItem}
-          disabled={!inputText.trim() || safeValue.length >= maxItems}
-        >
-          <Ionicons name="add" size={20} color="white" />
-        </TouchableOpacity>
-      </View>
+      <ScrollView style={styles.itemsList} showsVerticalScrollIndicator={false}>
+        {items.map((item, index) => (
+          <View key={index} style={styles.itemContainer}>
+            <TextInput
+              style={styles.itemInput}
+              value={item}
+              onChangeText={(value) => updateItem(index, value)}
+              placeholder={placeholder}
+            />
+            <TouchableOpacity
+              style={styles.removeButton}
+              onPress={() => removeItem(index)}
+            >
+              <Ionicons name="close-circle" size={24} color="#FF3B30" />
+            </TouchableOpacity>
+          </View>
+        ))}
+      </ScrollView>
 
-      {safeValue.length > 0 && (
-        <ScrollView
-          style={styles.listContainer}
-          showsVerticalScrollIndicator={false}
-        >
-          {Array.isArray(safeValue) &&
-            safeValue.map((item, index) => (
-              <View key={index} style={styles.listItem}>
-                <Text style={styles.listItemText}>{item}</Text>
-                <TouchableOpacity
-                  style={styles.removeButton}
-                  onPress={() => removeItem(index)}
-                >
-                  <Ionicons name="close" size={16} color="#FF3B30" />
-                </TouchableOpacity>
-              </View>
-            ))}
-        </ScrollView>
-      )}
-
-      {safeValue.length > 0 && (
-        <Text style={styles.countText}>
-          {safeValue.length} {safeValue.length === 1 ? "item" : "items"} added
-        </Text>
+      {items.length < maxItems && (
+        <View style={styles.addContainer}>
+          <TextInput
+            style={styles.addInput}
+            value={inputValue}
+            onChangeText={setInputValue}
+            placeholder={placeholder}
+            onSubmitEditing={addItem}
+          />
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={addItem}
+            disabled={!inputValue.trim()}
+          >
+            <Ionicons name="add-circle" size={24} color="#007AFF" />
+          </TouchableOpacity>
+        </View>
       )}
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 25,
+    backgroundColor: "white",
+    borderRadius: 12,
+    padding: 16,
+    marginVertical: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  label: {
+  title: {
     fontSize: 16,
     fontWeight: "600",
     color: "#333",
-    marginBottom: 10,
+    marginBottom: 12,
   },
-  inputContainer: {
+  itemsList: {
+    maxHeight: 200,
+    marginBottom: 12,
+  },
+  itemContainer: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    marginBottom: 8,
   },
-  textInput: {
+  itemInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#ddd",
+    borderColor: "#E0E0E0",
     borderRadius: 8,
     padding: 12,
-    fontSize: 16,
-    backgroundColor: "white",
-  },
-  addButton: {
-    backgroundColor: "#007AFF",
-    borderRadius: 8,
-    padding: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    minWidth: 44,
-  },
-  addButtonDisabled: {
-    backgroundColor: "#ccc",
-  },
-  listContainer: {
-    maxHeight: 150,
-    marginTop: 10,
-  },
-  listItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#f8f9fa",
-    padding: 10,
-    borderRadius: 6,
-    marginBottom: 5,
-  },
-  listItemText: {
-    flex: 1,
-    fontSize: 14,
-    color: "#333",
+    backgroundColor: "#F9F9F9",
+    marginRight: 8,
   },
   removeButton: {
-    padding: 5,
-    marginLeft: 10,
+    padding: 4,
   },
-  countText: {
-    fontSize: 12,
-    color: "#666",
-    marginTop: 5,
-    fontStyle: "italic",
+  addContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  addInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: "#F9F9F9",
+    marginRight: 8,
+  },
+  addButton: {
+    padding: 4,
   },
 });
