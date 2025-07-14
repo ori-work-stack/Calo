@@ -70,7 +70,7 @@ export default function TabLayout() {
         options={{
           title: t("tabs.meal_plans"),
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="house.fill" color={color} />
+            <IconSymbol size={28} name="fork.knife" color={color} />
           ),
         }}
       />
@@ -143,6 +143,15 @@ export default function TabLayout() {
           title: t("tabs.profile"),
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="person.fill" color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="questionnaire"
+        options={{
+          title: t("tabs.questionnaire"),
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="doc.text.fill" color={color} />
           ),
         }}
       />

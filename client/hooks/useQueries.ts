@@ -5,15 +5,15 @@ import {
   useInfiniteQuery,
 } from "@tanstack/react-query";
 import {
-  authAPI,
   nutritionAPI,
+  authAPI,
   calendarAPI,
   userAPI,
 } from "@/src/services/api";
 import { MealAnalysisData, Meal } from "@/src/types";
-import { deviceAPI } from "@/src/services/deviceAPI";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-// Query Keys
+// Centralized query keys
 export const queryKeys = {
   auth: ["auth"] as const,
   meals: ["meals"] as const,
@@ -23,10 +23,36 @@ export const queryKeys = {
   calendar: (year: number, month: number) => ["calendar", year, month] as const,
   calendarStats: (year: number, month: number) =>
     ["calendarStats", year, month] as const,
-  devices: ["devices"] as const,
-  activityData: (date: string) => ["activityData", date] as const,
-  dailyBalance: (date: string) => ["dailyBalance", date] as const,
+  userProfile: ["userProfile"] as const,
+  tooltips: ["tooltips"] as const,
+  statistics: (timeRange: string, start?: string, end?: string) =>
+    ["statistics", timeRange, start, end] as const,
 } as const;
+
+// Tooltip hooks
+export const useTooltipVisibility = (tooltipId: string) => {
+  return useQuery({
+    queryKey: [...queryKeys.tooltips, tooltipId],
+    queryFn: async () => {
+      const shown = await AsyncStorage.getItem(`tooltip_${tooltipId}_shown`);
+      return shown === "true";
+    },
+    staleTime: Infinity,
+  });
+};
+
+export const useMarkTooltipShown = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (tooltipId: string) => {
+      await AsyncStorage.setItem(`tooltip_${tooltipId}_shown`, "true");
+      return tooltipId;
+    },
+    onSuccess: (tooltipId) => {
+      queryClient.setQueryData([...queryKeys.tooltips, tooltipId], true);
+    },
+  });
+};
 
 // Auth Hooks
 export function useSignIn() {
@@ -35,7 +61,6 @@ export function useSignIn() {
   return useMutation({
     mutationFn: authAPI.signIn,
     onSuccess: () => {
-      // Invalidate and refetch user data
       queryClient.invalidateQueries({ queryKey: queryKeys.auth });
     },
   });
@@ -58,7 +83,6 @@ export function useSignOut() {
   return useMutation({
     mutationFn: authAPI.signOut,
     onSuccess: () => {
-      // Clear all queries on sign out
       queryClient.clear();
     },
   });
@@ -68,10 +92,9 @@ export function useSignOut() {
 export function useMeals() {
   return useQuery({
     queryKey: queryKeys.meals,
-    queryFn: () => nutritionAPI.getMeals(), // Wrap in arrow function
-    staleTime: 1000 * 60 * 15, // 15 minutes - longer cache
+    queryFn: () => nutritionAPI.getMeals(),
+    staleTime: 1000 * 60 * 15,
     select: (data: Meal[]) => {
-      // Sort meals by upload_time for consistent ordering
       return (
         data?.sort(
           (a: Meal, b: Meal) =>
@@ -91,7 +114,7 @@ export function useMealsInfinite(limit = 20) {
       if (lastPage.length < limit) return undefined;
       return pages.length * limit;
     },
-    staleTime: 1000 * 60 * 15, // 15 minutes
+    staleTime: 1000 * 60 * 15,
     initialPageParam: 0,
   });
 }
@@ -119,42 +142,35 @@ export function useSaveMeal() {
       imageBase64?: string;
     }) => nutritionAPI.saveMeal(mealData, imageBase64),
     onMutate: async ({ mealData }) => {
-      // Cancel any outgoing refetches
       await queryClient.cancelQueries({ queryKey: queryKeys.meals });
 
-      // Snapshot the previous value
       const previousMeals = queryClient.getQueryData<Meal[]>(queryKeys.meals);
 
-      // Generate a temporary numeric ID for meal_id
       const tempId = Date.now();
-      // Optimistically update to the new value
       const optimisticMeal: Meal = {
-        // Primary fields matching Prisma schema
         meal_id: tempId,
         id: `temp-${tempId}`,
         user_id: "temp-user",
         image_url: "",
         upload_time: new Date().toISOString(),
         analysis_status: "COMPLETED" as const,
-        meal_name: mealData.name || "New Meal",
+        meal_name: mealData.meal_name || "New Meal",
         calories: mealData.calories || 0,
-        protein_g: mealData.protein || 0,
-        carbs_g: mealData.carbs || 0,
-        fats_g: mealData.fat || 0,
-        fiber_g: mealData.fiber || null,
-        sugar_g: mealData.sugar || null,
-        sodium_mg: mealData.sodium || null,
+        protein_g: mealData.protein_g || 0,
+        carbs_g: mealData.carbs_g || 0,
+        fats_g: mealData.fats_g || 0,
+        fiber_g: mealData.fiber_g || null,
+        sugar_g: mealData.sugar_g || null,
+        sodium_mg: mealData.sodium_g || null,
         created_at: new Date().toISOString(),
-
-        // Computed fields for compatibility
-        name: mealData.name || "New Meal",
+        name: mealData.meal_name || "New Meal",
         description: mealData.description,
-        protein: mealData.protein || 0,
-        carbs: mealData.carbs || 0,
-        fat: mealData.fat || 0,
-        fiber: mealData.fiber,
-        sugar: mealData.sugar,
-        sodium: mealData.sodium,
+        protein: mealData.protein_g || 0,
+        carbs: mealData.carbs_g || 0,
+        fat: mealData.fats_g || 0,
+        fiber: mealData.fiber_g,
+        sugar: mealData.sugar_g,
+        sodium: mealData.sodium_g,
         userId: "temp-user",
       };
 
@@ -166,18 +182,15 @@ export function useSaveMeal() {
       return { previousMeals };
     },
     onSuccess: (data, variables, context) => {
-      // Replace optimistic update with real data
       queryClient.setQueryData<Meal[]>(queryKeys.meals, (old) => {
         if (!old) return [data];
-        return [data, ...old.slice(1)]; // Remove the optimistic meal and add real one
+        return [data, ...old.slice(1)];
       });
 
-      // Invalidate related queries for fresh data
       const today = new Date().toISOString().split("T")[0];
       queryClient.invalidateQueries({ queryKey: queryKeys.dailyStats(today) });
       queryClient.invalidateQueries({ queryKey: queryKeys.globalStats });
 
-      // Also invalidate calendar data for today
       const currentDate = new Date();
       queryClient.invalidateQueries({
         queryKey: queryKeys.calendar(
@@ -187,7 +200,6 @@ export function useSaveMeal() {
       });
     },
     onError: (err, variables, context) => {
-      // If the mutation fails, use the context returned from onMutate to roll back
       if (context?.previousMeals) {
         queryClient.setQueryData(queryKeys.meals, context.previousMeals);
       }
@@ -208,7 +220,6 @@ export function useUpdateMeal() {
     }) => nutritionAPI.updateMeal(mealId, updateText),
     onSuccess: (response, variables) => {
       if (response.success && response.data) {
-        // Update the meal in the cache
         queryClient.setQueryData<Meal[]>(queryKeys.meals, (old) => {
           if (!old) return [response.data];
           return old.map((meal) =>
@@ -219,7 +230,6 @@ export function useUpdateMeal() {
           );
         });
 
-        // Invalidate daily stats
         const today = new Date().toISOString().split("T")[0];
         queryClient.invalidateQueries({
           queryKey: queryKeys.dailyStats(today),
@@ -237,13 +247,11 @@ export function useDuplicateMeal() {
       nutritionAPI.duplicateMeal(mealId, newDate),
     onSuccess: (response) => {
       if (response.success && response.data) {
-        // Add duplicated meal to cache
         queryClient.setQueryData<Meal[]>(queryKeys.meals, (old) => {
           if (!old) return [response.data];
           return [response.data, ...old];
         });
 
-        // Invalidate daily stats for the target date
         const targetDate =
           response.data.upload_time?.split("T")[0] ||
           new Date().toISOString().split("T")[0];
@@ -261,7 +269,6 @@ export function useToggleMealFavorite() {
   return useMutation({
     mutationFn: (mealId: string) => nutritionAPI.toggleMealFavorite(mealId),
     onMutate: async (mealId) => {
-      // Optimistically update the cache
       await queryClient.cancelQueries({ queryKey: queryKeys.meals });
 
       const previousMeals = queryClient.getQueryData<Meal[]>(queryKeys.meals);
@@ -270,7 +277,7 @@ export function useToggleMealFavorite() {
         if (!old) return old;
         return old.map((meal) =>
           meal.meal_id?.toString() === mealId || meal.id === mealId
-            ? { ...meal, isFavorite: !meal.isFavorite }
+            ? { ...meal, isFavorite: !meal.is_favorite }
             : meal
         );
       });
@@ -278,7 +285,6 @@ export function useToggleMealFavorite() {
       return { previousMeals };
     },
     onError: (err, mealId, context) => {
-      // Revert on error
       if (context?.previousMeals) {
         queryClient.setQueryData(queryKeys.meals, context.previousMeals);
       }
@@ -303,7 +309,6 @@ export function useSaveMealFeedback() {
       };
     }) => nutritionAPI.saveMealFeedback(mealId, feedback),
     onSuccess: (data, variables) => {
-      // Update meal in cache with new feedback
       queryClient.setQueryData<Meal[]>(queryKeys.meals, (old) => {
         if (!old) return old;
         return old.map((meal) =>
@@ -322,7 +327,7 @@ export function useDailyStats(date: string) {
   return useQuery({
     queryKey: queryKeys.dailyStats(date),
     queryFn: () => nutritionAPI.getDailyStats(date),
-    staleTime: 1000 * 60 * 10, // 10 minutes
+    staleTime: 1000 * 60 * 10,
   });
 }
 
@@ -331,7 +336,7 @@ export function useGlobalStats() {
   return useQuery({
     queryKey: queryKeys.globalStats,
     queryFn: userAPI.getGlobalStatistics,
-    staleTime: 1000 * 60 * 60, // 1 hour
+    staleTime: 1000 * 60 * 60,
   });
 }
 
@@ -340,7 +345,7 @@ export function useCalendarData(year: number, month: number) {
   return useQuery({
     queryKey: queryKeys.calendar(year, month),
     queryFn: () => calendarAPI.getCalendarData(year, month),
-    staleTime: 1000 * 60 * 15, // 15 minutes
+    staleTime: 1000 * 60 * 15,
   });
 }
 
@@ -348,7 +353,7 @@ export function useCalendarStats(year: number, month: number) {
   return useQuery({
     queryKey: queryKeys.calendarStats(year, month),
     queryFn: () => calendarAPI.getStatistics(year, month),
-    staleTime: 1000 * 60 * 30, // 30 minutes
+    staleTime: 1000 * 60 * 30,
   });
 }
 
@@ -366,7 +371,6 @@ export function useAddEvent() {
       type: string;
     }) => calendarAPI.addEvent(date, title, type),
     onSuccess: (data, variables) => {
-      // Invalidate calendar data for the relevant month
       const eventDate = new Date(variables.date);
       queryClient.invalidateQueries({
         queryKey: queryKeys.calendar(
@@ -378,88 +382,53 @@ export function useAddEvent() {
   });
 }
 
-// Device Hooks
-export function useConnectedDevices() {
+// Statistics query using existing API method
+export const useStatistics = (
+  timeRange: string,
+  startDate?: string,
+  endDate?: string
+) => {
   return useQuery({
-    queryKey: queryKeys.devices,
-    queryFn: () => deviceAPI.getConnectedDevices(),
-    staleTime: 1000 * 60 * 5, // 5 minutes
-  });
-}
-
-export function useConnectDevice() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (deviceType: string) => deviceAPI.connectDevice(deviceType),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.devices });
-    },
-  });
-}
-
-export function useSyncDevice() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (deviceId: string) => deviceAPI.syncDevice(deviceId),
-    onSuccess: (success, deviceId) => {
-      if (success) {
-        // Invalidate activity data and balance for today
-        const today = new Date().toISOString().split("T")[0];
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.activityData(today),
-        });
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.dailyBalance(today),
-        });
-        queryClient.invalidateQueries({ queryKey: queryKeys.devices });
+    queryKey: queryKeys.statistics(timeRange, startDate, endDate),
+    queryFn: () => {
+      if (timeRange === "custom" && startDate && endDate) {
+        return nutritionAPI.getRangeStatistics(startDate, endDate);
       }
-    },
-  });
-}
+      // For other time ranges, calculate dates
+      const today = new Date();
+      let start: string;
+      let end: string = today.toISOString().split("T")[0];
 
-export function useActivityData(date: string) {
+      switch (timeRange) {
+        case "today":
+          start = end;
+          break;
+        case "week":
+          const weekAgo = new Date(today);
+          weekAgo.setDate(today.getDate() - 7);
+          start = weekAgo.toISOString().split("T")[0];
+          break;
+        case "month":
+          const monthAgo = new Date(today);
+          monthAgo.setDate(today.getDate() - 30);
+          start = monthAgo.toISOString().split("T")[0];
+          break;
+        default:
+          start = end;
+      }
+
+      return nutritionAPI.getRangeStatistics(start, end);
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+};
+
+// User profile query
+export const useUserProfile = () => {
   return useQuery({
-    queryKey: queryKeys.activityData(date),
-    queryFn: () => deviceAPI.getActivityData(date),
-    staleTime: 1000 * 60 * 15, // 15 minutes
+    queryKey: queryKeys.userProfile,
+    queryFn: () => userAPI.getUserProfile(),
+    staleTime: 10 * 60 * 1000,
   });
-}
-
-export function useDailyBalance(date: string) {
-  return useQuery({
-    queryKey: queryKeys.dailyBalance(date),
-    queryFn: () => deviceAPI.getDailyBalance(date),
-    staleTime: 1000 * 60 * 10, // 10 minutes
-  });
-}
-
-export function useDisconnectDevice() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (deviceId: string) => deviceAPI.disconnectDevice(deviceId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.devices });
-    },
-  });
-}
-
-export function useSyncAllDevices() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: () => deviceAPI.syncAllDevices(),
-    onSuccess: () => {
-      const today = new Date().toISOString().split("T")[0];
-      queryClient.invalidateQueries({ queryKey: queryKeys.devices });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.activityData(today),
-      });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.dailyBalance(today),
-      });
-    },
-  });
-}
+};

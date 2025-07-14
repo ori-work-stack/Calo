@@ -942,6 +942,35 @@ export const userAPI = {
       return { success: false, error: errMsg };
     }
   },
+  getUserProfile: async (): Promise<any> => {
+    try {
+      const response = await api.get("/user/profile");
+      return response.data;
+    } catch (error) {
+      console.error("Get user profile error:", error);
+      throw error;
+    }
+  },
+
+  getMeals: async (): Promise<any[]> => {
+    try {
+      const response = await api.get("/nutrition/meals");
+      return response.data?.data || [];
+    } catch (error) {
+      console.error("Get meals error:", error);
+      throw error;
+    }
+  },
+
+  getDailyStats: async (date: string): Promise<any> => {
+    try {
+      const response = await api.get(`/nutrition/daily-stats?date=${date}`);
+      return response.data;
+    } catch (error) {
+      console.error("Get daily stats error:", error);
+      throw error;
+    }
+  },
 
   updateSubscription: async (subscriptionType: string) => {
     // Optimized with minimal logging
@@ -1337,5 +1366,3 @@ export const foodScannerAPI = {
     }
   },
 };
-
-// This file defines the API endpoints for the application using axios for making HTTP requests and SecureStore for securely storing authentication tokens.

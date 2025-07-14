@@ -19,7 +19,7 @@ import {
   clearError,
 } from "@/src/store/questionnaireSlice";
 import { Ionicons } from "@expo/vector-icons";
-import { DynamicListInput } from "@/components/DynamicListInputs";
+import DynamicListInput from "@/components/DynamicListInputs";
 
 interface QuestionnaireData {
   // Personal data
@@ -244,7 +244,7 @@ export default function QuestionnaireScreen() {
     past_diet_difficulties: [],
 
     // Additional schema fields
-    program_duration: "",
+    program_duration: "MEDIUM_TERM",
     meal_timing_restrictions: [],
     dietary_restrictions: [],
     willingness_to_follow: true,
@@ -258,33 +258,21 @@ export default function QuestionnaireScreen() {
     sleep_hours_per_night: null,
   });
 
-  // Load existing questionnaire data if in edit mode
-  useEffect(() => {
-    const loadQuestionnaireData = async () => {
-      if (isEditMode && !dataLoaded && !isLoading) {
-        console.log("📖 Getting questionnaire...");
-        try {
-          await dispatch(fetchQuestionnaire());
-        } catch (error) {
-          console.error("Failed to fetch questionnaire:", error);
-          Alert.alert(
-            "שגיאה",
-            "לא ניתן לטעון את הנתונים הקיימים. נסה שוב מאוחר יותר."
-          );
-          setDataLoaded(true); // Set to true even on error to prevent infinite loading
-        }
-      } else if (!isEditMode) {
-        // If not in edit mode, mark data as loaded immediately
+  // Load existing questionnaire data if in edit mode - simplified
+  React.useEffect(() => {
+    if (isEditMode && !dataLoaded && !isLoading) {
+      console.log("📖 Getting questionnaire...");
+      dispatch(fetchQuestionnaire()).finally(() => {
         setDataLoaded(true);
-      }
-    };
+      });
+    } else if (!isEditMode) {
+      setDataLoaded(true);
+    }
+  }, [dispatch, isEditMode]);
 
-    loadQuestionnaireData();
-  }, [dispatch, isEditMode, dataLoaded, isLoading]);
-
-  // Map questionnaire data to form when available
-  useEffect(() => {
-    if (isEditMode && questionnaire && !dataLoaded) {
+  // Map questionnaire data to form when available - simplified
+  React.useEffect(() => {
+    if (isEditMode && questionnaire && dataLoaded) {
       console.log("📋 Mapping questionnaire data to form:", questionnaire);
 
       // Helper function to safely convert values
@@ -513,12 +501,13 @@ export default function QuestionnaireScreen() {
     }
   };
 
-  useEffect(() => {
+  // Simplified error handling
+  React.useEffect(() => {
     if (error) {
       Alert.alert("שגיאה", error);
       dispatch(clearError());
     }
-  }, [error, dispatch]);
+  }, [error]);
 
   const renderProgress = () => (
     <View style={styles.progressContainer}>
@@ -614,12 +603,12 @@ export default function QuestionnaireScreen() {
       <DynamicListInput
         label="פרטים נוספים"
         placeholder="הוסף פרט נוסף..."
-        value={
+        initialItems={
           Array.isArray(formData.additional_personal_info)
             ? formData.additional_personal_info
             : []
         }
-        onValueChange={(value) =>
+        onItemsChange={(value) =>
           setFormData({
             ...formData,
             additional_personal_info: Array.isArray(value) ? value : [value],
@@ -666,12 +655,12 @@ export default function QuestionnaireScreen() {
         <DynamicListInput
           label="פרט את המטרה שלך"
           placeholder="הוסף מטרה..."
-          value={
+          initialItems={
             Array.isArray(formData.main_goal_text)
               ? formData.main_goal_text
               : []
           }
-          onValueChange={(value) =>
+          onItemsChange={(value) =>
             setFormData({
               ...formData,
               main_goal_text: Array.isArray(value) ? value : [value],
@@ -684,10 +673,10 @@ export default function QuestionnaireScreen() {
       <DynamicListInput
         label="מטרות ספציפיות"
         placeholder="הוסף מטרה ספציפית (לדוגמה: לרדת 5 ק״ג לקראת החתונה)..."
-        value={
+        initialItems={
           Array.isArray(formData.specific_goal) ? formData.specific_goal : []
         }
-        onValueChange={(value) =>
+        onItemsChange={(value) =>
           setFormData({
             ...formData,
             specific_goal: Array.isArray(value) ? value : [value],
@@ -825,10 +814,10 @@ export default function QuestionnaireScreen() {
           <DynamicListInput
             label="סוגי פעילות"
             placeholder="הוסף סוג פעילות (לדוגמה: ריצה, כושר, יוגה)..."
-            value={
+            initialItems={
               Array.isArray(formData.sport_types) ? formData.sport_types : []
             }
-            onValueChange={(value: string[]) =>
+            onItemsChange={(value: string[]) =>
               setFormData({
                 ...formData,
                 sport_types: Array.isArray(value) ? value : [value],
@@ -840,12 +829,12 @@ export default function QuestionnaireScreen() {
           <DynamicListInput
             label="זמני אימונים מועדפים"
             placeholder="הוסף זמן אימון (לדוגמה: בוקר, ערב)..."
-            value={
+            initialItems={
               Array.isArray(formData.workout_times)
                 ? formData.workout_times
                 : []
             }
-            onValueChange={(value: string[]) =>
+            onItemsChange={(value: string[]) =>
               setFormData({
                 ...formData,
                 workout_times: Array.isArray(value) ? value : [value],
@@ -857,12 +846,12 @@ export default function QuestionnaireScreen() {
           <DynamicListInput
             label="מכשירי כושר"
             placeholder="הוסף מכשיר כושר (לדוגמה: שעון חכם, צמיד כושר)..."
-            value={
+            initialItems={
               Array.isArray(formData.fitness_device_type)
                 ? formData.fitness_device_type
                 : []
             }
-            onValueChange={(value: string[]) =>
+            onItemsChange={(value: string[]) =>
               setFormData({
                 ...formData,
                 fitness_device_type: Array.isArray(value) ? value : [value],
@@ -874,12 +863,12 @@ export default function QuestionnaireScreen() {
           <DynamicListInput
             label="מידע נוסף על פעילות"
             placeholder="הוסף מידע נוסף..."
-            value={
+            initialItems={
               Array.isArray(formData.additional_activity_info)
                 ? formData.additional_activity_info
                 : []
             }
-            onValueChange={(value: string[]) =>
+            onItemsChange={(value: string[]) =>
               setFormData({
                 ...formData,
                 additional_activity_info: Array.isArray(value)
@@ -904,12 +893,12 @@ export default function QuestionnaireScreen() {
       <DynamicListInput
         label="בעיות רפואיות"
         placeholder="הוסף בעיה רפואית (לדוגמה: סכרת, לחץ דם)..."
-        value={
+        initialItems={
           Array.isArray(formData.medical_conditions_text)
             ? formData.medical_conditions_text
             : []
         }
-        onValueChange={(value: string[]) =>
+        onItemsChange={(value: string[]) =>
           setFormData({
             ...formData,
             medical_conditions_text: Array.isArray(value) ? value : [value],
@@ -921,8 +910,10 @@ export default function QuestionnaireScreen() {
       <DynamicListInput
         label="תרופות קבועות"
         placeholder="הוסף תרופה..."
-        value={Array.isArray(formData.medications) ? formData.medications : []}
-        onValueChange={(value: string[]) =>
+        initialItems={
+          Array.isArray(formData.medications) ? formData.medications : []
+        }
+        onItemsChange={(value: string[]) =>
           setFormData({
             ...formData,
             medications: Array.isArray(value) ? value : [value],
@@ -934,10 +925,10 @@ export default function QuestionnaireScreen() {
       <DynamicListInput
         label="יעדים בריאותיים"
         placeholder="הוסף יעד בריאותי (לדוגמה: הורדת כולסטרול)..."
-        value={
+        initialItems={
           Array.isArray(formData.health_goals) ? formData.health_goals : []
         }
-        onValueChange={(value: string[]) =>
+        onItemsChange={(value: string[]) =>
           setFormData({
             ...formData,
             health_goals: Array.isArray(value) ? value : [value],
@@ -949,12 +940,12 @@ export default function QuestionnaireScreen() {
       <DynamicListInput
         label="בעיות תפקודיות"
         placeholder="הוסף בעיה תפקודית (לדוגמה: עייפות, חוסר ערנות)..."
-        value={
+        initialItems={
           Array.isArray(formData.functional_issues)
             ? formData.functional_issues
             : []
         }
-        onValueChange={(value: string[]) =>
+        onItemsChange={(value: string[]) =>
           setFormData({
             ...formData,
             functional_issues: Array.isArray(value) ? value : [value],
@@ -966,12 +957,12 @@ export default function QuestionnaireScreen() {
       <DynamicListInput
         label="בעיות תזונתיות"
         placeholder="הוסף בעיה תזונתית..."
-        value={
+        initialItems={
           Array.isArray(formData.food_related_medical_issues)
             ? formData.food_related_medical_issues
             : []
         }
-        onValueChange={(value: string[]) =>
+        onItemsChange={(value: string[]) =>
           setFormData({
             ...formData,
             food_related_medical_issues: Array.isArray(value) ? value : [value],
@@ -1091,8 +1082,10 @@ export default function QuestionnaireScreen() {
       <DynamicListInput
         label="זמני ארוחות"
         placeholder="הוסף זמן ארוחה (לדוגמה: 8:00, 13:00)..."
-        value={Array.isArray(formData.meal_times) ? formData.meal_times : []}
-        onValueChange={(value: string[]) =>
+        initialItems={
+          Array.isArray(formData.meal_times) ? formData.meal_times : []
+        }
+        onItemsChange={(value: string[]) =>
           setFormData({
             ...formData,
             meal_times: Array.isArray(value) ? value : [value],
@@ -1104,12 +1097,12 @@ export default function QuestionnaireScreen() {
       <DynamicListInput
         label="שיטות קנייה"
         placeholder="הוסף שיטת קנייה (לדוגמה: סופרמרקט, שוק)..."
-        value={
+        initialItems={
           Array.isArray(formData.shopping_method)
             ? formData.shopping_method
             : []
         }
-        onValueChange={(value: string[]) =>
+        onItemsChange={(value: string[]) =>
           setFormData({
             ...formData,
             shopping_method: Array.isArray(value) ? value : [value],
@@ -1172,12 +1165,12 @@ export default function QuestionnaireScreen() {
       <DynamicListInput
         label="היסטוריה רפואית משפחתית"
         placeholder="הוסף מחלה במשפחה (לדוגמה: סכרת, לחץ דם)..."
-        value={
+        initialItems={
           Array.isArray(formData.family_medical_history)
             ? formData.family_medical_history
             : []
         }
-        onValueChange={(value: string[]) =>
+        onItemsChange={(value: string[]) =>
           setFormData({
             ...formData,
             family_medical_history: Array.isArray(value) ? value : [value],
@@ -1189,12 +1182,12 @@ export default function QuestionnaireScreen() {
       <DynamicListInput
         label="הגבלות זמן ארוחות"
         placeholder="הוסף הגבלת זמן (לדוגמה: לא יכול לאכול לפני 9:00)..."
-        value={
+        initialItems={
           Array.isArray(formData.meal_timing_restrictions)
             ? formData.meal_timing_restrictions
             : []
         }
-        onValueChange={(value: string[]) =>
+        onItemsChange={(value: string[]) =>
           setFormData({
             ...formData,
             meal_timing_restrictions: Array.isArray(value) ? value : [value],
@@ -1327,12 +1320,12 @@ export default function QuestionnaireScreen() {
       <DynamicListInput
         label="הגבלות תזונתיות נוספות"
         placeholder="הוסף הגבלה תזונתית..."
-        value={
+        initialItems={
           Array.isArray(formData.dietary_restrictions)
             ? formData.dietary_restrictions
             : []
         }
-        onValueChange={(value: string[]) =>
+        onItemsChange={(value: string[]) =>
           setFormData({
             ...formData,
             dietary_restrictions: Array.isArray(value) ? value : [value],
@@ -1344,12 +1337,12 @@ export default function QuestionnaireScreen() {
       <DynamicListInput
         label="העדפות התראות"
         placeholder="הוסף העדפת התראה (לדוגמה: בוקר, ערב)..."
-        value={
+        initialItems={
           Array.isArray(formData.notifications_preference)
             ? formData.notifications_preference
             : []
         }
-        onValueChange={(value: string[]) =>
+        onItemsChange={(value: string[]) =>
           setFormData({
             ...formData,
             notifications_preference: Array.isArray(value) ? value : [value],
@@ -1361,12 +1354,12 @@ export default function QuestionnaireScreen() {
       <DynamicListInput
         label="אירועים קרובים"
         placeholder="הוסף אירוע קרוב (לדוגמה: חתונה, חופשה)..."
-        value={
+        initialItems={
           Array.isArray(formData.upcoming_events)
             ? formData.upcoming_events
             : []
         }
-        onValueChange={(value: string[]) =>
+        onItemsChange={(value: string[]) =>
           setFormData({
             ...formData,
             upcoming_events: Array.isArray(value) ? value : [value],
@@ -1378,12 +1371,12 @@ export default function QuestionnaireScreen() {
       <DynamicListInput
         label="קשיים בדיאטות בעבר"
         placeholder="הוסף קושי שחווית (לדוגמה: רעב, חוסר זמן)..."
-        value={
+        initialItems={
           Array.isArray(formData.past_diet_difficulties)
             ? formData.past_diet_difficulties
             : []
         }
-        onValueChange={(value: string[]) =>
+        onItemsChange={(value: string[]) =>
           setFormData({
             ...formData,
             past_diet_difficulties: Array.isArray(value) ? value : [value],
@@ -1476,10 +1469,10 @@ export default function QuestionnaireScreen() {
       <DynamicListInput
         label="אלרגיות נוספות"
         placeholder="הוסף אלרגיה נוספת..."
-        value={
+        initialItems={
           Array.isArray(formData.allergies_text) ? formData.allergies_text : []
         }
-        onValueChange={(value: string[]) =>
+        onItemsChange={(value: string[]) =>
           setFormData({
             ...formData,
             allergies_text: Array.isArray(value) ? value : [value],
@@ -1491,12 +1484,12 @@ export default function QuestionnaireScreen() {
       <DynamicListInput
         label="העדפות מרקם"
         placeholder="הוסף העדפת מרקם (לדוגמה: רך, פריך)..."
-        value={
+        initialItems={
           Array.isArray(formData.meal_texture_preference)
             ? formData.meal_texture_preference
             : []
         }
-        onValueChange={(value: string[]) =>
+        onItemsChange={(value: string[]) =>
           setFormData({
             ...formData,
             meal_texture_preference: Array.isArray(value) ? value : [value],
@@ -1508,10 +1501,10 @@ export default function QuestionnaireScreen() {
       <DynamicListInput
         label="מזונות שאינך אוהב"
         placeholder="הוסף מזון שאינך אוהב (לדוגמה: דגים, ירקות ירוקים)..."
-        value={
+        initialItems={
           Array.isArray(formData.disliked_foods) ? formData.disliked_foods : []
         }
-        onValueChange={(value: string[]) =>
+        onItemsChange={(value: string[]) =>
           setFormData({
             ...formData,
             disliked_foods: Array.isArray(value) ? value : [value],
@@ -1523,8 +1516,10 @@ export default function QuestionnaireScreen() {
       <DynamicListInput
         label="מזונות שאתה אוהב במיוחד"
         placeholder="הוסף מזון שאתה אוהב (לדוגמה: עוף, קינואה, אבוקדו)..."
-        value={Array.isArray(formData.liked_foods) ? formData.liked_foods : []}
-        onValueChange={(value: string[]) =>
+        initialItems={
+          Array.isArray(formData.liked_foods) ? formData.liked_foods : []
+        }
+        onItemsChange={(value: string[]) =>
           setFormData({
             ...formData,
             liked_foods: Array.isArray(value) ? value : [value],

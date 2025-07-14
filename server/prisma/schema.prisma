@@ -197,12 +197,12 @@ model UserQuestionnaire {
   past_diet_difficulties String[]
 
   // Legacy fields (keeping for compatibility)
-  program_duration           ProgramDuration?
+  program_duration           String?
   meal_timing_restrictions   String?
   dietary_restrictions       String[]
   willingness_to_follow      Boolean?
   upcoming_events            String[]
-  upload_frequency           UploadFrequency?
+  upload_frequency           String?
   notifications_preference   NotificationsPreference?
   personalized_tips          Boolean?
   health_metrics_integration Boolean?
@@ -645,19 +645,6 @@ enum MainGoal {
   ENERGY
   SLEEP_QUALITY
   OTHER
-}
-
-enum ProgramDuration {
-  SHORT_TERM
-  MEDIUM_TERM
-  LONG_TERM
-}
-
-enum UploadFrequency {
-  DAILY
-  WEEKLY
-  MONTHLY
-  NONE
 }
 
 enum NotificationsPreference {

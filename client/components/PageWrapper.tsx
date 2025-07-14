@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { View, StyleSheet } from "react-native";
 import { useFocusEffect, usePathname } from "expo-router";
-import { SwipeNavigationWrapper } from "./SwipeNavigationWrapper";
-import { TooltipBubble } from "./TooltipBubble";
+import SwipeNavigationWrapper from "./SwipeNavigationWrapper";
+import TooltipBubble from "./TooltipBubble";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 interface PageWrapperProps {

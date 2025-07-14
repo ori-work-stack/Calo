@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import {
   View,
   Text,
@@ -10,15 +10,15 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 
 interface DynamicListInputsProps {
-  title: string;
   placeholder: string;
+  label: string;
   onItemsChange: (items: string[]) => void;
   initialItems?: string[];
   maxItems?: number;
 }
 
 export default function DynamicListInputs({
-  title,
+  label,
   placeholder,
   onItemsChange,
   initialItems = [],
@@ -51,7 +51,7 @@ export default function DynamicListInputs({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{title}</Text>
+      <Text style={styles.title}>{label}</Text>
 
       <ScrollView style={styles.itemsList} showsVerticalScrollIndicator={false}>
         {items.map((item, index) => (

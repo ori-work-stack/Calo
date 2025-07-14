@@ -150,10 +150,10 @@ export default function HistoryScreen() {
   const getMealScore = (meal: Meal): { score: number; color: string } => {
     let score = 5; // Start with base score
 
-    const calories = meal.calories || meal.totalCalories || 0;
-    const protein = meal.protein || meal.protein_g || meal.totalProtein || 0;
-    const carbs = meal.carbs || meal.carbs_g || meal.totalCarbs || 0;
-    const fat = meal.fat || meal.fats_g || meal.totalFat || 0;
+    const calories = meal.calories;
+    const protein = meal.protein || meal.protein_g;
+    const carbs = meal.carbs || meal.carbs_g;
+    const fat = meal.fat || meal.fats_g;
     const fiber = meal.fiber || meal.fiber_g || 0;
 
     // Protein adequacy (good if 15-30% of calories)
@@ -419,7 +419,7 @@ export default function HistoryScreen() {
                 {t("nutrition.calories", "Calories")}
               </Text>
               <Text style={styles.nutritionDetailValue}>
-                {Math.round(meal.calories || meal.totalCalories || 0)}
+                {Math.round(meal.calories || 0)}
               </Text>
             </View>
             <View style={styles.nutritionDetailItem}>
@@ -427,10 +427,7 @@ export default function HistoryScreen() {
                 {t("nutrition.protein", "Protein")}
               </Text>
               <Text style={styles.nutritionDetailValue}>
-                {Math.round(
-                  meal.protein || meal.protein_g || meal.totalProtein || 0
-                )}
-                g
+                {Math.round(meal.protein || meal.protein_g || 0)}g
               </Text>
             </View>
             <View style={styles.nutritionDetailItem}>
@@ -438,8 +435,7 @@ export default function HistoryScreen() {
                 {t("nutrition.carbs", "Carbs")}
               </Text>
               <Text style={styles.nutritionDetailValue}>
-                {Math.round(meal.carbs || meal.carbs_g || meal.totalCarbs || 0)}
-                g
+                {Math.round(meal.carbs || meal.carbs_g || 0)}g
               </Text>
             </View>
             <View style={styles.nutritionDetailItem}>
@@ -447,7 +443,7 @@ export default function HistoryScreen() {
                 {t("nutrition.fat", "Fat")}
               </Text>
               <Text style={styles.nutritionDetailValue}>
-                {Math.round(meal.fat || meal.fats_g || meal.totalFat || 0)}g
+                {Math.round(meal.fat || meal.fats_g || 0)}g
               </Text>
             </View>
           </View>
@@ -603,7 +599,36 @@ export default function HistoryScreen() {
               </Text>
               <View style={styles.allergensContainer}>
                 {meal.allergens_json.possible_allergens.map(
-                  (allergen, index) => (
+                  (
+                    allergen:
+                      | string
+                      | number
+                      | bigint
+                      | boolean
+                      | React.ReactElement<
+                          unknown,
+                          string | React.JSXElementConstructor<any>
+                        >
+                      | Iterable<React.ReactNode>
+                      | React.ReactPortal
+                      | Promise<
+                          | string
+                          | number
+                          | bigint
+                          | boolean
+                          | React.ReactPortal
+                          | React.ReactElement<
+                              unknown,
+                              string | React.JSXElementConstructor<any>
+                            >
+                          | Iterable<React.ReactNode>
+                          | null
+                          | undefined
+                        >
+                      | null
+                      | undefined,
+                    index: React.Key | null | undefined
+                  ) => (
                     <View key={index} style={styles.allergenTag}>
                       <Text style={styles.allergenText}>{allergen}</Text>
                     </View>
@@ -614,17 +639,48 @@ export default function HistoryScreen() {
           )}
 
         {/* Health Warnings */}
-        {meal.health_warnings && meal.health_warnings.length > 0 && (
+        {meal.health_risk_notes && meal.health_risk_notes.length > 0 && (
           <View style={styles.macroSection}>
             <Text style={styles.sectionTitle}>
-              {t("nutrition.health_warnings", "Health Warnings")}
+              {t("nutrition.health_risk_notes", "Health Warnings")}
             </Text>
-            {meal.health_warnings.map((warning, index) => (
-              <View key={index} style={styles.warningItem}>
-                <Ionicons name="warning" size={16} color="#FF9800" />
-                <Text style={styles.warningText}>{warning}</Text>
-              </View>
-            ))}
+            {meal.health_risk_notes.map(
+              (
+                warning:
+                  | string
+                  | number
+                  | bigint
+                  | boolean
+                  | React.ReactElement<
+                      unknown,
+                      string | React.JSXElementConstructor<any>
+                    >
+                  | Iterable<React.ReactNode>
+                  | React.ReactPortal
+                  | Promise<
+                      | string
+                      | number
+                      | bigint
+                      | boolean
+                      | React.ReactPortal
+                      | React.ReactElement<
+                          unknown,
+                          string | React.JSXElementConstructor<any>
+                        >
+                      | Iterable<React.ReactNode>
+                      | null
+                      | undefined
+                    >
+                  | null
+                  | undefined,
+                index: React.Key | null | undefined
+              ) => (
+                <View key={index} style={styles.warningItem}>
+                  <Ionicons name="warning" size={16} color="#FF9800" />
+                  <Text style={styles.warningText}>{warning}</Text>
+                </View>
+              )
+            )}
           </View>
         )}
       </View>
@@ -692,7 +748,7 @@ export default function HistoryScreen() {
         <View style={styles.nutritionSummary}>
           <View style={styles.nutritionItem}>
             <Text style={styles.nutritionValue}>
-              {Math.round(item.calories || item.totalCalories || 0)}
+              {Math.round(item.calories || 0)}
             </Text>
             <Text style={styles.nutritionLabel}>
               {t("nutrition.calories", "Calories")}
@@ -700,10 +756,7 @@ export default function HistoryScreen() {
           </View>
           <View style={styles.nutritionItem}>
             <Text style={styles.nutritionValue}>
-              {Math.round(
-                item.protein || item.protein_g || item.totalProtein || 0
-              )}
-              g
+              {Math.round(item.protein || item.protein_g || 0)}g
             </Text>
             <Text style={styles.nutritionLabel}>
               {t("nutrition.protein", "Protein")}
@@ -711,7 +764,7 @@ export default function HistoryScreen() {
           </View>
           <View style={styles.nutritionItem}>
             <Text style={styles.nutritionValue}>
-              {Math.round(item.carbs || item.carbs_g || item.totalCarbs || 0)}g
+              {Math.round(item.carbs || item.carbs_g || 0)}g
             </Text>
             <Text style={styles.nutritionLabel}>
               {t("nutrition.carbs", "Carbs")}
@@ -719,7 +772,7 @@ export default function HistoryScreen() {
           </View>
           <View style={styles.nutritionItem}>
             <Text style={styles.nutritionValue}>
-              {Math.round(item.fat || item.fats_g || item.totalFat || 0)}g
+              {Math.round(item.fat || item.fats_g || 0)}g
             </Text>
             <Text style={styles.nutritionLabel}>
               {t("nutrition.fat", "Fat")}
@@ -740,11 +793,6 @@ export default function HistoryScreen() {
                 {item.ingredients.map((ingredient, index) => (
                   <View key={index} style={styles.ingredientItem}>
                     <Text style={styles.ingredientName}>{ingredient.name}</Text>
-                    {ingredient.quantity && (
-                      <Text style={styles.ingredientQuantity}>
-                        {ingredient.quantity} {ingredient.unit || ""}
-                      </Text>
-                    )}
                     {ingredient.calories && (
                       <Text style={styles.ingredientCalories}>
                         {Math.round(ingredient.calories)} cal

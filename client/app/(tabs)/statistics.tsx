@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from "react-native";
+import { useQuery } from "@tanstack/react-query";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import {
@@ -60,6 +61,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { useRTLStyles } from "../../hooks/useRTLStyle";
 import { nutritionAPI } from "../../src/services/api";
+import { useStatistics } from "../../hooks/useQueries";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import AccessibilityButton from "@/components/AccessibilityButton";
 
@@ -188,11 +190,6 @@ export default function StatisticsScreen() {
 
   const [selectedTimeRange, setSelectedTimeRange] =
     useState<TimeRangeType>("week");
-  const [statisticsData, setStatisticsData] = useState<StatisticsData | null>(
-    null
-  );
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [datePickerType, setDatePickerType] = useState<"start" | "end">(
@@ -535,106 +532,87 @@ export default function StatisticsScreen() {
     }
   }, [selectedTimeRange, customStartDate, customEndDate]);
 
-  // Load statistics data
-  const loadStatistics = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+  // Use react-query for statistics data
+  const { start, end } = getDateRange();
+  const {
+    data: statisticsResponse,
+    isLoading,
+    error: queryError,
+    refetch,
+  } = useStatistics(
+    selectedTimeRange,
+    selectedTimeRange === "custom" ? start : undefined,
+    selectedTimeRange === "custom" ? end : undefined
+  );
 
-    try {
-      const { start, end } = getDateRange();
-      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  // Transform the response data
+  const statisticsData = useMemo(() => {
+    if (!statisticsResponse?.success || !statisticsResponse?.data) return null;
 
-      if (!dateRegex.test(start) || !dateRegex.test(end)) {
-        throw new Error("Invalid date format");
-      }
+    const d = statisticsResponse.data;
+    return {
+      averageAlcoholG: d.average_alcohol_g || 0,
+      averageCaffeineMg: d.average_caffeine_mg || 0,
+      averageCalories: d.average_calories || 0,
+      averageCarbsG: d.average_carbs_g || 0,
+      averageCholesterolMg: d.average_cholesterol_mg || 0,
+      averageConfidence: d.average_confidence || 0,
+      averageFatsG: d.average_fats_g || 0,
+      averageFiberG: d.average_fiber_g || 0,
+      averageGlycemicIndex: d.average_glycemic_index || 0,
+      averageInsolubleFiberG: d.average_insoluble_fiber_g || 0,
+      averageInsulinIndex: d.average_insulin_index || 0,
+      averageLiquidsMl: d.average_liquids_ml || 0,
+      averageMonounsaturatedFatsG: d.average_monounsaturated_fats_g || 0,
+      averageOmega3G: d.average_omega_3_g || 0,
+      averageOmega6G: d.average_omega_6_g || 0,
+      averagePolyunsaturatedFatsG: d.average_polyunsaturated_fats_g || 0,
+      averageProteinG: d.average_protein_g || 0,
+      averageSaturatedFatsG: d.average_saturated_fats_g || 0,
+      averageServingSizeG: d.average_serving_size_g || 0,
+      averageSodiumMg: d.average_sodium_mg || 0,
+      averageSolubleFiberG: d.average_soluble_fiber_g || 0,
+      averageSugarG: d.average_sugar_g || 0,
+      totalAlcoholG: d.total_alcohol_g || 0,
+      totalCaffeineMg: d.total_caffeine_mg || 0,
+      totalCalories: d.total_calories || 0,
+      totalCarbsG: d.total_carbs_g || 0,
+      totalCholesterolMg: d.total_cholesterol_mg || 0,
+      totalConfidence: d.total_confidence || 0,
+      totalFatsG: d.total_fats_g || 0,
+      totalFiberG: d.total_fiber_g || 0,
+      totalGlycemicIndex: d.total_glycemic_index || 0,
+      totalInsolubleFiberG: d.total_insoluble_fiber_g || 0,
+      totalInsulinIndex: d.total_insulin_index || 0,
+      totalLiquidsMl: d.total_liquids_ml || 0,
+      totalMonounsaturatedFatsG: d.total_monounsaturated_fats_g || 0,
+      totalOmega3G: d.total_omega_3_g || 0,
+      totalOmega6G: d.total_omega_6_g || 0,
+      totalPolyunsaturatedFatsG: d.total_polyunsaturated_fats_g || 0,
+      totalProteinG: d.total_protein_g || 0,
+      totalSaturatedFatsG: d.total_saturated_fats_g || 0,
+      totalServingSizeG: d.total_serving_size_g || 0,
+      totalSodiumMg: d.total_sodium_mg || 0,
+      totalSolubleFiberG: d.total_soluble_fiber_g || 0,
+      totalSugarG: d.total_sugar_g || 0,
+      totalDays: d.total_days || 0,
+      totalMeals: d.total_meals || 0,
+      dateRange: {
+        startDate: start,
+        endDate: end,
+      },
+      dailyBreakdown: d.dailyBreakdown || [],
+    };
+  }, [statisticsResponse, start, end]);
 
-      const startDate = new Date(start + "T00:00:00");
-      const endDate = new Date(end + "T00:00:00");
-
-      if (startDate > endDate) {
-        throw new Error("Start date cannot be after end date");
-      }
-
-      const response = await nutritionAPI.getRangeStatistics(start, end);
-      console.log("📊 Statistics response:", response);
-
-      if (response?.success && response?.data) {
-        const d = response.data;
-        setStatisticsData({
-          averageAlcoholG: d.average_alcohol_g || 0,
-          averageCaffeineMg: d.average_caffeine_mg || 0,
-          averageCalories: d.average_calories || 0,
-          averageCarbsG: d.average_carbs_g || 0,
-          averageCholesterolMg: d.average_cholesterol_mg || 0,
-          averageConfidence: d.average_confidence || 0,
-          averageFatsG: d.average_fats_g || 0,
-          averageFiberG: d.average_fiber_g || 0,
-          averageGlycemicIndex: d.average_glycemic_index || 0,
-          averageInsolubleFiberG: d.average_insoluble_fiber_g || 0,
-          averageInsulinIndex: d.average_insulin_index || 0,
-          averageLiquidsMl: d.average_liquids_ml || 0,
-          averageMonounsaturatedFatsG: d.average_monounsaturated_fats_g || 0,
-          averageOmega3G: d.average_omega_3_g || 0,
-          averageOmega6G: d.average_omega_6_g || 0,
-          averagePolyunsaturatedFatsG: d.average_polyunsaturated_fats_g || 0,
-          averageProteinG: d.average_protein_g || 0,
-          averageSaturatedFatsG: d.average_saturated_fats_g || 0,
-          averageServingSizeG: d.average_serving_size_g || 0,
-          averageSodiumMg: d.average_sodium_mg || 0,
-          averageSolubleFiberG: d.average_soluble_fiber_g || 0,
-          averageSugarG: d.average_sugar_g || 0,
-          totalAlcoholG: d.total_alcohol_g || 0,
-          totalCaffeineMg: d.total_caffeine_mg || 0,
-          totalCalories: d.total_calories || 0,
-          totalCarbsG: d.total_carbs_g || 0,
-          totalCholesterolMg: d.total_cholesterol_mg || 0,
-          totalConfidence: d.total_confidence || 0,
-          totalFatsG: d.total_fats_g || 0,
-          totalFiberG: d.total_fiber_g || 0,
-          totalGlycemicIndex: d.total_glycemic_index || 0,
-          totalInsolubleFiberG: d.total_insoluble_fiber_g || 0,
-          totalInsulinIndex: d.total_insulin_index || 0,
-          totalLiquidsMl: d.total_liquids_ml || 0,
-          totalMonounsaturatedFatsG: d.total_monounsaturated_fats_g || 0,
-          totalOmega3G: d.total_omega_3_g || 0,
-          totalOmega6G: d.total_omega_6_g || 0,
-          totalPolyunsaturatedFatsG: d.total_polyunsaturated_fats_g || 0,
-          totalProteinG: d.total_protein_g || 0,
-          totalSaturatedFatsG: d.total_saturated_fats_g || 0,
-          totalServingSizeG: d.total_serving_size_g || 0,
-          totalSodiumMg: d.total_sodium_mg || 0,
-          totalSolubleFiberG: d.total_soluble_fiber_g || 0,
-          totalSugarG: d.total_sugar_g || 0,
-          totalDays: d.total_days || 0,
-          totalMeals: d.total_meals || 0,
-          dateRange: {
-            startDate: start,
-            endDate: end,
-          },
-          dailyBreakdown: d.dailyBreakdown || [],
-        });
-      } else {
-        throw new Error(response?.error || "Failed to load statistics data");
-      }
-    } catch (error: any) {
-      console.error("❌ Statistics loading failed:", error);
-      setError(error.message || "Unable to load statistics");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [getDateRange]);
+  const error = queryError?.message || null;
 
   // Refresh handler
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    await loadStatistics();
+    await refetch();
     setRefreshing(false);
-  }, [loadStatistics]);
-
-  // Load data when component mounts or dependencies change
-  useEffect(() => {
-    loadStatistics();
-  }, [loadStatistics]);
+  }, [refetch]);
 
   // Generate nutrition metrics from statistics data
   const generateNutritionMetrics = useCallback((): NutritionMetric[] => {
