@@ -48,7 +48,7 @@ export default function ProfileScreen() {
     {
       id: "personalData",
       title: t("profile.personal_data"),
-      icon: "personal-data",
+      icon: "person-circle-outline",
       color: "#FF9500",
       gradient: ["#FF9500", "#FF6B35"],
     },
@@ -85,6 +85,9 @@ export default function ProfileScreen() {
   const handleMenuPress = (itemId: string) => {
     if (itemId === "language") {
       setShowLanguageModal(true);
+    } else if (itemId === "personalData") {
+      // Navigate to questionnaire in edit mode
+      router.push("/questionnaire?mode=edit");
     } else {
       setActiveSection(activeSection === itemId ? null : itemId);
     }
@@ -111,9 +114,6 @@ export default function ProfileScreen() {
         return <NotificationSettings onClose={() => setActiveSection(null)} />;
       case "privacy":
         return <PrivacySettings onClose={() => setActiveSection(null)} />;
-      case "personalData":
-        router.push("/questionnaire?mode=edit");
-        return;
       default:
         return null;
     }

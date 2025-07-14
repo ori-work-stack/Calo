@@ -32,6 +32,11 @@ router.post("/", authenticateToken, async (req: AuthRequest, res) => {
       return isNaN(parsed) ? null : parsed;
     };
 
+    const sanitizeString = (val: any) => {
+      if (val === "" || val === null || val === undefined) return null;
+      return String(val);
+    };
+
     const sanitizeBoolean = (val: any) => {
       if (typeof val === "boolean") return val;
       if (typeof val === "string") {
@@ -101,8 +106,9 @@ router.post("/", authenticateToken, async (req: AuthRequest, res) => {
     questionnaireData.dietary_style = questionnaireData.dietary_style || "רגיל";
 
     // Optional string fields
-    questionnaireData.daily_cooking_time =
-      questionnaireData.daily_cooking_time || null;
+    questionnaireData.daily_cooking_time = sanitizeString(
+      questionnaireData.daily_cooking_time
+    );
 
     // Handle meal_times - convert array to string as per Prisma schema
     if (Array.isArray(questionnaireData.meal_times)) {
@@ -366,6 +372,20 @@ router.post("/", authenticateToken, async (req: AuthRequest, res) => {
           // Additional
           past_diet_difficulties: validatedData.past_diet_difficulties,
 
+          // Legacy fields
+          program_duration: validatedData.program_duration,
+          meal_timing_restrictions: validatedData.meal_timing_restrictions,
+          dietary_restrictions: validatedData.dietary_restrictions,
+          willingness_to_follow: validatedData.willingness_to_follow,
+          upcoming_events: validatedData.upcoming_events,
+          upload_frequency: validatedData.upload_frequency,
+          notifications_preference: validatedData.notifications_preference,
+          personalized_tips: validatedData.personalized_tips,
+          health_metrics_integration: validatedData.health_metrics_integration,
+          family_medical_history: validatedData.family_medical_history,
+          smoking_status: validatedData.smoking_status,
+          sleep_hours_per_night: validatedData.sleep_hours_per_night,
+
           date_completed: new Date(),
         },
       });
@@ -438,18 +458,34 @@ router.post("/", authenticateToken, async (req: AuthRequest, res) => {
           // Additional
           past_diet_difficulties: validatedData.past_diet_difficulties,
 
+          // Legacy fields
+          program_duration: validatedData.program_duration,
+          meal_timing_restrictions: validatedData.meal_timing_restrictions,
+          dietary_restrictions: validatedData.dietary_restrictions,
+          willingness_to_follow: validatedData.willingness_to_follow,
+          upcoming_events: validatedData.upcoming_events,
+          upload_frequency: validatedData.upload_frequency,
+          notifications_preference: validatedData.notifications_preference,
+          personalized_tips: validatedData.personalized_tips,
+          health_metrics_integration: validatedData.health_metrics_integration,
+          family_medical_history: validatedData.family_medical_history,
+          smoking_status: validatedData.smoking_status,
+          sleep_hours_per_night: validatedData.sleep_hours_per_night,
+
           date_completed: new Date(),
         },
       });
     }
 
-    // Mark questionnaire as completed
-    await prisma.user.update({
-      where: { user_id: userId },
-      data: {
-        is_questionnaire_completed: true,
-      },
-    });
+    // Mark questionnaire as completed only if it's not an edit mode
+    if (!questionnaireData.isEditMode) {
+      await prisma.user.update({
+        where: { user_id: userId },
+        data: {
+          is_questionnaire_completed: true,
+        },
+      });
+    }
 
     console.log("✅ Questionnaire saved successfully");
 

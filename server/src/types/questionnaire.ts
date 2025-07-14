@@ -24,14 +24,24 @@ export const questionnaireSchema = z.object({
   target_weight_kg: z
     .union([z.number(), z.string()])
     .optional()
+    .nullable()
     .transform((val) =>
-      val ? (typeof val === "string" ? parseFloat(val) : val) : undefined
+      val && val !== ""
+        ? typeof val === "string"
+          ? parseFloat(val)
+          : val
+        : null
     ),
   body_fat_percentage: z
     .union([z.number(), z.string()])
     .optional()
+    .nullable()
     .transform((val) =>
-      val ? (typeof val === "string" ? parseFloat(val) : val) : undefined
+      val && val !== ""
+        ? typeof val === "string"
+          ? parseFloat(val)
+          : val
+        : null
     ),
   additional_personal_info: z.array(z.string()).default([]),
 
@@ -53,8 +63,9 @@ export const questionnaireSchema = z.object({
   goal_timeframe_days: z
     .union([z.number(), z.string()])
     .optional()
+    .nullable()
     .transform((val) =>
-      val ? (typeof val === "string" ? parseInt(val) : val) : undefined
+      val && val !== "" ? (typeof val === "string" ? parseInt(val) : val) : null
     ),
   commitment_level: z.string(),
   most_important_outcome: z.array(z.string()).default([]),
@@ -73,8 +84,9 @@ export const questionnaireSchema = z.object({
   sport_duration_min: z
     .union([z.number(), z.string()])
     .optional()
+    .nullable()
     .transform((val) =>
-      val ? (typeof val === "string" ? parseInt(val) : val) : undefined
+      val && val !== "" ? (typeof val === "string" ? parseInt(val) : val) : null
     ),
   workout_times: z.array(z.string()).default([]),
   uses_fitness_devices: z.boolean().default(false),
@@ -113,11 +125,16 @@ export const questionnaireSchema = z.object({
   daily_food_budget: z
     .union([z.number(), z.string()])
     .optional()
+    .nullable()
     .transform((val) =>
-      val ? (typeof val === "string" ? parseFloat(val) : val) : undefined
+      val && val !== ""
+        ? typeof val === "string"
+          ? parseFloat(val)
+          : val
+        : null
     ),
   shopping_method: z.array(z.string()).default([]),
-  daily_cooking_time: z.string().optional(),
+  daily_cooking_time: z.string().optional().nullable(),
 
   // Dietary preferences and restrictions
   kosher: z.boolean().default(false),
@@ -161,8 +178,13 @@ export const questionnaireSchema = z.object({
   sleep_hours_per_night: z
     .union([z.number(), z.string()])
     .optional()
+    .nullable()
     .transform((val) =>
-      val ? (typeof val === "string" ? parseFloat(val) : val) : undefined
+      val && val !== ""
+        ? typeof val === "string"
+          ? parseFloat(val)
+          : val
+        : null
     ),
 });
 

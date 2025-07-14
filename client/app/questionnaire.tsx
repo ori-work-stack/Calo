@@ -27,15 +27,15 @@ interface QuestionnaireData {
   gender: string;
   height_cm: string;
   weight_kg: string;
-  target_weight_kg: string;
-  body_fat_percentage: string;
+  target_weight_kg: string | null;
+  body_fat_percentage: string | null;
   additional_personal_info: string[];
 
   // Goals
   main_goal: string;
   main_goal_text: string[];
   specific_goal: string[];
-  goal_timeframe_days: string;
+  goal_timeframe_days: string | null;
   commitment_level: string;
   most_important_outcome: string[];
   special_personal_goal: string[];
@@ -44,7 +44,7 @@ interface QuestionnaireData {
   physical_activity_level: string;
   sport_frequency: string;
   sport_types: string[];
-  sport_duration_min: string;
+  sport_duration_min: string | null;
   workout_times: string[];
   uses_fitness_devices: boolean;
   fitness_device_type: string[];
@@ -64,9 +64,9 @@ interface QuestionnaireData {
   meal_times: string[];
   cooking_preference: string;
   available_cooking_methods: string[];
-  daily_food_budget: string;
+  daily_food_budget: string | null;
   shopping_method: string[];
-  daily_cooking_time: string;
+  daily_cooking_time: string | null;
 
   // Dietary preferences and restrictions
   kosher: boolean;
@@ -78,7 +78,7 @@ interface QuestionnaireData {
   liked_foods: string[];
   regular_drinks: string[];
   intermittent_fasting: boolean;
-  fasting_hours: string;
+  fasting_hours: string | null;
 
   // Additional
   past_diet_difficulties: string[];
@@ -95,7 +95,7 @@ interface QuestionnaireData {
   health_metrics_integration?: boolean;
   family_medical_history?: string[];
   smoking_status?: string;
-  sleep_hours_per_night?: string;
+  sleep_hours_per_night?: string | null;
 }
 
 const MAIN_GOALS = [
@@ -178,8 +178,7 @@ export default function QuestionnaireScreen() {
   const searchParams = useLocalSearchParams();
 
   // Check if we're in editing mode
-  const isEditMode =
-    searchParams?.mode === "edit" || user?.is_questionnaire_completed;
+  const isEditMode = searchParams?.mode === "edit";
 
   const [currentStep, setCurrentStep] = useState(1);
   const [showTip, setShowTip] = useState("");
@@ -194,14 +193,14 @@ export default function QuestionnaireScreen() {
     gender: "",
     height_cm: "",
     weight_kg: "",
-    target_weight_kg: "",
-    body_fat_percentage: "",
+    target_weight_kg: null,
+    body_fat_percentage: null,
     additional_personal_info: [],
 
     main_goal: "",
     main_goal_text: [],
     specific_goal: [],
-    goal_timeframe_days: "",
+    goal_timeframe_days: null,
     commitment_level: "",
     most_important_outcome: [],
     special_personal_goal: [],
@@ -209,7 +208,7 @@ export default function QuestionnaireScreen() {
     physical_activity_level: "",
     sport_frequency: "",
     sport_types: [],
-    sport_duration_min: "",
+    sport_duration_min: null,
     workout_times: [],
     uses_fitness_devices: false,
     fitness_device_type: [],
@@ -227,9 +226,9 @@ export default function QuestionnaireScreen() {
     meal_times: [],
     cooking_preference: "",
     available_cooking_methods: [],
-    daily_food_budget: "",
+    daily_food_budget: null,
     shopping_method: [],
-    daily_cooking_time: "",
+    daily_cooking_time: null,
 
     kosher: false,
     allergies: [],
@@ -240,7 +239,7 @@ export default function QuestionnaireScreen() {
     liked_foods: [],
     regular_drinks: [],
     intermittent_fasting: false,
-    fasting_hours: "",
+    fasting_hours: null,
 
     past_diet_difficulties: [],
 
@@ -256,31 +255,43 @@ export default function QuestionnaireScreen() {
     health_metrics_integration: false,
     family_medical_history: [],
     smoking_status: "",
-    sleep_hours_per_night: "",
+    sleep_hours_per_night: null,
   });
 
   // Load existing questionnaire data if in edit mode
   useEffect(() => {
     const loadQuestionnaireData = async () => {
-      if (isEditMode && !dataLoaded) {
+      if (isEditMode && !dataLoaded && !isLoading) {
+        console.log("📖 Getting questionnaire...");
         try {
           await dispatch(fetchQuestionnaire());
         } catch (error) {
           console.error("Failed to fetch questionnaire:", error);
+          Alert.alert(
+            "שגיאה",
+            "לא ניתן לטעון את הנתונים הקיימים. נסה שוב מאוחר יותר."
+          );
+          setDataLoaded(true); // Set to true even on error to prevent infinite loading
         }
+      } else if (!isEditMode) {
+        // If not in edit mode, mark data as loaded immediately
+        setDataLoaded(true);
       }
     };
 
     loadQuestionnaireData();
-  }, [dispatch, isEditMode, dataLoaded]);
+  }, [dispatch, isEditMode, dataLoaded, isLoading]);
 
   // Map questionnaire data to form when available
   useEffect(() => {
-    if (questionnaire && !dataLoaded) {
+    if (isEditMode && questionnaire && !dataLoaded) {
       console.log("📋 Mapping questionnaire data to form:", questionnaire);
 
       // Helper function to safely convert values
-      const safeString = (value: any) => value?.toString() || "";
+      const safeString = (value: any) => {
+        if (value === null || value === undefined) return "";
+        return value.toString();
+      };
       const safeArray = (value: any) => {
         if (Array.isArray(value)) return value;
         if (typeof value === "string") {
@@ -416,8 +427,12 @@ export default function QuestionnaireScreen() {
       setFormData(mappedData);
       setDataLoaded(true);
       console.log("✅ Form data mapped successfully");
+    } else if (isEditMode && !questionnaire && !isLoading && !dataLoaded) {
+      // If we're in edit mode but no questionnaire data and not loading, still set dataLoaded to true
+      console.log("⚠️ No questionnaire data found in edit mode");
+      setDataLoaded(true);
     }
-  }, [questionnaire, dataLoaded]);
+  }, [questionnaire, dataLoaded, isEditMode, isLoading]);
 
   const handleArrayToggle = (
     array: string[],
@@ -440,17 +455,38 @@ export default function QuestionnaireScreen() {
 
       console.log("💾 Submitting questionnaire data:", formData);
 
+      // Clean up empty strings and convert to null for optional fields
+      const cleanFormData = { ...formData };
+
+      // Convert empty strings to null for optional numeric fields
+      if (cleanFormData.target_weight_kg === "")
+        cleanFormData.target_weight_kg = null;
+      if (cleanFormData.body_fat_percentage === "")
+        cleanFormData.body_fat_percentage = null;
+      if (cleanFormData.goal_timeframe_days === "")
+        cleanFormData.goal_timeframe_days = null;
+      if (cleanFormData.sport_duration_min === "")
+        cleanFormData.sport_duration_min = null;
+      if (cleanFormData.daily_food_budget === "")
+        cleanFormData.daily_food_budget = null;
+      if (cleanFormData.daily_cooking_time === "")
+        cleanFormData.daily_cooking_time = null;
+      if (cleanFormData.sleep_hours_per_night === "")
+        cleanFormData.sleep_hours_per_night = null;
+      if (cleanFormData.fasting_hours === "")
+        cleanFormData.fasting_hours = null;
+
       // For edit mode, we want to preserve the questionnaire completion status
       const dataToSubmit = {
-        ...formData,
+        ...cleanFormData,
         // Ensure we preserve the questionnaire completion status in edit mode
-        isEditMode: isEditMode,
+        isEditMode: isEditMode || user?.is_questionnaire_completed,
       };
 
       const result = await dispatch(saveQuestionnaire(dataToSubmit));
 
       if (saveQuestionnaire.fulfilled.match(result)) {
-        if (isEditMode) {
+        if (isEditMode || user?.is_questionnaire_completed) {
           // In edit mode, show success message and navigate back to profile
           Alert.alert("הצלחה!", "הנתונים שלך עודכנו בהצלחה", [
             {
@@ -566,9 +602,9 @@ export default function QuestionnaireScreen() {
         <Text style={styles.inputLabel}>משקל יעד (ק"ג)</Text>
         <TextInput
           style={styles.textInput}
-          value={formData.target_weight_kg}
+          value={formData.target_weight_kg || ""}
           onChangeText={(text) =>
-            setFormData({ ...formData, target_weight_kg: text })
+            setFormData({ ...formData, target_weight_kg: text || null })
           }
           keyboardType="numeric"
           placeholder="הכנס משקל יעד (אופציונלי)"
@@ -666,9 +702,9 @@ export default function QuestionnaireScreen() {
         </Text>
         <TextInput
           style={styles.textInput}
-          value={formData.goal_timeframe_days}
+          value={formData.goal_timeframe_days || ""}
           onChangeText={(text) =>
-            setFormData({ ...formData, goal_timeframe_days: text })
+            setFormData({ ...formData, goal_timeframe_days: text || null })
           }
           keyboardType="numeric"
           placeholder="לדוגמה: 90 ימים"
@@ -777,9 +813,9 @@ export default function QuestionnaireScreen() {
             <Text style={styles.inputLabel}>משך ממוצע של כל פעילות (דקות)</Text>
             <TextInput
               style={styles.textInput}
-              value={formData.sport_duration_min}
+              value={formData.sport_duration_min || ""}
               onChangeText={(text) =>
-                setFormData({ ...formData, sport_duration_min: text })
+                setFormData({ ...formData, sport_duration_min: text || null })
               }
               keyboardType="numeric"
               placeholder="לדוגמה: 45"
@@ -1043,9 +1079,9 @@ export default function QuestionnaireScreen() {
         <Text style={styles.inputLabel}>תקציב יומי לאוכל (₪)</Text>
         <TextInput
           style={styles.textInput}
-          value={formData.daily_food_budget}
+          value={formData.daily_food_budget || ""}
           onChangeText={(text) =>
-            setFormData({ ...formData, daily_food_budget: text })
+            setFormData({ ...formData, daily_food_budget: text || null })
           }
           keyboardType="numeric"
           placeholder="לדוגמה: 50"
@@ -1095,9 +1131,9 @@ export default function QuestionnaireScreen() {
         <Text style={styles.inputLabel}>כמה שעות שינה בלילה?</Text>
         <TextInput
           style={styles.textInput}
-          value={formData.sleep_hours_per_night}
+          value={formData.sleep_hours_per_night || ""}
           onChangeText={(text) =>
-            setFormData({ ...formData, sleep_hours_per_night: text })
+            setFormData({ ...formData, sleep_hours_per_night: text || null })
           }
           keyboardType="numeric"
           placeholder="לדוגמה: 7-8 שעות"
@@ -1569,9 +1605,9 @@ export default function QuestionnaireScreen() {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
     } else {
-      // Navigate based on edit mode
-      if (isEditMode) {
-        router.replace("/(tabs)/profile");
+      // Navigate based on edit mode or questionnaire completion status
+      if (isEditMode || user?.is_questionnaire_completed) {
+        router.back();
       } else {
         router.replace("/payment-plan");
       }
@@ -1579,7 +1615,7 @@ export default function QuestionnaireScreen() {
   };
 
   // Show loading while fetching data in edit mode
-  if (isEditMode && (isLoading || !dataLoaded)) {
+  if (isEditMode && isLoading && !dataLoaded) {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
         <ActivityIndicator size="large" color="#007AFF" />

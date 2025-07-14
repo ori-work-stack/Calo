@@ -22,8 +22,16 @@ export const fetchQuestionnaire = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await questionnaireAPI.getQuestionnaire();
-      return response.data;
+      const data = response.data?.data || response.data;
+
+      // If no questionnaire data found, return null instead of throwing error
+      if (!data && response.data?.message === "No questionnaire found") {
+        return null;
+      }
+
+      return data;
     } catch (error: any) {
+      console.error("Fetch questionnaire error:", error);
       return rejectWithValue(
         error.response?.data?.error ||
           error.message ||

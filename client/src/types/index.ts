@@ -197,24 +197,24 @@ export interface QuestionnaireData {
   gender?: string;
   height_cm?: string;
   weight_kg?: string;
-  target_weight_kg?: string;
-  body_fat_percentage?: string;
-  additional_personal_info?: string;
+  target_weight_kg?: string | null;
+  body_fat_percentage?: string | null;
+  additional_personal_info?: string[] | string;
 
   // Goals
   main_goal: string;
   main_goal_text?: string;
   specific_goal?: string;
-  goal_timeframe_days?: string;
+  goal_timeframe_days?: string | null;
   commitment_level?: string;
-  most_important_outcome?: string;
-  special_personal_goal?: string;
+  most_important_outcome?: string[] | string;
+  special_personal_goal?: string[] | string;
 
   // Physical activity
   physical_activity_level: string;
   sport_frequency: string;
   sport_types?: string[];
-  sport_duration_min?: string;
+  sport_duration_min?: string | null;
   workout_times?: string;
   uses_fitness_devices?: boolean;
   fitness_device_type?: string;
@@ -234,9 +234,9 @@ export interface QuestionnaireData {
   meal_times?: string;
   cooking_preference?: string;
   available_cooking_methods?: string[];
-  daily_food_budget?: string;
-  shopping_method?: string;
-  daily_cooking_time?: string;
+  daily_food_budget?: string | null;
+  shopping_method?: string[] | string;
+  daily_cooking_time?: string | null;
 
   // Dietary preferences and restrictions
   kosher?: boolean;
@@ -248,7 +248,7 @@ export interface QuestionnaireData {
   liked_foods?: string;
   regular_drinks?: string[];
   intermittent_fasting?: boolean;
-  fasting_hours?: string;
+  fasting_hours?: string | null;
 
   // Additional
   past_diet_difficulties?: string;
