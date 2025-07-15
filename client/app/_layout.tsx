@@ -27,6 +27,7 @@ import { I18nextProvider } from "react-i18next";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import i18n from "@/src/i18n";
 import { User } from "@/src/types";
+import LanguageToolbar from "@/components/LanguageToolbar";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -43,13 +44,13 @@ function useNavigationState(
   segments: string[]
 ) {
   return useMemo(() => {
-    const currentPath = segments[0] || "";
+    const currentPath = segments?.[0] || "";
     const inAuthGroup = currentPath === "(auth)";
     const inTabsGroup = currentPath === "(tabs)";
     const onPaymentPlan = currentPath === "payment-plan";
     const onQuestionnaire = currentPath === "questionnaire";
     const onEmailVerification =
-      inAuthGroup && segments[1] === "email-verification";
+      inAuthGroup && segments?.[1] === "email-verification";
 
     // Create current route string for comparison
     const currentRoute = "/" + segments.join("/");
@@ -60,23 +61,24 @@ function useNavigationState(
       if (!inAuthGroup) {
         targetRoute = "/(auth)/signin";
       }
-    } else if (user.email_verified === false && !onEmailVerification) {
-      targetRoute = `/(auth)/email-verification?email=${user.email}`;
-    } else if (!user.subscription_type && !onPaymentPlan) {
+    } else if (user?.email_verified === false && !onEmailVerification) {
+      targetRoute = `/(auth)/email-verification?email=${user?.email || ""}`;
+    } else if (!user?.subscription_type && !onPaymentPlan) {
       targetRoute = "/payment-plan";
     } else if (
+      user?.subscription_type &&
       ["PREMIUM", "GOLD"].includes(user.subscription_type) &&
-      !user.is_questionnaire_completed &&
+      !user?.is_questionnaire_completed &&
       !onQuestionnaire
     ) {
       targetRoute = "/questionnaire";
     } else if (
       !inTabsGroup &&
       isAuthenticated &&
-      user.email_verified &&
-      user.subscription_type &&
-      (user.is_questionnaire_completed ||
-        !["PREMIUM", "GOLD"].includes(user.subscription_type))
+      user?.email_verified &&
+      user?.subscription_type &&
+      (user?.is_questionnaire_completed ||
+        !["PREMIUM", "GOLD"].includes(user?.subscription_type || ""))
     ) {
       targetRoute = "/(tabs)";
     }
@@ -92,7 +94,7 @@ function useNavigationState(
     user?.is_questionnaire_completed,
     user?.email,
     isAuthenticated,
-    segments.join("/"), // Stable string representation
+    segments?.join("/") || "", // Stable string representation
   ]);
 }
 
@@ -153,13 +155,13 @@ const StackScreens = () => (
 );
 
 const AppContent = () => {
-  const authState = useSelector((state: any) => state.auth || {});
+  const authState = useSelector((state: any) => state?.auth || {});
   const questionnaireState = useSelector(
-    (state: any) => state.questionnaire || {}
+    (state: any) => state?.questionnaire || {}
   );
 
-  const { isAuthenticated = false, user = null } = authState;
-  const { questionnaire = null } = questionnaireState;
+  const { isAuthenticated = false, user = null } = authState || {};
+  const { questionnaire = null } = questionnaireState || {};
 
   useAppInitialization();
 
@@ -197,8 +199,33 @@ const AppContent = () => {
   return <StackScreens />;
 };
 
-// Main root layout with all providers
+function useHelpContent(): { title: string; description: string } | undefined {
+  const segments = useSegments();
+  const route = "/" + segments.join("/");
+
+  switch (route) {
+    case "/(tabs)/route":
+      return {
+        title: "Route Help",
+        description: "This is help content for the Route tab.",
+      };
+    case "/(tabs)/calendar":
+      return {
+        title: "Calendar Help",
+        description: "Here's how to use your calendar.",
+      };
+    case "/(tabs)/statistics":
+      return {
+        title: "Statistics Help",
+        description: "View your health stats and progress here.",
+      };
+    default:
+      return undefined; // No help content for this route
+  }
+}
+
 export default function RootLayout() {
+  const helpContent = useHelpContent();
   return (
     <I18nextProvider i18n={i18n}>
       <GestureHandlerRootView style={styles.root}>
@@ -207,7 +234,10 @@ export default function RootLayout() {
             <QueryClientProvider client={queryClient}>
               <PersistGate loading={<LoadingScreen />} persistor={persistor}>
                 <LanguageProvider>
-                  <AppContent />
+                  <View style={{ flex: 1 }}>
+                    <LanguageToolbar helpContent={helpContent} />
+                    <AppContent />
+                  </View>
                   <StatusBar style="auto" />
                 </LanguageProvider>
               </PersistGate>
