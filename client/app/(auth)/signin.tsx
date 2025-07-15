@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   containerRTL: {
-    direction: "rtl",
+    writingDirection: "rtl",
   },
   header: {
     marginBottom: 40,

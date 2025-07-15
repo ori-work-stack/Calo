@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8f9fa",
   },
   containerRTL: {
-    direction: "rtl",
+    writingDirection: "rtl",
   },
   header: {
     flexDirection: "row",

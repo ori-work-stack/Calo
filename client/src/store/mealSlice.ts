@@ -6,7 +6,7 @@ import {
   AIResponse,
   MealAnalysisSchema,
 } from "../types";
-import { nutritionAPI } from "../services/api";
+import { mealAPI, nutritionAPI } from "../services/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 import * as FileSystem from "expo-file-system";
@@ -721,7 +721,7 @@ export const deleteMeal = createAsyncThunk(
   "meals/delete",
   async (mealId: number, { rejectWithValue, dispatch }) => {
     try {
-      await nutritionAPI.deleteMeal(mealId);
+      await mealAPI.deleteMeal(mealId);
 
       // Refresh all meal-related data after deletion
       dispatch(fetchMeals());

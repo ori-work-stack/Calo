@@ -27,10 +27,15 @@ import { useTranslation } from "react-i18next";
 import { useRTLStyles } from "../../hooks/useRTLStyle";
 import { useMealDataRefresh } from "@/hooks/useMealDataRefresh";
 import LanguageToolbar from "@/components/LanguageToolbar";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 interface MealWithFeedback extends Meal {
   userRating?: number;
   expanded?: boolean;
+  taste_rating?: number;
+  satiety_rating?: number;
+  energy_rating?: number;
+  heaviness_rating?: number;
 }
 
 interface FilterOptions {
@@ -146,10 +151,10 @@ export default function HistoryScreen() {
   const getMealScore = (meal: Meal): { score: number; color: string } => {
     let score = 5; // Start with base score
 
-    const calories = meal.calories;
-    const protein = meal.protein || meal.protein_g;
-    const carbs = meal.carbs || meal.carbs_g;
-    const fat = meal.fat || meal.fats_g;
+    const calories = meal.calories || 0;
+    const protein = meal.protein || meal.protein_g || 0;
+    const carbs = meal.carbs || meal.carbs_g || 0;
+    const fat = meal.fat || meal.fats_g || 0;
     const fiber = meal.fiber || meal.fiber_g || 0;
 
     // Protein adequacy (good if 15-30% of calories)
@@ -189,7 +194,7 @@ export default function HistoryScreen() {
   const generateSmartInsight = () => {
     if (meals.length === 0) {
       setSmartInsight(
-        t("history.no_meals_insight", "Start logging meals to see insights")
+        t("history.no_meals_insight") || "Start logging meals to see insights"
       );
       return;
     }
@@ -208,23 +213,21 @@ export default function HistoryScreen() {
     const avgDailyCalories = thisWeekCalories / 7;
 
     const insights = [
-      t(
-        "history.insight_calories",
-        "This week you consumed an average of {{calories}} calories per day",
-        {
-          calories: Math.round(avgDailyCalories),
-        }
-      ),
-      t("history.insight_meals", "You logged {{count}} meals this week", {
+      t("history.insight_calories", {
+        calories: Math.round(avgDailyCalories),
+      }) ||
+        `This week you consumed an average of ${Math.round(
+          avgDailyCalories
+        )} calories per day`,
+      t("history.insight_meals", {
         count: lastWeekMeals.length,
-      }),
-      t(
-        "history.insight_score",
-        "Your healthiest meal this week scored {{score}}",
-        {
-          score: Math.max(...lastWeekMeals.map((m) => getMealScore(m).score)),
-        }
-      ),
+      }) || `You logged ${lastWeekMeals.length} meals this week`,
+      t("history.insight_score", {
+        score: Math.max(...lastWeekMeals.map((m) => getMealScore(m).score)),
+      }) ||
+        `Your healthiest meal this week scored ${Math.max(
+          ...lastWeekMeals.map((m) => getMealScore(m).score)
+        )}`,
     ];
 
     setSmartInsight(insights[Math.floor(Math.random() * insights.length)]);
@@ -256,15 +259,16 @@ export default function HistoryScreen() {
       ).unwrap();
 
       Alert.alert(
-        t("common.success", "Success"),
-        t("history.feedback_saved", "Your feedback has been saved successfully")
+        t("common.success") || "Success",
+        t("history.feedback_saved") ||
+          "Your feedback has been saved successfully"
       );
       setShowFeedbackModal(false);
       resetFeedbackRatings();
     } catch (error) {
       Alert.alert(
-        t("common.error", "Error"),
-        t("history.feedback_error", "Failed to save feedback")
+        t("common.error") || "Error",
+        t("history.feedback_error") || "Failed to save feedback"
       );
     }
   };
@@ -272,8 +276,8 @@ export default function HistoryScreen() {
   const handleUpdateSubmit = async () => {
     if (!selectedMeal || !updateText.trim()) {
       Alert.alert(
-        t("common.error", "Error"),
-        t("history.update_text_required", "Please enter update text")
+        t("common.error") || "Error",
+        t("history.update_text_required") || "Please enter update text"
       );
       return;
     }
@@ -287,8 +291,8 @@ export default function HistoryScreen() {
       ).unwrap();
 
       Alert.alert(
-        t("common.success", "Success"),
-        t("history.meal_updated", "Meal updated successfully!")
+        t("common.success") || "Success",
+        t("history.meal_updated") || "Meal updated successfully!"
       );
       setShowUpdateModal(false);
       setUpdateText("");
@@ -297,8 +301,8 @@ export default function HistoryScreen() {
       dispatch(fetchMeals());
     } catch (error) {
       Alert.alert(
-        t("common.error", "Error"),
-        t("history.update_error", "Failed to update meal")
+        t("common.error") || "Error",
+        t("history.update_error") || "Failed to update meal"
       );
     }
   };
@@ -314,28 +318,26 @@ export default function HistoryScreen() {
     try {
       await dispatch(toggleMealFavorite(mealId)).unwrap();
       Alert.alert(
-        t("common.success", "Success"),
-        t("history.favorite_updated", "Favorite status updated")
+        t("common.success") || "Success",
+        t("history.favorite_updated") || "Favorite status updated"
       );
     } catch (error) {
       Alert.alert(
-        t("common.error", "Error"),
-        t("history.favorite_error", "Failed to update favorite status")
+        t("common.error") || "Error",
+        t("history.favorite_error") || "Failed to update favorite status"
       );
     }
   };
 
   const handleDuplicateMeal = async (meal: Meal) => {
     Alert.alert(
-      t("history.duplicate_meal", "Duplicate Meal"),
-      t(
-        "history.duplicate_confirmation",
-        "Would you like to duplicate this meal to today?"
-      ),
+      t("history.duplicate_meal") || "Duplicate Meal",
+      t("history.duplicate_confirmation") ||
+        "Would you like to duplicate this meal to today?",
       [
-        { text: t("common.cancel", "Cancel"), style: "cancel" },
+        { text: t("common.cancel") || "Cancel", style: "cancel" },
         {
-          text: t("common.yes", "Yes"),
+          text: t("common.yes") || "Yes",
           onPress: async () => {
             try {
               console.log("🔄 Starting duplicate process for meal:", meal.id);
@@ -350,8 +352,8 @@ export default function HistoryScreen() {
 
               console.log("✅ Duplicate result:", result);
               Alert.alert(
-                t("common.success", "Success"),
-                t("history.meal_duplicated", "Meal duplicated successfully!")
+                t("common.success") || "Success",
+                t("history.meal_duplicated") || "Meal duplicated successfully!"
               );
 
               // Refresh meals to show the new duplicate
@@ -359,11 +361,11 @@ export default function HistoryScreen() {
             } catch (error) {
               console.error("💥 Duplicate error:", error);
               Alert.alert(
-                t("common.error", "Error"),
-                t("history.duplicate_error", "Failed to duplicate meal: ") +
+                t("common.error") || "Error",
+                (t("history.duplicate_error") || "Failed to duplicate meal: ") +
                   (error instanceof Error
                     ? error.message
-                    : t("common.unknown_error", "Unknown error"))
+                    : t("common.unknown_error") || "Unknown error")
               );
             }
           },
@@ -401,18 +403,18 @@ export default function HistoryScreen() {
     return (
       <View style={styles.nutritionDetails}>
         <Text style={styles.nutritionDetailsTitle}>
-          {t("nutrition.detailed_info", "Detailed Nutrition Information")}
+          {t("history.detailed_nutrition") || "Detailed Nutrition Information"}
         </Text>
 
         {/* Basic Macros */}
         <View style={styles.macroSection}>
           <Text style={styles.sectionTitle}>
-            {t("nutrition.macronutrients", "Macronutrients")}
+            {t("meals.nutrition_info") || "Macronutrients"}
           </Text>
           <View style={styles.nutritionGrid}>
             <View style={styles.nutritionDetailItem}>
               <Text style={styles.nutritionDetailLabel}>
-                {t("nutrition.calories", "Calories")}
+                {t("meals.calories") || "Calories"}
               </Text>
               <Text style={styles.nutritionDetailValue}>
                 {Math.round(meal.calories || 0)}
@@ -420,7 +422,7 @@ export default function HistoryScreen() {
             </View>
             <View style={styles.nutritionDetailItem}>
               <Text style={styles.nutritionDetailLabel}>
-                {t("nutrition.protein", "Protein")}
+                {t("meals.protein") || "Protein"}
               </Text>
               <Text style={styles.nutritionDetailValue}>
                 {Math.round(meal.protein || meal.protein_g || 0)}g
@@ -428,7 +430,7 @@ export default function HistoryScreen() {
             </View>
             <View style={styles.nutritionDetailItem}>
               <Text style={styles.nutritionDetailLabel}>
-                {t("nutrition.carbs", "Carbs")}
+                {t("meals.carbs") || "Carbs"}
               </Text>
               <Text style={styles.nutritionDetailValue}>
                 {Math.round(meal.carbs || meal.carbs_g || 0)}g
@@ -436,7 +438,7 @@ export default function HistoryScreen() {
             </View>
             <View style={styles.nutritionDetailItem}>
               <Text style={styles.nutritionDetailLabel}>
-                {t("nutrition.fat", "Fat")}
+                {t("meals.fat") || "Fat"}
               </Text>
               <Text style={styles.nutritionDetailValue}>
                 {Math.round(meal.fat || meal.fats_g || 0)}g
@@ -454,13 +456,13 @@ export default function HistoryScreen() {
           meal.sodium_mg) && (
           <View style={styles.macroSection}>
             <Text style={styles.sectionTitle}>
-              {t("nutrition.additional", "Additional Nutrients")}
+              {t("statistics.additional_nutrients") || "Additional Nutrients"}
             </Text>
             <View style={styles.nutritionGrid}>
               {(meal.fiber || meal.fiber_g) && (
                 <View style={styles.nutritionDetailItem}>
                   <Text style={styles.nutritionDetailLabel}>
-                    {t("nutrition.fiber", "Fiber")}
+                    {t("meals.fiber") || "Fiber"}
                   </Text>
                   <Text style={styles.nutritionDetailValue}>
                     {Math.round(meal.fiber || meal.fiber_g || 0)}g
@@ -470,7 +472,7 @@ export default function HistoryScreen() {
               {(meal.sugar || meal.sugar_g) && (
                 <View style={styles.nutritionDetailItem}>
                   <Text style={styles.nutritionDetailLabel}>
-                    {t("nutrition.sugar", "Sugar")}
+                    {t("meals.sugar") || "Sugar"}
                   </Text>
                   <Text style={styles.nutritionDetailValue}>
                     {Math.round(meal.sugar || meal.sugar_g || 0)}g
@@ -480,7 +482,7 @@ export default function HistoryScreen() {
               {(meal.sodium || meal.sodium_mg) && (
                 <View style={styles.nutritionDetailItem}>
                   <Text style={styles.nutritionDetailLabel}>
-                    {t("nutrition.sodium", "Sodium")}
+                    {t("meals.sodium") || "Sodium"}
                   </Text>
                   <Text style={styles.nutritionDetailValue}>
                     {Math.round(meal.sodium || meal.sodium_mg || 0)}mg
@@ -495,7 +497,7 @@ export default function HistoryScreen() {
         {meal.vitamins_json && (
           <View style={styles.macroSection}>
             <Text style={styles.sectionTitle}>
-              {t("nutrition.vitamins", "Vitamins")}
+              {t("statistics.vitamins") || "Vitamins"}
             </Text>
             <View style={styles.nutritionGrid}>
               {Object.entries(meal.vitamins_json).map(([key, value]) => {
@@ -511,7 +513,7 @@ export default function HistoryScreen() {
                     <Text style={styles.nutritionDetailValue}>
                       {typeof value === "number"
                         ? Math.round(value * 100) / 100
-                        : value}
+                        : String(value)}
                     </Text>
                   </View>
                 );
@@ -523,7 +525,7 @@ export default function HistoryScreen() {
         {meal.micronutrients_json && (
           <View style={styles.macroSection}>
             <Text style={styles.sectionTitle}>
-              {t("nutrition.minerals", "Minerals")}
+              {t("history.vitamins_minerals") || "Minerals"}
             </Text>
             <View style={styles.nutritionGrid}>
               {Object.entries(meal.micronutrients_json).map(([key, value]) => {
@@ -539,7 +541,7 @@ export default function HistoryScreen() {
                     <Text style={styles.nutritionDetailValue}>
                       {typeof value === "number"
                         ? Math.round(value * 100) / 100
-                        : value}
+                        : String(value)}
                     </Text>
                   </View>
                 );
@@ -554,12 +556,12 @@ export default function HistoryScreen() {
           meal.cooking_method) && (
           <View style={styles.macroSection}>
             <Text style={styles.sectionTitle}>
-              {t("nutrition.food_analysis", "Food Analysis")}
+              {t("history.meal_analysis") || "Food Analysis"}
             </Text>
             {meal.processing_level && (
               <View style={styles.analysisItem}>
                 <Text style={styles.analysisLabel}>
-                  {t("nutrition.processing_level", "Processing Level")}
+                  {t("history.processing_level") || "Processing Level"}
                 </Text>
                 <Text style={styles.analysisValue}>
                   {meal.processing_level}
@@ -569,7 +571,7 @@ export default function HistoryScreen() {
             {meal.food_category && (
               <View style={styles.analysisItem}>
                 <Text style={styles.analysisLabel}>
-                  {t("nutrition.food_category", "Food Category")}
+                  {t("history.food_category") || "Food Category"}
                 </Text>
                 <Text style={styles.analysisValue}>{meal.food_category}</Text>
               </View>
@@ -577,7 +579,7 @@ export default function HistoryScreen() {
             {meal.cooking_method && (
               <View style={styles.analysisItem}>
                 <Text style={styles.analysisLabel}>
-                  {t("nutrition.cooking_method", "Cooking Method")}
+                  {t("food_scanner.cooking_method") || "Cooking Method"}
                 </Text>
                 <Text style={styles.analysisValue}>{meal.cooking_method}</Text>
               </View>
@@ -591,40 +593,11 @@ export default function HistoryScreen() {
           meal.allergens_json.possible_allergens.length > 0 && (
             <View style={styles.macroSection}>
               <Text style={styles.sectionTitle}>
-                {t("nutrition.allergens", "Possible Allergens")}
+                {t("history.allergens") || "Possible Allergens"}
               </Text>
               <View style={styles.allergensContainer}>
                 {meal.allergens_json.possible_allergens.map(
-                  (
-                    allergen:
-                      | string
-                      | number
-                      | bigint
-                      | boolean
-                      | React.ReactElement<
-                          unknown,
-                          string | React.JSXElementConstructor<any>
-                        >
-                      | Iterable<React.ReactNode>
-                      | React.ReactPortal
-                      | Promise<
-                          | string
-                          | number
-                          | bigint
-                          | boolean
-                          | React.ReactPortal
-                          | React.ReactElement<
-                              unknown,
-                              string | React.JSXElementConstructor<any>
-                            >
-                          | Iterable<React.ReactNode>
-                          | null
-                          | undefined
-                        >
-                      | null
-                      | undefined,
-                    index: React.Key | null | undefined
-                  ) => (
+                  (allergen: string, index: number) => (
                     <View key={index} style={styles.allergenTag}>
                       <Text style={styles.allergenText}>{allergen}</Text>
                     </View>
@@ -638,45 +611,14 @@ export default function HistoryScreen() {
         {meal.health_risk_notes && meal.health_risk_notes.length > 0 && (
           <View style={styles.macroSection}>
             <Text style={styles.sectionTitle}>
-              {t("nutrition.health_risk_notes", "Health Warnings")}
+              {t("history.health_warnings") || "Health Warnings"}
             </Text>
-            {meal.health_risk_notes.map(
-              (
-                warning:
-                  | string
-                  | number
-                  | bigint
-                  | boolean
-                  | React.ReactElement<
-                      unknown,
-                      string | React.JSXElementConstructor<any>
-                    >
-                  | Iterable<React.ReactNode>
-                  | React.ReactPortal
-                  | Promise<
-                      | string
-                      | number
-                      | bigint
-                      | boolean
-                      | React.ReactPortal
-                      | React.ReactElement<
-                          unknown,
-                          string | React.JSXElementConstructor<any>
-                        >
-                      | Iterable<React.ReactNode>
-                      | null
-                      | undefined
-                    >
-                  | null
-                  | undefined,
-                index: React.Key | null | undefined
-              ) => (
-                <View key={index} style={styles.warningItem}>
-                  <Ionicons name="warning" size={16} color="#FF9800" />
-                  <Text style={styles.warningText}>{warning}</Text>
-                </View>
-              )
-            )}
+            {meal.health_risk_notes.map((warning: string, index: number) => (
+              <View key={index} style={styles.warningItem}>
+                <Ionicons name="warning" size={16} color="#FF9800" />
+                <Text style={styles.warningText}>{warning}</Text>
+              </View>
+            ))}
           </View>
         )}
       </View>
@@ -700,7 +642,8 @@ export default function HistoryScreen() {
               <Text style={styles.mealName}>
                 {item.name ||
                   item.meal_name ||
-                  t("meals.unnamed_meal", "Unnamed Meal")}
+                  t("history.unnamed_meal") ||
+                  "Unnamed Meal"}
               </Text>
               {item.is_favorite && (
                 <Ionicons name="heart" size={16} color="#FF6B6B" />
@@ -747,7 +690,7 @@ export default function HistoryScreen() {
               {Math.round(item.calories || 0)}
             </Text>
             <Text style={styles.nutritionLabel}>
-              {t("nutrition.calories", "Calories")}
+              {t("meals.calories") || "Calories"}
             </Text>
           </View>
           <View style={styles.nutritionItem}>
@@ -755,7 +698,7 @@ export default function HistoryScreen() {
               {Math.round(item.protein || item.protein_g || 0)}g
             </Text>
             <Text style={styles.nutritionLabel}>
-              {t("nutrition.protein", "Protein")}
+              {t("meals.protein") || "Protein"}
             </Text>
           </View>
           <View style={styles.nutritionItem}>
@@ -763,16 +706,14 @@ export default function HistoryScreen() {
               {Math.round(item.carbs || item.carbs_g || 0)}g
             </Text>
             <Text style={styles.nutritionLabel}>
-              {t("nutrition.carbs", "Carbs")}
+              {t("meals.carbs") || "Carbs"}
             </Text>
           </View>
           <View style={styles.nutritionItem}>
             <Text style={styles.nutritionValue}>
               {Math.round(item.fat || item.fats_g || 0)}g
             </Text>
-            <Text style={styles.nutritionLabel}>
-              {t("nutrition.fat", "Fat")}
-            </Text>
+            <Text style={styles.nutritionLabel}>{t("meals.fat") || "Fat"}</Text>
           </View>
         </View>
 
@@ -783,7 +724,7 @@ export default function HistoryScreen() {
             {item.ingredients && item.ingredients.length > 0 && (
               <View style={styles.ingredientsSection}>
                 <Text style={styles.ingredientsTitle}>
-                  {t("nutrition.ingredients", "Ingredients")} (
+                  {t("food_scanner.ingredients") || "Ingredients"} (
                   {item.ingredients.length}):
                 </Text>
                 {item.ingredients.map((ingredient, index) => (
@@ -811,13 +752,13 @@ export default function HistoryScreen() {
           item.heaviness_rating) && (
           <View style={styles.ratingsDisplay}>
             <Text style={styles.ratingsTitle}>
-              {t("history.your_ratings", "Your Ratings")}:
+              {t("history.your_ratings") || "Your Ratings"}:
             </Text>
             <View style={styles.ratingsRow}>
               {item.taste_rating && (
                 <View style={styles.ratingItem}>
                   <Text style={styles.ratingLabel}>
-                    {t("history.taste", "Taste")}
+                    {t("history.taste") || "Taste"}
                   </Text>
                   <View style={styles.miniStars}>
                     {[1, 2, 3, 4, 5].map((star) => (
@@ -840,7 +781,7 @@ export default function HistoryScreen() {
               {item.satiety_rating && (
                 <View style={styles.ratingItem}>
                   <Text style={styles.ratingLabel}>
-                    {t("history.satiety", "Satiety")}
+                    {t("history.satiety") || "Satiety"}
                   </Text>
                   <View style={styles.miniStars}>
                     {[1, 2, 3, 4, 5].map((star) => (
@@ -881,7 +822,7 @@ export default function HistoryScreen() {
             disabled={isSavingFeedback}
           >
             <Ionicons name="chatbubble-outline" size={20} color="#007AFF" />
-            <Text style={styles.actionText}>{t("history.rate", "Rate")}</Text>
+            <Text style={styles.actionText}>{t("history.rate") || "Rate"}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -896,8 +837,8 @@ export default function HistoryScreen() {
             />
             <Text style={styles.actionText}>
               {item.is_favorite
-                ? t("history.unfavorite", "Unfavorite")
-                : t("history.favorite", "Favorite")}
+                ? t("history.unfavorite") || "Unfavorite"
+                : t("history.favorite") || "Favorite"}
             </Text>
           </TouchableOpacity>
 
@@ -912,7 +853,7 @@ export default function HistoryScreen() {
               <Ionicons name="copy-outline" size={20} color="#4CAF50" />
             )}
             <Text style={styles.actionText}>
-              {t("history.duplicate", "Duplicate")}
+              {t("history.duplicate") || "Duplicate"}
             </Text>
           </TouchableOpacity>
 
@@ -923,7 +864,7 @@ export default function HistoryScreen() {
           >
             <Ionicons name="create-outline" size={20} color="#FF9800" />
             <Text style={styles.actionText}>
-              {t("history.update", "Update")}
+              {t("history.update") || "Update"}
             </Text>
           </TouchableOpacity>
         </View>
@@ -934,10 +875,12 @@ export default function HistoryScreen() {
   const onRefresh = () => {
     dispatch(fetchMeals());
   };
+
   const helpContent = {
-    title: "היסטוריית ארוחות",
+    title: t("history.title") || "Meal History",
     description:
-      "כאן תוכל לראות את כל הארוחות שצילמת והעלית. ניתן לסנן לפי סוג ארוחה או תאריך. לחץ על ארוחה כדי לראות פרטים נוספים או לערוך אותה.",
+      t("history.help_description") ||
+      "Here you can see all the meals you've photographed and uploaded. You can filter by meal type or date. Click on a meal to see more details or edit it.",
   };
 
   if (isLoading && filteredMeals.length === 0) {
@@ -945,14 +888,14 @@ export default function HistoryScreen() {
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#007AFF" />
         <Text style={styles.loadingText}>
-          {t("common.loading", "Loading")}...
+          {t("common.loading") || "Loading"}...
         </Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <LanguageToolbar helpContent={helpContent} />
 
       {/* Search and Filter Header */}
@@ -960,7 +903,7 @@ export default function HistoryScreen() {
         <Ionicons name="search" size={20} color="#666" />
         <TextInput
           style={styles.searchInput}
-          placeholder={t("history.search_meals", "Search meals...")}
+          placeholder={t("history.search_meals") || "Search meals..."}
           value={searchText}
           onChangeText={setSearchText}
         />
@@ -991,13 +934,11 @@ export default function HistoryScreen() {
           <View style={styles.emptyState}>
             <Ionicons name="restaurant-outline" size={64} color="#DDD" />
             <Text style={styles.emptyTitle}>
-              {t("history.no_meals", "No meals to display")}
+              {t("history.no_meals") || "No meals to display"}
             </Text>
             <Text style={styles.emptyText}>
-              {t(
-                "history.start_logging",
-                "Start logging your meals to see your history here"
-              )}
+              {t("history.start_logging") ||
+                "Start logging your meals to see your history here"}
             </Text>
           </View>
         }
@@ -1013,34 +954,34 @@ export default function HistoryScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>
-              {t("history.rate_meal", "Rate Meal")}
+              {t("history.rate_meal") || "Rate Meal"}
             </Text>
-            <Text style={styles.modalSubtitle}>{selectedMeal?.name}</Text>
+            <Text style={styles.modalSubtitle}>{selectedMeal?.name || ""}</Text>
 
             <View style={styles.ratingSection}>
               <Text style={styles.ratingLabel}>
-                {t("history.taste", "Taste")}
+                {t("history.taste") || "Taste"}
               </Text>
               {renderStarRating(tasteRating, setTasteRating)}
             </View>
 
             <View style={styles.ratingSection}>
               <Text style={styles.ratingLabel}>
-                {t("history.satiety", "Satiety")}
+                {t("history.satiety") || "Satiety"}
               </Text>
               {renderStarRating(satietyRating, setSatietyRating)}
             </View>
 
             <View style={styles.ratingSection}>
               <Text style={styles.ratingLabel}>
-                {t("history.energy", "Energy")}
+                {t("history.energy") || "Energy"}
               </Text>
               {renderStarRating(energyRating, setEnergyRating)}
             </View>
 
             <View style={styles.ratingSection}>
               <Text style={styles.ratingLabel}>
-                {t("history.heaviness", "Heaviness")}
+                {t("history.heaviness") || "Heaviness"}
               </Text>
               {renderStarRating(heavinessRating, setHeavinessRating)}
             </View>
@@ -1055,7 +996,7 @@ export default function HistoryScreen() {
                 disabled={isSavingFeedback}
               >
                 <Text style={styles.cancelButtonText}>
-                  {t("common.cancel", "Cancel")}
+                  {t("common.cancel") || "Cancel"}
                 </Text>
               </TouchableOpacity>
 
@@ -1068,7 +1009,7 @@ export default function HistoryScreen() {
                   <ActivityIndicator color="white" size="small" />
                 ) : (
                   <Text style={styles.submitButtonText}>
-                    {t("common.save", "Save")}
+                    {t("common.save") || "Save"}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -1087,22 +1028,20 @@ export default function HistoryScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>
-              {t("history.update_meal", "Update Meal")}
+              {t("history.update_meal") || "Update Meal"}
             </Text>
             <Text style={styles.modalSubtitle}>
-              {t(
-                "history.add_additional_info",
-                "Add additional information about"
-              )}{" "}
-              "{selectedMeal?.name}"
+              {t("history.add_additional_info") ||
+                "Add additional information about"}{" "}
+              "{selectedMeal?.name || ""}"
             </Text>
 
             <TextInput
               style={styles.updateInput}
-              placeholder={t(
-                "history.enter_additional_info",
+              placeholder={
+                t("history.enter_additional_info") ||
                 "Enter additional meal information..."
-              )}
+              }
               value={updateText}
               onChangeText={setUpdateText}
               multiline
@@ -1122,7 +1061,7 @@ export default function HistoryScreen() {
                 disabled={isUpdating}
               >
                 <Text style={styles.cancelButtonText}>
-                  {t("common.cancel", "Cancel")}
+                  {t("common.cancel") || "Cancel"}
                 </Text>
               </TouchableOpacity>
 
@@ -1135,7 +1074,7 @@ export default function HistoryScreen() {
                   <ActivityIndicator color="white" size="small" />
                 ) : (
                   <Text style={styles.submitButtonText}>
-                    {t("common.update", "Update")}
+                    {t("common.update") || "Update"}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -1154,31 +1093,31 @@ export default function HistoryScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>
-              {t("history.filter_meals", "Filter Meals")}
+              {t("history.filter_meals") || "Filter Meals"}
             </Text>
 
             <View style={styles.filterSection}>
               <Text style={styles.filterLabel}>
-                {t("history.category", "Category")}
+                {t("history.category") || "Category"}
               </Text>
               <View style={styles.categoryButtons}>
                 {[
-                  { key: "", label: t("common.all", "All") },
+                  { key: "", label: t("common.all") || "All" },
                   {
                     key: "high-protein",
-                    label: t("nutrition.high_protein", "High Protein"),
+                    label: t("history.high_protein") || "High Protein",
                   },
                   {
                     key: "high-carb",
-                    label: t("nutrition.high_carb", "High Carb"),
+                    label: t("history.high_carb") || "High Carb",
                   },
                   {
                     key: "high-fat",
-                    label: t("nutrition.high_fat", "High Fat"),
+                    label: t("history.high_fat") || "High Fat",
                   },
                   {
                     key: "balanced",
-                    label: t("nutrition.balanced", "Balanced"),
+                    label: t("history.balanced") || "Balanced",
                   },
                 ].map((category) => (
                   <TouchableOpacity
@@ -1215,7 +1154,7 @@ export default function HistoryScreen() {
                 }}
               >
                 <Text style={styles.cancelButtonText}>
-                  {t("common.reset", "Reset")}
+                  {t("common.refresh") || "Reset"}
                 </Text>
               </TouchableOpacity>
 
@@ -1224,21 +1163,21 @@ export default function HistoryScreen() {
                 onPress={() => setShowFilters(false)}
               >
                 <Text style={styles.submitButtonText}>
-                  {t("common.apply", "Apply")}
+                  {t("common.ok") || "Apply"}
                 </Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#f8f9fa",
   },
   centered: {
     flex: 1,
@@ -1252,15 +1191,30 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: "row",
-    padding: 15,
-    backgroundColor: "white",
+    padding: 16,
+    backgroundColor: "#ffffff",
     alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 3,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e9ecef",
   },
   searchInput: {
     flex: 1,
-    paddingVertical: 10,
-    paddingLeft: 8,
+    paddingVertical: 12,
+    paddingLeft: 12,
     fontSize: 16,
+    backgroundColor: "#f8f9fa",
+    borderRadius: 8,
+    marginLeft: 8,
+    borderWidth: 1,
+    borderColor: "#e9ecef",
   },
   filterButton: {
     padding: 10,
@@ -1268,11 +1222,21 @@ const styles = StyleSheet.create({
   insightContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFF9C4",
-    padding: 15,
-    marginHorizontal: 15,
-    marginTop: 10,
-    borderRadius: 8,
+    backgroundColor: "#fff3cd",
+    padding: 16,
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: "#ffc107",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   insightText: {
     flex: 1,
@@ -1289,15 +1253,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   mealCard: {
-    backgroundColor: "white",
-    borderRadius: 12,
-    marginBottom: 15,
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    marginBottom: 16,
+    marginHorizontal: 4,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 6,
     overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#f0f0f0",
   },
   mealHeader: {
     flexDirection: "row",
@@ -1350,8 +1320,10 @@ const styles = StyleSheet.create({
   nutritionSummary: {
     flexDirection: "row",
     justifyContent: "space-around",
-    padding: 15,
+    padding: 16,
     backgroundColor: "#f8f9fa",
+    borderTopWidth: 1,
+    borderTopColor: "#e9ecef",
   },
   nutritionItem: {
     alignItems: "center",

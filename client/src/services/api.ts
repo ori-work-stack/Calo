@@ -358,7 +358,7 @@ export const authAPI = {
     try {
       // Call server signout endpoint to clear server-side session and cookie
       await api.post("/auth/signout");
-      router.push("/signin")
+      router.push("/signin");
       // Clear local storage
       await clearAuthToken();
       console.log("🔓 Auth token cleared securely");
@@ -1195,11 +1195,38 @@ export const mealPlanAPI = {
   },
 };
 
-export const statisticsAPI = {
-  async getStatistics(period: "week" | "month" | "custom") {
-    const response = await api.get(`/statistics?period=${period}`);
-    return response.data;
-  },
+// Statistics API
+export const getRangeStatistics = async (
+  startDate: string,
+  endDate: string
+) => {
+  try {
+    const response = await api.get(`/statistics`, {
+      params: {
+        start_date: startDate,
+        end_date: endDate,
+        period: "custom",
+      },
+    });
+    return { success: true, data: response.data };
+  } catch (error) {
+    console.error("Failed to get range statistics:", error);
+    throw error;
+  }
+};
+
+export const getStatistics = async (
+  period: "today" | "week" | "month" = "week"
+) => {
+  try {
+    const response = await api.get("/statistics", {
+      params: { period },
+    });
+    return { success: true, data: response.data };
+  } catch (error) {
+    console.error("Failed to get statistics:", error);
+    throw error;
+  }
 };
 
 // NEW CHAT API

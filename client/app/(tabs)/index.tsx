@@ -31,7 +31,6 @@ import { fetchMeals } from "../../src/store/mealSlice";
 import { Meal } from "../../src/types";
 import { useTranslation } from "react-i18next";
 import { useLanguage } from "@/src/i18n/context/LanguageContext";
-import LanguageToolbar from "@/components/LanguageToolbar";
 
 interface UserStats {
   totalMeals: number;
@@ -81,16 +80,6 @@ const HomeScreen = React.memo(() => {
   const isLoadingRef = useRef(false);
   const lastDataLoadRef = useRef<number>(0);
   const lastFocusTimeRef = useRef<number>(0);
-
-  const helpContent = useMemo(
-    () => ({
-      title: t("home.help_title") || "Home Screen Help",
-      description:
-        t("home.help_description") ||
-        "This is your dashboard where you can see your daily progress, quick stats, and access main features. Swipe left or right to navigate between screens quickly.",
-    }),
-    [t]
-  );
 
   // Memoized calculations to prevent unnecessary re-renders
   const processedMealsData = useMemo(() => {
@@ -453,7 +442,6 @@ const HomeScreen = React.memo(() => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#4ECDC4" />
-      <LanguageToolbar helpContent={helpContent} />
 
       <ScrollView
         style={styles.scrollView}
