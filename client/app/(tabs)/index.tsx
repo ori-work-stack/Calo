@@ -17,6 +17,7 @@ import {
   Image,
   StatusBar,
   SafeAreaView,
+  Platform,
 } from "react-native";
 import { useSelector, useDispatch } from "react-redux";
 import { router } from "expo-router";
@@ -30,6 +31,7 @@ import { fetchMeals } from "../../src/store/mealSlice";
 import { Meal } from "../../src/types";
 import { useTranslation } from "react-i18next";
 import { useLanguage } from "@/src/i18n/context/LanguageContext";
+import LanguageToolbar from "@/components/LanguageToolbar";
 
 interface UserStats {
   totalMeals: number;
@@ -56,6 +58,7 @@ const HomeScreen = React.memo(() => {
   const { meals, isLoading } = useSelector((state: RootState) => state.meal);
   const { user } = useSelector((state: RootState) => state.auth);
 
+  // ALL HOOKS MUST BE DECLARED FIRST - BEFORE ANY CONDITIONAL LOGIC
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [dailyGoals, setDailyGoals] = useState<DailyGoals>({
     calories: 0,
@@ -78,6 +81,16 @@ const HomeScreen = React.memo(() => {
   const isLoadingRef = useRef(false);
   const lastDataLoadRef = useRef<number>(0);
   const lastFocusTimeRef = useRef<number>(0);
+
+  const helpContent = useMemo(
+    () => ({
+      title: t("home.help_title") || "Home Screen Help",
+      description:
+        t("home.help_description") ||
+        "This is your dashboard where you can see your daily progress, quick stats, and access main features. Swipe left or right to navigate between screens quickly.",
+    }),
+    [t]
+  );
 
   // Memoized calculations to prevent unnecessary re-renders
   const processedMealsData = useMemo(() => {
@@ -117,7 +130,7 @@ const HomeScreen = React.memo(() => {
   }, [meals]);
 
   // Update daily goals when processed data changes
-  useEffect(() => {
+  const updateDailyGoals = useCallback(() => {
     setDailyGoals((prev) => ({
       ...prev,
       ...processedMealsData.dailyTotals,
@@ -199,29 +212,6 @@ const HomeScreen = React.memo(() => {
     [user?.user_id, loadUserStats, dispatch]
   );
 
-  // Initial load when user id is available
-  useEffect(() => {
-    if (user?.user_id && initialLoading) {
-      loadAllData(true);
-    }
-  }, [user?.user_id, loadAllData, initialLoading]);
-
-  // Optimized focus effect with throttling
-  useFocusEffect(
-    useCallback(() => {
-      if (!user?.user_id || initialLoading) return;
-
-      const now = Date.now();
-      const FOCUS_RELOAD_THROTTLE = 10 * 1000; // 10 seconds minimum between focus reloads
-
-      // Throttle focus-based reloads
-      if (now - lastFocusTimeRef.current > FOCUS_RELOAD_THROTTLE) {
-        lastFocusTimeRef.current = now;
-        loadAllData();
-      }
-    }, [user?.user_id, initialLoading, loadAllData])
-  );
-
   // Optimized refresh with proper state management
   const onRefresh = useCallback(async () => {
     if (refreshing) return; // Prevent multiple simultaneous refreshes
@@ -248,6 +238,49 @@ const HomeScreen = React.memo(() => {
     }),
     [dailyGoals]
   );
+
+  const navigateToCamera = useCallback(() => {
+    router.push("/(tabs)/camera");
+  }, []);
+
+  // EFFECTS SECTION - All useEffect and useFocusEffect hooks go here
+  useEffect(() => {
+    updateDailyGoals();
+  }, [updateDailyGoals]);
+
+  // Initial load when user id is available
+  useEffect(() => {
+    if (user?.user_id && initialLoading) {
+      loadAllData(true);
+    }
+  }, [user?.user_id, loadAllData, initialLoading]);
+
+  // Optimized focus effect with throttling
+  useFocusEffect(
+    useCallback(() => {
+      if (!user?.user_id || initialLoading) return;
+
+      const now = Date.now();
+      const FOCUS_RELOAD_THROTTLE = 10 * 1000; // 10 seconds minimum between focus reloads
+
+      // Throttle focus-based reloads
+      if (now - lastFocusTimeRef.current > FOCUS_RELOAD_THROTTLE) {
+        lastFocusTimeRef.current = now;
+        loadAllData();
+      }
+    }, [user?.user_id, initialLoading, loadAllData])
+  );
+
+  // NOW WE CAN HAVE CONDITIONAL LOGIC - ALL HOOKS ARE DECLARED ABOVE
+  if (initialLoading) {
+    return (
+      <SafeAreaView style={styles.centered}>
+        <StatusBar barStyle="light-content" backgroundColor="#4ECDC4" />
+        <ActivityIndicator size="large" color="#4ECDC4" />
+        <Text style={styles.loadingText}>{t("common.loading")}</Text>
+      </SafeAreaView>
+    );
+  }
 
   // Memoized components to prevent unnecessary re-renders
   const QuickActionButton = React.memo(
@@ -417,46 +450,10 @@ const HomeScreen = React.memo(() => {
     )
   );
 
-  // Easter egg: Konami code detector
-  const [konamiSequence, setKonamiSequence] = useState<string[]>([]);
-  const konamiCode = [
-    "up",
-    "up",
-    "down",
-    "down",
-    "left",
-    "right",
-    "left",
-    "right",
-    "b",
-    "a",
-  ];
-
-  const handleKonamiInput = useCallback((direction: string) => {
-    setKonamiSequence((prev) => {
-      const newSequence = [...prev, direction].slice(-10);
-      if (newSequence.join(",") === konamiCode.join(",")) {
-        // Easter egg activated!
-        console.log("🎉 KONAMI CODE ACTIVATED! 🎉");
-        // You could show a special animation, unlock features, etc.
-      }
-      return newSequence;
-    });
-  }, []);
-
-  if (initialLoading) {
-    return (
-      <SafeAreaView style={styles.centered}>
-        <StatusBar barStyle="light-content" backgroundColor="#4ECDC4" />
-        <ActivityIndicator size="large" color="#4ECDC4" />
-        <Text style={styles.loadingText}>{t("common.loading")}</Text>
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#4ECDC4" />
+      <LanguageToolbar helpContent={helpContent} />
 
       <ScrollView
         style={styles.scrollView}
@@ -491,7 +488,9 @@ const HomeScreen = React.memo(() => {
             </View>
             <TouchableOpacity
               style={styles.notificationButton}
-              onPress={() => handleKonamiInput("up")}
+              onPress={() => {
+                /* Notification functionality */
+              }}
             >
               <Ionicons name="notifications-outline" size={24} color="#fff" />
             </TouchableOpacity>
@@ -588,6 +587,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f8f9fa",
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
   scrollView: {
     flex: 1,

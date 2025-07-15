@@ -1,138 +1,121 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
-import { I18nManager } from "react-native";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useMemo,
+  useCallback,
+} from "react";
+import { I18nManager, Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTranslation } from "react-i18next";
-import { Platform } from "react-native";
 
 interface LanguageContextType {
   currentLanguage: string;
-  isRTL: boolean;
+  language: string;
+  setLanguage: (language: string) => void;
   changeLanguage: (language: string) => Promise<void>;
+  isRTL: boolean;
   isLoading: boolean;
+  t: (key: string) => string;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(
   undefined
 );
 
-export const useLanguage = () => {
+export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  const { i18n, t } = useTranslation();
+  const [currentLanguage, setCurrentLanguage] = useState("en");
+  const [isRTL, setIsRTL] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const updateRTL = useCallback((language: string) => {
+    const rtl = language === "he";
+    setIsRTL(rtl);
+
+    if (Platform.OS !== "web") {
+      if (I18nManager.isRTL !== rtl) {
+        I18nManager.allowRTL(rtl);
+        I18nManager.forceRTL(rtl);
+        // Note: App reload might be needed to reflect RTL changes.
+      }
+    } else {
+      document.documentElement.dir = rtl ? "rtl" : "ltr";
+      document.documentElement.lang = language;
+      document.body.style.direction = rtl ? "rtl" : "ltr";
+    }
+  }, []);
+
+  const changeLanguage = useCallback(
+    async (language: string) => {
+      if (language === currentLanguage) return;
+      setIsLoading(true);
+      try {
+        await i18n.changeLanguage(language);
+        await AsyncStorage.setItem("userLanguage", language);
+        setCurrentLanguage(language);
+        updateRTL(language);
+      } catch (err) {
+        console.error("Error changing language:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [currentLanguage, i18n, updateRTL]
+  );
+
+  const setLanguage = useCallback(
+    (lang: string) => {
+      void changeLanguage(lang);
+    },
+    [changeLanguage]
+  );
+
+  const loadSavedLanguage = useCallback(async () => {
+    try {
+      const savedLanguage = await AsyncStorage.getItem("userLanguage");
+      const languageToUse = savedLanguage || "en";
+      await i18n.changeLanguage(languageToUse);
+      setCurrentLanguage(languageToUse);
+      updateRTL(languageToUse);
+    } catch (err) {
+      console.error("Error loading language:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [i18n, updateRTL]);
+
+  useEffect(() => {
+    void loadSavedLanguage();
+  }, [loadSavedLanguage]);
+
+  const value = useMemo(
+    () => ({
+      currentLanguage,
+      language: currentLanguage,
+      setLanguage,
+      changeLanguage,
+      isRTL,
+      isLoading,
+      t,
+    }),
+    [currentLanguage, setLanguage, changeLanguage, isRTL, isLoading, t]
+  );
+
+  return (
+    <LanguageContext.Provider value={value}>
+      {children}
+    </LanguageContext.Provider>
+  );
+};
+
+export const useLanguage = (): LanguageContextType => {
   const context = useContext(LanguageContext);
   if (!context) {
     throw new Error("useLanguage must be used within a LanguageProvider");
   }
   return context;
-};
-
-export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
-  const { i18n } = useTranslation();
-  const [currentLanguage, setCurrentLanguage] = useState<string>("en");
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRTL, setIsRTL] = useState(false);
-
-  useEffect(() => {
-    loadLanguagePreference();
-  }, []);
-
-  const loadLanguagePreference = async () => {
-    try {
-      const savedLanguage = await AsyncStorage.getItem("userLanguage");
-      const language = savedLanguage || "en";
-
-      await i18n.changeLanguage(language);
-      setCurrentLanguage(language);
-      updateRTLDirection(language);
-    } catch (error) {
-      console.error("Error loading language preference:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const updateRTLDirection = (language: string) => {
-    const isRTLLanguage = language === "he";
-    setIsRTL(isRTLLanguage);
-
-    if (Platform.OS !== "web") {
-      I18nManager.forceRTL(isRTLLanguage);
-    }
-  };
-
-  const updateRTL = (language: string) => {
-    const rtl = language === "he";
-    setIsRTL(rtl);
-
-    if (Platform.OS !== "web") {
-      // For React Native
-      if (I18nManager.isRTL !== rtl) {
-        I18nManager.allowRTL(rtl);
-        I18nManager.forceRTL(rtl);
-        // Note: App restart is required for RTL changes in React Native
-      }
-    } else {
-      // For web
-      document.documentElement.dir = rtl ? "rtl" : "ltr";
-      document.documentElement.lang = language;
-      document.body.style.direction = rtl ? "rtl" : "ltr";
-    }
-  };
-
-  const changeLanguage = async (language: string) => {
-    try {
-      setIsLoading(true);
-      await i18n.changeLanguage(language);
-      await AsyncStorage.setItem("@userLanguage", language);
-      setCurrentLanguage(language);
-      updateRTL(language);
-    } catch (error) {
-      console.error("Error changing language:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const loadSavedLanguage = async () => {
-    try {
-      const savedLanguage = await AsyncStorage.getItem("@userLanguage");
-      const languageToUse = savedLanguage || "en";
-
-      if (i18n.language !== languageToUse) {
-        await i18n.changeLanguage(languageToUse);
-      }
-
-      setCurrentLanguage(languageToUse);
-      updateRTL(languageToUse);
-    } catch (error) {
-      console.error("Error loading saved language:", error);
-      setCurrentLanguage("en");
-      updateRTL("en");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadSavedLanguage();
-  }, []);
-
-  const value: LanguageContextType = {
-    currentLanguage,
-    isRTL,
-    changeLanguage,
-    isLoading,
-  };
-
-  return (
-    <LanguageContext.Provider
-      value={{
-        currentLanguage,
-        isRTL,
-        changeLanguage,
-        isLoading,
-      }}
-    >
-      {children}
-    </LanguageContext.Provider>
-  );
 };

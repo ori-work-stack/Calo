@@ -1,25 +1,39 @@
 import { Tabs } from "expo-router";
-import React from "react";
-import { Platform, View } from "react-native";
-import LanguageToolbar from "@/components/LanguageToolbar";
+import React, { useMemo } from "react";
+import { Platform } from "react-native";
 import { useTranslation } from "react-i18next";
 import { useLanguage } from "@/src/i18n/context/LanguageContext";
 
-import { HapticTab } from "@/components/HapticTab";
 import { IconSymbol } from "@/components/ui/IconSymbol";
-import TabBarBackground from "@/components/ui/TabBarBackground";
 import { Colors } from "@/constants/Colors";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { ScrollableTabBar } from "@/components/ScrollableTabBar";
+import SwipeNavigationWrapper from "@/components/SwipeNavigationWrapper";
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const { t } = useTranslation();
   const { isRTL } = useLanguage();
 
+  const routes = useMemo(
+    () => [
+      "index",
+      "history",
+      "camera",
+      "statistics",
+      "calendar",
+      "devices",
+      "recommended-menus",
+      "ai-chat",
+      "food-scanner",
+      "profile",
+      "questionnaire",
+    ],
+    []
+  );
+
   return (
-    <View style={{ flex: 1 }}>
-      <LanguageToolbar />
+    <SwipeNavigationWrapper threshold={120}>
       <Tabs
         screenOptions={{
           tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
@@ -66,15 +80,7 @@ export default function TabLayout() {
             ),
           }}
         />
-        <Tabs.Screen
-          name="meal-plans"
-          options={{
-            title: t("tabs.meal_plans"),
-            tabBarIcon: ({ color }) => (
-              <IconSymbol size={28} name="fork.knife" color={color} />
-            ),
-          }}
-        />
+
         <Tabs.Screen
           name="camera"
           options={{
@@ -108,6 +114,15 @@ export default function TabLayout() {
             title: t("tabs.devices"),
             tabBarIcon: ({ color }) => (
               <IconSymbol size={28} name="watch.digital" color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="questionnaire"
+          options={{
+            title: t("tabs.questionnaire"),
+            tabBarIcon: ({ color }) => (
+              <IconSymbol size={28} name="doc.text.fill" color={color} />
             ),
           }}
         />
@@ -147,16 +162,7 @@ export default function TabLayout() {
             ),
           }}
         />
-        <Tabs.Screen
-          name="questionnaire"
-          options={{
-            title: t("tabs.questionnaire"),
-            tabBarIcon: ({ color }) => (
-              <IconSymbol size={28} name="doc.text.fill" color={color} />
-            ),
-          }}
-        />
       </Tabs>
-    </View>
+    </SwipeNavigationWrapper>
   );
 }

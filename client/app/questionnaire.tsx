@@ -102,11 +102,12 @@ const MAIN_GOALS = [
   { key: "WEIGHT_LOSS", label: "ירידה במשקל" },
   { key: "WEIGHT_GAIN", label: "עלייה במסת שריר" },
   { key: "WEIGHT_MAINTENANCE", label: "שמירה על משקל" },
+  { key: "GENERAL_HEALTH", label: "בריאות כללית" },
   { key: "MEDICAL_CONDITION", label: "מטרה רפואית" },
+  { key: "SPORTS_PERFORMANCE", label: "ביצועי ספורט" },
   { key: "ALERTNESS", label: "שיפור ערנות" },
   { key: "ENERGY", label: "הגדלת אנרגיה" },
   { key: "SLEEP_QUALITY", label: "איכות שינה" },
-  { key: "SPORTS_PERFORMANCE", label: "ביצועי ספורט" },
   { key: "OTHER", label: "אחר" },
 ];
 
@@ -167,6 +168,51 @@ const REGULAR_DRINKS = [
   "אלכוהול",
   "משקאות ספורט",
   "משקאות דיאט",
+];
+
+const COMMITMENT_LEVELS = [
+  { key: "קל", label: "קל" },
+  { key: "ממוצע", label: "ממוצע" },
+  { key: "קפדני", label: "קפדני" },
+];
+
+const COOKING_PREFERENCES = [
+  { key: "מבושל", label: "מבושל" },
+  { key: "קל הכנה", label: "קל הכנה" },
+  { key: "מוכן מראש", label: "מוכן מראש" },
+  { key: "ללא בישול", label: "ללא בישול" },
+];
+
+const GENDERS = [
+  { key: "זכר", label: "זכר" },
+  { key: "נקבה", label: "נקבה" },
+  { key: "אחר", label: "אחר" },
+];
+
+const SMOKING_STATUS_OPTIONS = [
+  { key: "NO", label: "לא מעשן" },
+  { key: "YES", label: "מעשן" },
+];
+
+const NOTIFICATION_PREFERENCES = [
+  { key: "DAILY", label: "יומי" },
+  { key: "WEEKLY", label: "שבועי" },
+  { key: "NONE", label: "ללא" },
+];
+
+const PROGRAM_DURATIONS = [
+  { key: "SHORT_TERM", label: "חודש" },
+  { key: "MEDIUM_TERM", label: "3 חודשים" },
+  { key: "LONG_TERM", label: "6 חודשים" },
+  { key: "YEARLY", label: "שנה" },
+  { key: "UNLIMITED", label: "ללא הגבלה" },
+];
+
+const UPLOAD_FREQUENCIES = [
+  { key: "EVERY_MEAL", label: "כל ארוחה" },
+  { key: "DAILY", label: "פעם ביום" },
+  { key: "SEVERAL_TIMES_WEEK", label: "כמה פעמים בשבוע" },
+  { key: "WEEKLY", label: "פעם בשבוע" },
 ];
 
 export default function QuestionnaireScreen() {
@@ -296,6 +342,11 @@ export default function QuestionnaireScreen() {
         return [];
       };
       const safeBoolean = (value: any) => Boolean(value);
+      const safeNumber = (value: any) => {
+        if (value === null || value === undefined || value === "") return null;
+        const num = typeof value === "string" ? parseFloat(value) : value;
+        return isNaN(num) ? null : num;
+      };
 
       // Parse meal_times if it's a string
       const parseMealTimes = (mealTimes: any) => {
@@ -386,7 +437,8 @@ export default function QuestionnaireScreen() {
         past_diet_difficulties: safeArray(questionnaire.past_diet_difficulties),
 
         // Additional schema fields
-        program_duration: safeString(questionnaire.program_duration),
+        program_duration:
+          safeString(questionnaire.program_duration) || "MEDIUM_TERM",
         meal_timing_restrictions: safeString(
           questionnaire.meal_timing_restrictions
         ),
@@ -411,9 +463,7 @@ export default function QuestionnaireScreen() {
         ),
         family_medical_history: safeArray(questionnaire.family_medical_history),
         smoking_status: questionnaire.smoking_status as "YES" | "NO" | null,
-        sleep_hours_per_night: questionnaire.sleep_hours_per_night as
-          | number
-          | null,
+        sleep_hours_per_night: safeNumber(questionnaire.sleep_hours_per_night),
       };
 
       setFormData(mappedData);
@@ -477,15 +527,20 @@ export default function QuestionnaireScreen() {
       if (cleanFormData.fasting_hours === "")
         cleanFormData.fasting_hours = null;
 
-      // Convert sleep_hours_per_night from string to number
+      // Ensure meal_timing_restrictions is a string, not array
+      if (Array.isArray(cleanFormData.meal_timing_restrictions)) {
+        cleanFormData.meal_timing_restrictions =
+          cleanFormData.meal_timing_restrictions.join(", ");
+      }
+
+      // Ensure notifications_preference is valid enum value or null
       if (
-        cleanFormData.sleep_hours_per_night === "" ||
-        cleanFormData.sleep_hours_per_night === null
+        cleanFormData.notifications_preference &&
+        !["DAILY", "WEEKLY", "NONE"].includes(
+          cleanFormData.notifications_preference
+        )
       ) {
-        cleanFormData.sleep_hours_per_night = null;
-      } else if (typeof cleanFormData.sleep_hours_per_night === "string") {
-        const parsed = parseFloat(cleanFormData.sleep_hours_per_night);
-        cleanFormData.sleep_hours_per_night = isNaN(parsed) ? null : parsed;
+        cleanFormData.notifications_preference = null;
       }
 
       // For edit mode, we want to preserve the questionnaire completion status
@@ -567,22 +622,22 @@ export default function QuestionnaireScreen() {
       <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>מגדר *</Text>
         <View style={styles.optionGroup}>
-          {["זכר", "נקבה", "אחר"].map((option) => (
+          {GENDERS.map((option) => (
             <TouchableOpacity
-              key={option}
+              key={option.key}
               style={[
                 styles.optionButton,
-                formData.gender === option && styles.optionButtonSelected,
+                formData.gender === option.key && styles.optionButtonSelected,
               ]}
-              onPress={() => setFormData({ ...formData, gender: option })}
+              onPress={() => setFormData({ ...formData, gender: option.key })}
             >
               <Text
                 style={[
                   styles.optionText,
-                  formData.gender === option && styles.optionTextSelected,
+                  formData.gender === option.key && styles.optionTextSelected,
                 ]}
               >
-                {option}
+                {option.label}
               </Text>
             </TouchableOpacity>
           ))}
@@ -727,26 +782,26 @@ export default function QuestionnaireScreen() {
       <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>באיזו רמת מחויבות תרצה לפעול?</Text>
         <View style={styles.optionGroup}>
-          {["קל", "ממוצע", "קפדני"].map((level) => (
+          {COMMITMENT_LEVELS.map((level) => (
             <TouchableOpacity
-              key={level}
+              key={level.key}
               style={[
                 styles.optionButton,
-                formData.commitment_level === level &&
+                formData.commitment_level === level.key &&
                   styles.optionButtonSelected,
               ]}
               onPress={() =>
-                setFormData({ ...formData, commitment_level: level })
+                setFormData({ ...formData, commitment_level: level.key })
               }
             >
               <Text
                 style={[
                   styles.optionText,
-                  formData.commitment_level === level &&
+                  formData.commitment_level === level.key &&
                     styles.optionTextSelected,
                 ]}
               >
-                {level}
+                {level.label}
               </Text>
             </TouchableOpacity>
           ))}
@@ -1032,26 +1087,26 @@ export default function QuestionnaireScreen() {
       <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>העדפת הכנה</Text>
         <View style={styles.optionGroup}>
-          {["מבושל", "קל הכנה", "מוכן מראש", "ללא בישול"].map((pref) => (
+          {COOKING_PREFERENCES.map((pref) => (
             <TouchableOpacity
-              key={pref}
+              key={pref.key}
               style={[
                 styles.optionButton,
-                formData.cooking_preference === pref &&
+                formData.cooking_preference === pref.key &&
                   styles.optionButtonSelected,
               ]}
               onPress={() =>
-                setFormData({ ...formData, cooking_preference: pref })
+                setFormData({ ...formData, cooking_preference: pref.key })
               }
             >
               <Text
                 style={[
                   styles.optionText,
-                  formData.cooking_preference === pref &&
+                  formData.cooking_preference === pref.key &&
                     styles.optionTextSelected,
                 ]}
               >
-                {pref}
+                {pref.label}
               </Text>
             </TouchableOpacity>
           ))}
@@ -1148,40 +1203,38 @@ export default function QuestionnaireScreen() {
         <Text style={styles.inputLabel}>כמה שעות שינה בלילה?</Text>
         <TextInput
           style={styles.textInput}
-          value={formData.sleep_hours_per_night || ""}
-          onChangeText={(text) =>
-            setFormData({ ...formData, sleep_hours_per_night: text || null })
-          }
+          value={formData.sleep_hours_per_night?.toString() || ""}
+          onChangeText={(text) => {
+            const value = text ? parseFloat(text) : null;
+            setFormData({ ...formData, sleep_hours_per_night: value });
+          }}
           keyboardType="numeric"
-          placeholder="לדוגמה: 7-8 שעות"
+          placeholder="לדוגמה: 7.5"
         />
       </View>
 
       <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>סטטוס עישון</Text>
         <View style={styles.optionGroup}>
-          {[
-            { label: "לא מעשן", value: "NO" },
-            { label: "מעשן", value: "YES" },
-          ].map((status) => (
+          {SMOKING_STATUS_OPTIONS.map((status) => (
             <TouchableOpacity
-              key={status.value}
+              key={status.key}
               style={[
                 styles.optionButton,
-                formData.smoking_status === status.value &&
+                formData.smoking_status === status.key &&
                   styles.optionButtonSelected,
               ]}
               onPress={() =>
                 setFormData({
                   ...formData,
-                  smoking_status: status.value as "YES" | "NO",
+                  smoking_status: status.key as "YES" | "NO",
                 })
               }
             >
               <Text
                 style={[
                   styles.optionText,
-                  formData.smoking_status === status.value &&
+                  formData.smoking_status === status.key &&
                     styles.optionTextSelected,
                 ]}
               >
@@ -1234,62 +1287,58 @@ export default function QuestionnaireScreen() {
       <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>משך התוכנית המועדף</Text>
         <View style={styles.optionGroup}>
-          {["חודש", "3 חודשים", "6 חודשים", "שנה", "ללא הגבלה"].map(
-            (duration) => (
-              <TouchableOpacity
-                key={duration}
+          {PROGRAM_DURATIONS.map((duration) => (
+            <TouchableOpacity
+              key={duration.key}
+              style={[
+                styles.optionButton,
+                formData.program_duration === duration.key &&
+                  styles.optionButtonSelected,
+              ]}
+              onPress={() =>
+                setFormData({ ...formData, program_duration: duration.key })
+              }
+            >
+              <Text
                 style={[
-                  styles.optionButton,
-                  formData.program_duration === duration &&
-                    styles.optionButtonSelected,
+                  styles.optionText,
+                  formData.program_duration === duration.key &&
+                    styles.optionTextSelected,
                 ]}
-                onPress={() =>
-                  setFormData({ ...formData, program_duration: duration })
-                }
               >
-                <Text
-                  style={[
-                    styles.optionText,
-                    formData.program_duration === duration &&
-                      styles.optionTextSelected,
-                  ]}
-                >
-                  {duration}
-                </Text>
-              </TouchableOpacity>
-            )
-          )}
+                {duration.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
       </View>
 
       <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>תדירות העלאת ארוחות</Text>
         <View style={styles.optionGroup}>
-          {["כל ארוחה", "פעם ביום", "כמה פעמים בשבוע", "פעם בשבוע"].map(
-            (freq) => (
-              <TouchableOpacity
-                key={freq}
+          {UPLOAD_FREQUENCIES.map((freq) => (
+            <TouchableOpacity
+              key={freq.key}
+              style={[
+                styles.optionButton,
+                formData.upload_frequency === freq.key &&
+                  styles.optionButtonSelected,
+              ]}
+              onPress={() =>
+                setFormData({ ...formData, upload_frequency: freq.key })
+              }
+            >
+              <Text
                 style={[
-                  styles.optionButton,
-                  formData.upload_frequency === freq &&
-                    styles.optionButtonSelected,
+                  styles.optionText,
+                  formData.upload_frequency === freq.key &&
+                    styles.optionTextSelected,
                 ]}
-                onPress={() =>
-                  setFormData({ ...formData, upload_frequency: freq })
-                }
               >
-                <Text
-                  style={[
-                    styles.optionText,
-                    formData.upload_frequency === freq &&
-                      styles.optionTextSelected,
-                  ]}
-                >
-                  {freq}
-                </Text>
-              </TouchableOpacity>
-            )
-          )}
+                {freq.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
       </View>
 
@@ -1363,22 +1412,18 @@ export default function QuestionnaireScreen() {
       <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>העדפות התראות</Text>
         <View style={styles.optionGroup}>
-          {[
-            { label: "יומי", value: "DAILY" },
-            { label: "שבועי", value: "WEEKLY" },
-            { label: "ללא", value: "NONE" },
-          ].map((pref) => (
+          {NOTIFICATION_PREFERENCES.map((pref) => (
             <TouchableOpacity
-              key={pref.value}
+              key={pref.key}
               style={[
                 styles.optionButton,
-                formData.notifications_preference === pref.value &&
+                formData.notifications_preference === pref.key &&
                   styles.optionButtonSelected,
               ]}
               onPress={() =>
                 setFormData({
                   ...formData,
-                  notifications_preference: pref.value as
+                  notifications_preference: pref.key as
                     | "DAILY"
                     | "WEEKLY"
                     | "NONE",
@@ -1388,7 +1433,7 @@ export default function QuestionnaireScreen() {
               <Text
                 style={[
                   styles.optionText,
-                  formData.notifications_preference === pref.value &&
+                  formData.notifications_preference === pref.key &&
                     styles.optionTextSelected,
                 ]}
               >
