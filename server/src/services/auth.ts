@@ -143,23 +143,141 @@ export class AuthService {
       console.log("✅ Email connection verified", transporter);
 
       const mailOptions = {
-        from: `"NutriApp" <${process.env.EMAIL_USER}>`,
+        from: `"Calo Fitness & Diet" <${process.env.EMAIL_USER}>`,
         to: email,
-        subject: "Email Verification - NutriApp",
+        subject: "Verify Your Email Address - Calo",
         html: `
-        <div style="max-width: 600px; margin: 0 auto; padding: 20px; font-family: Arial, sans-serif;">
-          <h2 style="color: #007AFF; text-align: center;">Email Verification</h2>
-          <p>Hello <strong>${name}</strong>,</p>
-          <p>Thank you for signing up! Please use the verification code below to verify your email address:</p>
-          <div style="text-align: center; margin: 30px 0;">
-            <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #007AFF; background: #f5f5f5; padding: 15px 20px; border-radius: 8px; display: inline-block;">${code}</span>
-          </div>
-          <p><strong>This code expires in 15 minutes.</strong></p>
-          <p>If you didn't create an account with us, please ignore this email.</p>
-          <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
-          <p style="color: #666; font-size: 12px; text-align: center;">NutriApp - Your Personal Nutrition Assistant</p>
-        </div>
-      `,
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Email Verification - Calo</title>
+      <!--[if mso]>
+      <noscript>
+        <xml>
+          <o:OfficeDocumentSettings>
+            <o:PixelsPerInch>96</o:PixelsPerInch>
+          </o:OfficeDocumentSettings>
+        </xml>
+      </noscript>
+      <![endif]-->
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f8f9fa; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;">
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f8f9fa;">
+        <tr>
+          <td align="center" style="padding: 40px 20px;">
+            
+            <!-- Main Container -->
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); overflow: hidden;">
+              
+              <!-- Header Section -->
+              <tr>
+                <td style="background: linear-gradient(135deg, #4ECDC4 0%, #44A08D 100%); padding: 40px 32px; text-align: center;">
+                  <div style="background-color: rgba(255, 255, 255, 0.1); width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; border: 3px solid rgba(255, 255, 255, 0.2);">
+                    <div style="width: 40px; height: 40px; background-color: white; border-radius: 50%; position: relative;">
+                      <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 20px; height: 20px; background: linear-gradient(135deg, #4ECDC4 0%, #44A08D 100%); border-radius: 50%;"></div>
+                    </div>
+                  </div>
+                  <h1 style="color: #ffffff; font-size: 28px; font-weight: 700; margin: 0; letter-spacing: -0.5px;">Calo</h1>
+                  <p style="color: rgba(255, 255, 255, 0.9); font-size: 16px; margin: 8px 0 0 0; font-weight: 400;">Fitness & Diet</p>
+                </td>
+              </tr>
+              
+              <!-- Content Section -->
+              <tr>
+                <td style="padding: 48px 32px 32px;">
+                  
+                  <!-- Greeting -->
+                  <h2 style="color: #1a1a1a; font-size: 24px; font-weight: 600; margin: 0 0 24px 0; line-height: 1.3;">
+                    Welcome, ${name}! 👋
+                  </h2>
+                  
+                  <p style="color: #4a5568; font-size: 16px; line-height: 1.6; margin: 0 0 32px 0;">
+                    Thank you for joining Calo! We're excited to help you on your fitness and nutrition journey. To get started, please verify your email address using the code below.
+                  </p>
+                  
+                  <!-- Verification Code Container -->
+                  <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); border: 2px dashed #cbd5e0; border-radius: 12px; padding: 32px; text-align: center; margin: 32px 0;">
+                    <p style="color: #4a5568; font-size: 14px; margin: 0 0 16px 0; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">
+                      Verification Code
+                    </p>
+                    <div style="font-family: 'Courier New', monospace; font-size: 36px; font-weight: 700; color: #2d3748; letter-spacing: 8px; margin: 16px 0; text-align: center;">
+                      ${code}
+                    </div>
+                    <p style="color: #718096; font-size: 13px; margin: 16px 0 0 0;">
+                      This code expires in <strong>15 minutes</strong>
+                    </p>
+                  </div>
+                  
+                  <!-- Instructions -->
+                  <div style="background-color: #f0f9ff; border-left: 4px solid #3b82f6; padding: 20px; margin: 32px 0; border-radius: 0 8px 8px 0;">
+                    <h3 style="color: #1e40af; font-size: 16px; font-weight: 600; margin: 0 0 8px 0;">
+                      📱 What's next?
+                    </h3>
+                    <p style="color: #1e40af; font-size: 14px; line-height: 1.5; margin: 0;">
+                      Enter this code in the Calo app to verify your email and unlock all features including personalized meal plans, workout tracking, and progress analytics.
+                    </p>
+                  </div>
+                  
+                  <!-- Security Notice -->
+                  <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 20px; margin: 32px 0; border-radius: 0 8px 8px 0;">
+                    <h3 style="color: #dc2626; font-size: 16px; font-weight: 600; margin: 0 0 8px 0;">
+                      🔒 Security Notice
+                    </h3>
+                    <p style="color: #dc2626; font-size: 14px; line-height: 1.5; margin: 0;">
+                      If you didn't create an account with Calo, please ignore this email. Never share your verification code with anyone.
+                    </p>
+                  </div>
+                  
+                </td>
+              </tr>
+              
+              <!-- Footer Section -->
+              <tr>
+                <td style="background-color: #f8f9fa; padding: 32px; text-align: center; border-top: 1px solid #e2e8f0;">
+                  
+                  <!-- Social Links -->
+                  <div style="margin-bottom: 24px;">
+                    <a href="#" style="display: inline-block; margin: 0 8px; width: 40px; height: 40px; background-color: #4ECDC4; border-radius: 50%; text-decoration: none; line-height: 40px; color: white; font-size: 16px;">📧</a>
+                    <a href="#" style="display: inline-block; margin: 0 8px; width: 40px; height: 40px; background-color: #4ECDC4; border-radius: 50%; text-decoration: none; line-height: 40px; color: white; font-size: 16px;">💬</a>
+                    <a href="#" style="display: inline-block; margin: 0 8px; width: 40px; height: 40px; background-color: #4ECDC4; border-radius: 50%; text-decoration: none; line-height: 40px; color: white; font-size: 16px;">🌐</a>
+                  </div>
+                  
+                  <!-- Company Info -->
+                  <p style="color: #1a1a1a; font-size: 16px; font-weight: 600; margin: 0 0 8px 0;">
+                    Calo - Fitness & Diet
+                  </p>
+                  <p style="color: #718096; font-size: 14px; margin: 0 0 16px 0; line-height: 1.5;">
+                    Your Personal Nutrition & Fitness Assistant<br>
+                    Transform your health, one meal at a time.
+                  </p>
+                  
+                  <!-- Links -->
+                  <div style="margin: 24px 0;">
+                    <a href="#" style="color: #4ECDC4; text-decoration: none; font-size: 14px; margin: 0 16px; font-weight: 500;">Privacy Policy</a>
+                    <a href="#" style="color: #4ECDC4; text-decoration: none; font-size: 14px; margin: 0 16px; font-weight: 500;">Terms of Service</a>
+                    <a href="#" style="color: #4ECDC4; text-decoration: none; font-size: 14px; margin: 0 16px; font-weight: 500;">Support</a>
+                  </div>
+                  
+                  <!-- Copyright -->
+                  <p style="color: #a0aec0; font-size: 12px; margin: 20px 0 0 0;">
+                    © 2025 Calo. All rights reserved.<br>
+                    <a href="#" style="color: #a0aec0; text-decoration: none;">Unsubscribe</a> | 
+                    <a href="#" style="color: #a0aec0; text-decoration: none;">Update Preferences</a>
+                  </p>
+                  
+                </td>
+              </tr>
+              
+            </table>
+            
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `,
       };
 
       const result = await transporter.sendMail(mailOptions);

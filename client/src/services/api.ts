@@ -3,6 +3,7 @@ import { SignInData, SignUpData, MealAnalysisData, Meal } from "../types";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 import { store } from "../store";
+import { router } from "expo-router";
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 // Get the correct API URL based on platform
 const getApiBaseUrl = () => {
@@ -357,7 +358,7 @@ export const authAPI = {
     try {
       // Call server signout endpoint to clear server-side session and cookie
       await api.post("/auth/signout");
-
+      router.push("/signin")
       // Clear local storage
       await clearAuthToken();
       console.log("🔓 Auth token cleared securely");
