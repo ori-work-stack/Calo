@@ -63,7 +63,6 @@ import { useRTLStyles } from "../../hooks/useRTLStyle";
 import { nutritionAPI } from "../../src/services/api";
 import { useStatistics } from "../../hooks/useQueries";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import AccessibilityButton from "@/components/AccessibilityButton";
 import LanguageToolbar from "@/components/LanguageToolbar";
 
 const { width } = Dimensions.get("window");
@@ -535,22 +534,80 @@ export default function StatisticsScreen() {
 
   // Use react-query for statistics data
   const { start, end } = getDateRange();
-  const {
-    data: statisticsResponse,
-    isLoading,
-    error: queryError,
-    refetch,
-  } = useStatistics(
+
+  const statisticsQuery = useStatistics(
     selectedTimeRange,
     selectedTimeRange === "custom" ? start : undefined,
     selectedTimeRange === "custom" ? end : undefined
   );
 
+  // Safely destructure with proper fallbacks
+  const data = statisticsQuery?.data || null;
+  const isLoading = statisticsQuery?.isLoading || false;
+  const queryError = statisticsQuery?.error || null;
+  const refetch = statisticsQuery?.refetch || (() => Promise.resolve());
+
+  const statisticsResponse = data;
+
   // Transform the response data
   const statisticsData = useMemo(() => {
-    if (!statisticsResponse?.success || !statisticsResponse?.data) return null;
+    if (!statisticsResponse?.success || !statisticsResponse?.data) {
+      return {
+        averageAlcoholG: 0,
+        averageCaffeineMg: 0,
+        averageCalories: 0,
+        averageCarbsG: 0,
+        averageCholesterolMg: 0,
+        averageConfidence: 0,
+        averageFatsG: 0,
+        averageFiberG: 0,
+        averageGlycemicIndex: 0,
+        averageInsolubleFiberG: 0,
+        averageInsulinIndex: 0,
+        averageLiquidsMl: 0,
+        averageMonounsaturatedFatsG: 0,
+        averageOmega3G: 0,
+        averageOmega6G: 0,
+        averagePolyunsaturatedFatsG: 0,
+        averageProteinG: 0,
+        averageSaturatedFatsG: 0,
+        averageServingSizeG: 0,
+        averageSodiumMg: 0,
+        averageSolubleFiberG: 0,
+        averageSugarG: 0,
+        totalAlcoholG: 0,
+        totalCaffeineMg: 0,
+        totalCalories: 0,
+        totalCarbsG: 0,
+        totalCholesterolMg: 0,
+        totalConfidence: 0,
+        totalFatsG: 0,
+        totalFiberG: 0,
+        totalGlycemicIndex: 0,
+        totalInsolubleFiberG: 0,
+        totalInsulinIndex: 0,
+        totalLiquidsMl: 0,
+        totalMonounsaturatedFatsG: 0,
+        totalOmega3G: 0,
+        totalOmega6G: 0,
+        totalPolyunsaturatedFatsG: 0,
+        totalProteinG: 0,
+        totalSaturatedFatsG: 0,
+        totalServingSizeG: 0,
+        totalSodiumMg: 0,
+        totalSolubleFiberG: 0,
+        totalSugarG: 0,
+        totalDays: 0,
+        totalMeals: 0,
+        dateRange: {
+          startDate: start || new Date().toISOString().split("T")[0],
+          endDate: end || new Date().toISOString().split("T")[0],
+        },
+        dailyBreakdown: [],
+      };
+    }
 
-    const d = statisticsResponse.data;
+    const d = statisticsResponse.data || {};
     return {
       averageAlcoholG: d.average_alcohol_g || 0,
       averageCaffeineMg: d.average_caffeine_mg || 0,
@@ -599,10 +656,10 @@ export default function StatisticsScreen() {
       totalDays: d.total_days || 0,
       totalMeals: d.total_meals || 0,
       dateRange: {
-        startDate: start,
-        endDate: end,
+        startDate: start || new Date().toISOString().split("T")[0],
+        endDate: end || new Date().toISOString().split("T")[0],
       },
-      dailyBreakdown: d.dailyBreakdown || [],
+      dailyBreakdown: Array.isArray(d.dailyBreakdown) ? d.dailyBreakdown : [],
     };
   }, [statisticsResponse, start, end]);
 
@@ -934,11 +991,20 @@ export default function StatisticsScreen() {
   };
   // Update dependent data when statistics change
   useEffect(() => {
-    if (statisticsData) {
-      setMetrics(generateNutritionMetrics());
-      setWeeklyData(generateWeeklyData());
-      setAchievements(generateAchievements());
-      setBadges(generateBadges());
+    try {
+      if (statisticsData) {
+        setMetrics(generateNutritionMetrics());
+        setWeeklyData(generateWeeklyData());
+        setAchievements(generateAchievements());
+        setBadges(generateBadges());
+      }
+    } catch (error) {
+      console.error("Error updating statistics data:", error);
+      // Set default empty arrays if there's an error
+      setMetrics([]);
+      setWeeklyData([]);
+      setAchievements([]);
+      setBadges([]);
     }
   }, [
     statisticsData,
@@ -1268,7 +1334,7 @@ export default function StatisticsScreen() {
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007AFF" />
         <Text style={[styles.loadingText, isRTL && styles.textRTL]}>
-          {t("common.loading")}
+          {t("common.loading") || "Loading..."}
         </Text>
       </View>
     );
@@ -1279,8 +1345,10 @@ export default function StatisticsScreen() {
       <View style={styles.errorContainer}>
         <AlertTriangle size={48} color="#F44336" />
         <Text style={[styles.errorText, isRTL && styles.textRTL]}>{error}</Text>
-        <TouchableOpacity style={styles.retryButton}>
-          <Text style={styles.retryButtonText}>{t("common.retry")}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
+          <Text style={styles.retryButtonText}>
+            {t("common.retry") || "Retry"}
+          </Text>
         </TouchableOpacity>
       </View>
     );
@@ -1307,7 +1375,6 @@ export default function StatisticsScreen() {
             <Text style={styles.subtitle}>{currentTexts.subtitle}</Text>
           </View>
           <View style={styles.headerIcons}>
-            <AccessibilityButton />
             <TouchableOpacity
               style={styles.languageButton}
               onPress={toggleLanguage}

@@ -130,7 +130,6 @@ export function ScrollableTabBar(props: BottomTabBarProps) {
 
   // Rest of component remains the same...
   const tabContainerHeight = Platform.OS === "ios" ? 85 : 65;
-  const bottomPadding = insets.bottom > 0 ? insets.bottom : 12;
 
   const colors = {
     background: isDarkMode
@@ -151,7 +150,7 @@ export function ScrollableTabBar(props: BottomTabBarProps) {
   };
 
   return (
-    <View style={[styles.wrapper, { paddingBottom: bottomPadding }]}>
+    <View style={[styles.wrapper]}>
       {Platform.OS === "ios" && (
         <BlurView
           intensity={20}

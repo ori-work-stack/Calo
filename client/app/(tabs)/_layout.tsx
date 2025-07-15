@@ -1,8 +1,9 @@
 import { Tabs } from "expo-router";
-import React, { useMemo } from "react";
+import React, { useCallback, useMemo } from "react";
 import { Platform } from "react-native";
 import { useTranslation } from "react-i18next";
 import { useLanguage } from "@/src/i18n/context/LanguageContext";
+import { router } from "expo-router";
 
 import { IconSymbol } from "@/components/ui/IconSymbol";
 import { Colors } from "@/constants/Colors";
@@ -32,8 +33,20 @@ export default function TabLayout() {
     []
   );
 
+  const handleSwipeLeft = useCallback(() => {
+    router.push("/(tabs)/camera");
+  }, []);
+
+  const handleSwipeRight = useCallback(() => {
+    router.push("/(tabs)/profile");
+  }, []);
+
   return (
-    <SwipeNavigationWrapper threshold={120}>
+    <SwipeNavigationWrapper
+      onSwipeLeft={handleSwipeLeft}
+      onSwipeRight={handleSwipeRight}
+      threshold={120}
+    >
       <Tabs
         screenOptions={{
           tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
@@ -118,15 +131,6 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
-          name="questionnaire"
-          options={{
-            title: t("tabs.questionnaire"),
-            tabBarIcon: ({ color }) => (
-              <IconSymbol size={28} name="doc.text.fill" color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
           name="recommended-menus"
           options={{
             title: t("tabs.recommended_menus"),
@@ -141,6 +145,15 @@ export default function TabLayout() {
             title: t("tabs.ai_chat"),
             tabBarIcon: ({ color }) => (
               <IconSymbol size={28} name="message.fill" color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="questionnaire"
+          options={{
+            title: t("tabs.questionnaire"),
+            tabBarIcon: ({ color }) => (
+              <IconSymbol size={28} name="doc.text.fill" color={color} />
             ),
           }}
         />

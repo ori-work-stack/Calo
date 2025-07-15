@@ -152,7 +152,15 @@ const StackScreens = () => (
   </Stack>
 );
 
-function AppContent() {
+const AppContent = () => {
+  const authState = useSelector((state: any) => state.auth || {});
+  const questionnaireState = useSelector(
+    (state: any) => state.questionnaire || {}
+  );
+
+  const { isAuthenticated = false, user = null } = authState;
+  const { questionnaire = null } = questionnaireState;
+
   useAppInitialization();
 
   // Font loading
@@ -160,16 +168,11 @@ function AppContent() {
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
   });
 
-  // Memoized auth state selector
-  const authState = useSelector(selectAuthState);
+  // Memoized navigation state selector
   const segments = useSegments() as string[];
 
   // Memoized navigation state
-  const navigationState = useNavigationState(
-    authState.user,
-    authState.isAuthenticated,
-    segments
-  );
+  const navigationState = useNavigationState(user, isAuthenticated, segments);
 
   // Navigation management
   useNavigationManager(
@@ -192,7 +195,7 @@ function AppContent() {
   }
 
   return <StackScreens />;
-}
+};
 
 // Main root layout with all providers
 export default function RootLayout() {

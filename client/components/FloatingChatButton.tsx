@@ -1,4 +1,10 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
 import {
   View,
   TouchableOpacity,
@@ -9,231 +15,437 @@ import {
   StatusBar,
   Platform,
   Vibration,
+  Text,
+  SafeAreaView,
+  PanResponder,
+  Easing,
 } from "react-native";
-import { PanGestureHandler, State } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
 import AIChatScreen from "../app/(tabs)/ai-chat";
 
-// Define the props interface for AIChatScreen
+// Enhanced interface with better typing
 interface AIChatScreenProps {
   onClose?: () => void;
+  onMinimize?: () => void;
 }
 
+interface Position {
+  x: number;
+  y: number;
+}
+
+// Enhanced constants with better responsive design
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
-const BUTTON_SIZE = 56;
-const EDGE_MARGIN = 20;
+const BUTTON_SIZE = 64;
+const MINIMIZED_SIZE = 48;
+const EDGE_MARGIN = 16;
+const SAFE_AREA_MARGIN = 100;
+
+// Animation configurations
+const ANIMATIONS = {
+  spring: {
+    tension: 120,
+    friction: 8,
+    useNativeDriver: true,
+  },
+  timing: {
+    duration: 300,
+    easing: Easing.bezier(0.25, 0.46, 0.45, 0.94),
+    useNativeDriver: true,
+  },
+  quickTiming: {
+    duration: 150,
+    easing: Easing.out(Easing.quad),
+    useNativeDriver: true,
+  },
+} as const;
+
+// Enhanced color scheme
+const COLORS = {
+  primary: "#007AFF",
+  primaryDark: "#0056CC",
+  secondary: "#34C759",
+  danger: "#FF3B30",
+  background: "#F2F2F7",
+  surface: "#FFFFFF",
+  text: "#1C1C1E",
+  textSecondary: "#8E8E93",
+  border: "#C6C6C8",
+  shadow: "rgba(0, 0, 0, 0.1)",
+  overlay: "rgba(0, 0, 0, 0.4)",
+} as const;
 
 export default function FloatingChatButton() {
+  // State management
   const [showChat, setShowChat] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [isOnline, setIsOnline] = useState(true);
+  const [position, setPosition] = useState<Position>({
+    x: screenWidth / 2 - EDGE_MARGIN - BUTTON_SIZE / 2,
+    y: 0,
+  });
+
+  // Animation refs
   const translateX = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
-  const [currentPosition, setCurrentPosition] = useState({ x: 0, y: 0 });
+  const opacityAnim = useRef(new Animated.Value(1)).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
 
-  // Pulse animation for attention
+  // Initialize position on mount
   useEffect(() => {
-    const pulse = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    pulse.start();
-    return () => pulse.stop();
-  }, []);
+    // Set initial position to right edge
+    const initialX = screenWidth / 2 - EDGE_MARGIN - BUTTON_SIZE / 2;
+    const initialY = 0;
 
-  const onGestureEvent = Animated.event(
-    [{ nativeEvent: { translationX: translateX, translationY: translateY } }],
-    { useNativeDriver: true }
-  );
+    setPosition({ x: initialX, y: initialY });
+    translateX.setOffset(initialX);
+    translateY.setOffset(initialY);
+  }, [translateX, translateY]);
 
-  const onHandlerStateChange = (event: any) => {
-    const { state, translationX, translationY } = event.nativeEvent;
+  // Enhanced pulse animation with better timing
+  useEffect(() => {
+    const createPulseAnimation = () => {
+      return Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.08,
+            duration: 2000,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 2000,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+        ])
+      );
+    };
 
-    if (state === State.BEGAN) {
-      // Scale down when touch starts
-      Animated.spring(scaleAnim, {
-        toValue: 0.9,
-        useNativeDriver: true,
-      }).start();
+    let pulseAnimation: Animated.CompositeAnimation;
 
-      // Light haptic feedback
-      if (Platform.OS === "ios") {
-        Vibration.vibrate(10);
+    if (!isDragging && !showChat) {
+      pulseAnimation = createPulseAnimation();
+      pulseAnimation.start();
+    }
+
+    return () => {
+      if (pulseAnimation) {
+        pulseAnimation.stop();
       }
+    };
+  }, [isDragging, showChat, pulseAnim]);
+
+  // Glow animation for online status
+  useEffect(() => {
+    if (isOnline) {
+      const glowAnimation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(glowAnim, {
+            toValue: 1,
+            duration: 1500,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(glowAnim, {
+            toValue: 0,
+            duration: 1500,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      glowAnimation.start();
+      return () => glowAnimation.stop();
     }
+  }, [isOnline, glowAnim]);
 
-    if (state === State.ACTIVE) {
-      // Update current position during drag
-      setCurrentPosition({
-        x: currentPosition.x + translationX,
-        y: currentPosition.y + translationY,
-      });
-    }
+  // Enhanced pan responder with proper gesture handling
+  const panResponder = useMemo(() => {
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        return Math.abs(gestureState.dx) > 2 || Math.abs(gestureState.dy) > 2;
+      },
+      onPanResponderGrant: () => {
+        setIsDragging(true);
 
-    if (state === State.END) {
-      // Scale back to normal
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        useNativeDriver: true,
-      }).start();
+        // Stop current offset and get current values
+        translateX.setOffset(position.x);
+        translateY.setOffset(position.y);
+        translateX.setValue(0);
+        translateY.setValue(0);
 
-      // Snap to edges logic
-      const finalX = currentPosition.x + translationX;
-      const finalY = currentPosition.y + translationY;
+        // Enhanced haptic feedback
+        if (Platform.OS === "ios") {
+          Vibration.vibrate([10]);
+        }
 
-      // Calculate snap position
-      const snapToLeft = finalX < screenWidth / 2;
-      const snapX = snapToLeft
-        ? -screenWidth / 2 + EDGE_MARGIN
-        : screenWidth / 2 - EDGE_MARGIN;
+        // Scale and opacity animations
+        Animated.parallel([
+          Animated.spring(scaleAnim, {
+            toValue: 1.1,
+            ...ANIMATIONS.spring,
+          }),
+          Animated.timing(opacityAnim, {
+            toValue: 0.9,
+            ...ANIMATIONS.quickTiming,
+          }),
+        ]).start();
+      },
+      onPanResponderMove: Animated.event(
+        [null, { dx: translateX, dy: translateY }],
+        { useNativeDriver: false }
+      ),
+      onPanResponderRelease: (evt, gestureState) => {
+        setIsDragging(false);
 
-      // Constrain Y position
-      const maxY = screenHeight / 2 - BUTTON_SIZE - 100;
-      const minY = -screenHeight / 2 + BUTTON_SIZE + 100;
-      const snapY = Math.max(minY, Math.min(maxY, finalY));
+        // Calculate final position based on current offset + gesture
+        const finalX = position.x + gestureState.dx;
+        const finalY = position.y + gestureState.dy;
 
-      // Animate to snap position
-      Animated.parallel([
-        Animated.spring(translateX, {
-          toValue: snapX,
-          tension: 100,
-          friction: 8,
-          useNativeDriver: true,
-        }),
-        Animated.spring(translateY, {
-          toValue: snapY,
-          tension: 100,
-          friction: 8,
-          useNativeDriver: true,
-        }),
-      ]).start();
+        // Enhanced snap logic - snap to nearest edge
+        const snapToLeft = finalX < 0;
+        const snapX = snapToLeft
+          ? -screenWidth / 2 + EDGE_MARGIN + BUTTON_SIZE / 2
+          : screenWidth / 2 - EDGE_MARGIN - BUTTON_SIZE / 2;
 
-      // Update stored position
-      setCurrentPosition({ x: snapX, y: snapY });
+        // Constrain Y position with safe areas
+        const maxY = screenHeight / 2 - BUTTON_SIZE - SAFE_AREA_MARGIN;
+        const minY = -screenHeight / 2 + BUTTON_SIZE + SAFE_AREA_MARGIN;
+        const snapY = Math.max(minY, Math.min(maxY, finalY));
 
-      // Reset gesture values
-      translateX.setOffset(snapX);
-      translateY.setOffset(snapY);
-      translateX.setValue(0);
-      translateY.setValue(0);
-    }
-  };
+        // Update position state
+        setPosition({ x: snapX, y: snapY });
 
-  const handlePress = () => {
-    // Rotation animation on press
+        // Animate to snap position
+        Animated.parallel([
+          Animated.spring(translateX, {
+            toValue: snapX,
+            ...ANIMATIONS.spring,
+          }),
+          Animated.spring(translateY, {
+            toValue: snapY,
+            ...ANIMATIONS.spring,
+          }),
+          Animated.spring(scaleAnim, {
+            toValue: 1,
+            ...ANIMATIONS.spring,
+          }),
+          Animated.timing(opacityAnim, {
+            toValue: 1,
+            ...ANIMATIONS.timing,
+          }),
+        ]).start(() => {
+          // Reset offset after animation completes
+          translateX.setOffset(snapX);
+          translateY.setOffset(snapY);
+          translateX.setValue(0);
+          translateY.setValue(0);
+        });
+      },
+    });
+  }, [position, scaleAnim, opacityAnim, translateX, translateY]);
+
+  // Enhanced press handler with better animations
+  const handlePress = useCallback(() => {
+    if (isDragging) return;
+
+    // Enhanced rotation and scale animation
     Animated.sequence([
-      Animated.timing(rotateAnim, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(rotateAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
+      Animated.parallel([
+        Animated.timing(rotateAnim, {
+          toValue: 1,
+          duration: 200,
+          easing: Easing.out(Easing.back(1.5)),
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 0.95,
+          ...ANIMATIONS.spring,
+        }),
+      ]),
+      Animated.parallel([
+        Animated.timing(rotateAnim, {
+          toValue: 0,
+          duration: 200,
+          easing: Easing.out(Easing.back(1.5)),
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          ...ANIMATIONS.spring,
+        }),
+      ]),
     ]).start();
 
-    // Haptic feedback
+    // Enhanced haptic feedback
     if (Platform.OS === "ios") {
-      Vibration.vibrate(50);
+      Vibration.vibrate([50, 20, 50]);
     }
 
     setShowChat(true);
-  };
+    setUnreadCount(0); // Clear unread count when opening chat
+  }, [isDragging, rotateAnim, scaleAnim]);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setShowChat(false);
-  };
+    setIsMinimized(false);
+  }, []);
 
-  const handleMinimize = () => {
+  const handleMinimize = useCallback(() => {
     setIsMinimized(true);
     setShowChat(false);
-  };
+  }, []);
 
+  // Computed styles
   const rotation = rotateAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ["0deg", "360deg"],
   });
 
+  const glowOpacity = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.3, 0.8],
+  });
+
+  const buttonSize = isMinimized ? MINIMIZED_SIZE : BUTTON_SIZE;
+
   return (
     <>
-      <PanGestureHandler
-        onGestureEvent={onGestureEvent}
-        onHandlerStateChange={onHandlerStateChange}
+      <Animated.View
+        style={[
+          styles.container,
+          {
+            transform: [
+              { translateX },
+              { translateY },
+              { scale: scaleAnim },
+              { scale: pulseAnim },
+              { rotate: rotation },
+            ],
+            opacity: opacityAnim,
+          },
+        ]}
+        {...panResponder.panHandlers}
       >
-        <Animated.View
+        <TouchableOpacity
           style={[
-            styles.container,
+            styles.button,
             {
-              transform: [
-                { translateX },
-                { translateY },
-                { scale: scaleAnim },
-                { scale: pulseAnim },
-                { rotate: rotation },
-              ],
+              width: buttonSize,
+              height: buttonSize,
+              borderRadius: buttonSize / 2,
+              backgroundColor: isOnline ? COLORS.primary : COLORS.textSecondary,
             },
           ]}
+          onPress={handlePress}
+          activeOpacity={0.8}
         >
-          <TouchableOpacity
-            style={[styles.button, isMinimized && styles.minimizedButton]}
-            onPress={handlePress}
-            activeOpacity={0.8}
-          >
-            <Ionicons
-              name="chatbubble-ellipses"
-              size={isMinimized ? 20 : 24}
-              color="#fff"
+          {/* Glow effect for online status */}
+          {isOnline && (
+            <Animated.View
+              style={[
+                styles.glowEffect,
+                {
+                  opacity: glowOpacity,
+                  width: buttonSize + 8,
+                  height: buttonSize + 8,
+                  borderRadius: (buttonSize + 8) / 2,
+                },
+              ]}
             />
-            {/* Notification dot */}
-            <View style={styles.notificationDot} />
-          </TouchableOpacity>
-        </Animated.View>
-      </PanGestureHandler>
+          )}
+
+          <Ionicons
+            name="chatbubble-ellipses"
+            size={isMinimized ? 20 : 28}
+            color={COLORS.surface}
+          />
+
+          {/* Enhanced notification badge */}
+          {unreadCount > 0 && (
+            <View style={styles.notificationBadge}>
+              <Text style={styles.notificationText}>
+                {unreadCount > 99 ? "99+" : unreadCount.toString()}
+              </Text>
+            </View>
+          )}
+
+          {/* Online status indicator */}
+          <View
+            style={[
+              styles.statusIndicator,
+              {
+                backgroundColor: isOnline
+                  ? COLORS.secondary
+                  : COLORS.textSecondary,
+              },
+            ]}
+          />
+        </TouchableOpacity>
+      </Animated.View>
 
       <Modal
         visible={showChat}
         animationType="slide"
         presentationStyle="pageSheet"
         onRequestClose={handleClose}
+        statusBarTranslucent={Platform.OS === "android"}
       >
-        <View style={styles.modalContainer}>
-          <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
+        <SafeAreaView style={styles.modalContainer}>
+          <StatusBar
+            barStyle="dark-content"
+            backgroundColor={COLORS.surface}
+            translucent={Platform.OS === "android"}
+          />
 
-          {/* Chat Header */}
+          {/* Enhanced chat header */}
           <View style={styles.chatHeader}>
             <TouchableOpacity
               onPress={handleMinimize}
               style={styles.headerButton}
             >
-              <Ionicons name="remove" size={24} color="#666" />
+              <Ionicons name="remove" size={24} color={COLORS.textSecondary} />
             </TouchableOpacity>
+
             <View style={styles.headerTitle}>
-              <Ionicons name="chatbubble-ellipses" size={20} color="#007AFF" />
+              <View style={styles.headerTitleContent}>
+                <Ionicons
+                  name="chatbubble-ellipses"
+                  size={20}
+                  color={COLORS.primary}
+                />
+                <Text style={styles.headerTitleText}>AI Assistant</Text>
+                <View
+                  style={[
+                    styles.headerStatusDot,
+                    {
+                      backgroundColor: isOnline
+                        ? COLORS.secondary
+                        : COLORS.textSecondary,
+                    },
+                  ]}
+                />
+              </View>
             </View>
+
             <TouchableOpacity onPress={handleClose} style={styles.headerButton}>
-              <Ionicons name="close" size={24} color="#666" />
+              <Ionicons name="close" size={24} color={COLORS.textSecondary} />
             </TouchableOpacity>
           </View>
 
-          {/* Chat Content */}
+          {/* Chat content */}
           <View style={styles.chatContent}>
-            <AIChatScreen />
+            <AIChatScreen onClose={handleClose} onMinimize={handleMinimize} />
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
     </>
   );
@@ -242,49 +454,62 @@ export default function FloatingChatButton() {
 const styles = StyleSheet.create({
   container: {
     position: "absolute",
-    bottom: 100,
+    bottom: 120,
     right: 20,
-    zIndex: 999,
+    zIndex: 1000,
   },
   button: {
-    width: BUTTON_SIZE,
-    height: BUTTON_SIZE,
-    borderRadius: BUTTON_SIZE / 2,
-    backgroundColor: "#007AFF",
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
+    shadowColor: COLORS.shadow,
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 6,
     },
     shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 8,
-    // Modern gradient effect
+    shadowRadius: 8,
+    elevation: 12,
     borderWidth: 2,
-    borderColor: "rgba(255, 255, 255, 0.2)",
+    borderColor: "rgba(255, 255, 255, 0.25)",
   },
-  minimizedButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    opacity: 0.8,
-  },
-  notificationDot: {
+  glowEffect: {
     position: "absolute",
-    top: -2,
-    right: -2,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: "#FF3B30",
+    backgroundColor: COLORS.primary,
+    zIndex: -1,
+  },
+  notificationBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: COLORS.danger,
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 2,
-    borderColor: "#fff",
+    borderColor: COLORS.surface,
+    paddingHorizontal: 6,
+  },
+  notificationText: {
+    color: COLORS.surface,
+    fontSize: 12,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  statusIndicator: {
+    position: "absolute",
+    bottom: 2,
+    right: 2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: COLORS.surface,
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: "#f8f9fa",
+    backgroundColor: COLORS.background,
   },
   chatHeader: {
     flexDirection: "row",
@@ -292,25 +517,43 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: "#fff",
+    backgroundColor: COLORS.surface,
     borderBottomWidth: 1,
-    borderBottomColor: "#e1e5e9",
-    ...Platform.select({
-      ios: {
-        paddingTop: 50, // Account for status bar
-      },
-      android: {
-        paddingTop: 20,
-      },
-    }),
+    borderBottomColor: COLORS.border,
+    shadowColor: COLORS.shadow,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
   },
   headerButton: {
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: "#f0f0f0",
+    padding: 10,
+    borderRadius: 22,
+    backgroundColor: COLORS.background,
+    minWidth: 44,
+    alignItems: "center",
   },
   headerTitle: {
-    padding: 8,
+    flex: 1,
+    alignItems: "center",
+  },
+  headerTitleContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  headerTitleText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: COLORS.text,
+  },
+  headerStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   chatContent: {
     flex: 1,

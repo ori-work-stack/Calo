@@ -388,40 +388,66 @@ export const useStatistics = (
   startDate?: string,
   endDate?: string
 ) => {
-  return useQuery({
-    queryKey: queryKeys.statistics(timeRange, startDate, endDate),
-    queryFn: () => {
-      if (timeRange === "custom" && startDate && endDate) {
-        return nutritionAPI.getRangeStatistics(startDate, endDate);
-      }
-      // For other time ranges, calculate dates
-      const today = new Date();
-      let start: string;
-      let end: string = today.toISOString().split("T")[0];
+  const fallbackResult = {
+    data: { success: false, data: null },
+    isLoading: false,
+    error: null,
+    refetch: () => Promise.resolve(),
+    isError: false,
+    isSuccess: false,
+  };
 
-      switch (timeRange) {
-        case "today":
-          start = end;
-          break;
-        case "week":
-          const weekAgo = new Date(today);
-          weekAgo.setDate(today.getDate() - 7);
-          start = weekAgo.toISOString().split("T")[0];
-          break;
-        case "month":
-          const monthAgo = new Date(today);
-          monthAgo.setDate(today.getDate() - 30);
-          start = monthAgo.toISOString().split("T")[0];
-          break;
-        default:
-          start = end;
-      }
+  try {
+    const result = useQuery({
+      queryKey: queryKeys.statistics(timeRange, startDate, endDate),
+      queryFn: async () => {
+        try {
+          if (timeRange === "custom" && startDate && endDate) {
+            return await nutritionAPI.getRangeStatistics(startDate, endDate);
+          }
+          // For other time ranges, calculate dates
+          const today = new Date();
+          let start: string;
+          let end: string = today.toISOString().split("T")[0];
 
-      return nutritionAPI.getRangeStatistics(start, end);
-    },
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-  });
+          switch (timeRange) {
+            case "today":
+              start = end;
+              break;
+            case "week":
+              const weekAgo = new Date(today);
+              weekAgo.setDate(today.getDate() - 7);
+              start = weekAgo.toISOString().split("T")[0];
+              break;
+            case "month":
+              const monthAgo = new Date(today);
+              monthAgo.setDate(today.getDate() - 30);
+              start = monthAgo.toISOString().split("T")[0];
+              break;
+            default:
+              start = end;
+          }
+
+          return await nutritionAPI.getRangeStatistics(start, end);
+        } catch (error: any) {
+          console.error("Error in useStatistics queryFn:", error);
+          throw new Error(error?.message || "Failed to fetch statistics");
+        }
+      },
+      staleTime: 5 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+      retry: 3,
+      retryDelay: 1000,
+      // Ensure we always have a valid structure
+      select: (data) => data || { success: false, data: null },
+    });
+
+    // Return the result if it exists, otherwise return fallback
+    return result || fallbackResult;
+  } catch (error) {
+    console.error("Error in useStatistics hook:", error);
+    return fallbackResult;
+  }
 };
 
 // User profile query
