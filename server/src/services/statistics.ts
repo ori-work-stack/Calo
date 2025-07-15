@@ -5,7 +5,7 @@ import { OpenAIService } from "./openai";
 export class StatisticsService {
   static async getNutritionStatistics(
     userId: string,
-    period: "week" | "month" | "custom"
+    period: "today" | "week" | "month" | "custom"
   ): Promise<NutritionStatistics> {
     try {
       console.log(
@@ -185,7 +185,7 @@ export class StatisticsService {
         : 0;
 
     // Calculate alcohol and caffeine intake using correct field names
-    const  alcohol_caffeine_intake = Math.round(
+    const alcohol_caffeine_intake = Math.round(
       meals.reduce(
         (sum, meal) =>
           sum + (meal.alcohol_g || 0) + (meal.caffeine_mg || 0) / 100,
@@ -273,7 +273,7 @@ export class StatisticsService {
       average_sugar_daily,
       average_fluids_daily: 2000, // Default value, would need actual tracking
       processed_food_percentage,
-       alcohol_caffeine_intake,
+      alcohol_caffeine_intake,
       vegetable_fruit_intake,
       full_logging_percentage,
       allergen_alerts,
@@ -328,7 +328,7 @@ export class StatisticsService {
       average_sugar_daily: 0,
       average_fluids_daily: 0,
       processed_food_percentage: 0,
-       alcohol_caffeine_intake: 0,
+      alcohol_caffeine_intake: 0,
       vegetable_fruit_intake: 0,
       full_logging_percentage: 0,
       allergen_alerts: [],
@@ -504,7 +504,7 @@ export class StatisticsService {
       average_sugar_daily: 0,
       average_fluids_daily: 0,
       processed_food_percentage: 0,
-       alcohol_caffeine_intake: 0,
+      alcohol_caffeine_intake: 0,
       vegetable_fruit_intake: 0,
       full_logging_percentage: 0,
       allergen_alerts: [],

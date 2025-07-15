@@ -5,7 +5,7 @@ import { z } from "zod";
 
 const router = Router();
 
-const periodSchema = z.enum(["week", "month", "custom"]);
+const periodSchema = z.enum(["today", "week", "month", "custom"]);
 
 // Get nutrition statistics
 router.get(
