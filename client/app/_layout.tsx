@@ -154,8 +154,94 @@ const StackScreens = () => (
   </Stack>
 );
 
+// Fixed help content hook with proper memoization
+function useHelpContent(): { title: string; description: string } | undefined {
+  const segments = useSegments();
+
+  return useMemo(() => {
+    const route = "/" + segments.join("/");
+
+    switch (route) {
+      case "/(tabs)":
+      case "/(tabs)/index":
+        return {
+          title: "Home Dashboard",
+          description:
+            "Welcome to your nutrition dashboard! Here you can view your daily progress, recent meals, and quick access to all features. Use the toolbar to switch languages or get help on any page.",
+        };
+      case "/(tabs)/calendar":
+        return {
+          title: "Calendar & Meal Planning",
+          description:
+            "Plan your meals for the week ahead. View scheduled meals, track your nutrition goals, and see your eating patterns over time. Tap any date to add or view planned meals.",
+        };
+      case "/(tabs)/statistics":
+        return {
+          title: "Nutrition Statistics",
+          description:
+            "Track your nutritional progress with detailed charts and metrics. Monitor your intake of macronutrients, micronutrients, and lifestyle factors. Use the time filters to view daily, weekly, or monthly trends.",
+        };
+      case "/(tabs)/camera":
+        return {
+          title: "Food Camera",
+          description:
+            "Take photos of your meals to automatically log nutrition information. The AI will analyze your food and provide detailed nutritional breakdown. Make sure to capture the entire meal for accurate results.",
+        };
+      case "/(tabs)/food-scanner":
+        return {
+          title: "Food Scanner",
+          description:
+            "Scan barcodes or upload food images to get instant nutrition information. Perfect for packaged foods and restaurant meals. The scanner works best with clear, well-lit images.",
+        };
+      case "/(tabs)/ai-chat":
+        return {
+          title: "AI Nutrition Assistant",
+          description:
+            "Chat with your personal AI nutrition assistant. Ask questions about food, get meal recommendations, and receive personalized advice based on your goals and dietary preferences.",
+        };
+      case "/(tabs)/recommended-menus":
+        return {
+          title: "Recommended Menus",
+          description:
+            "Discover personalized meal plans created just for you. Based on your dietary preferences, goals, and restrictions, these menus help you maintain a balanced and enjoyable diet.",
+        };
+      case "/(tabs)/history":
+        return {
+          title: "Meal History",
+          description:
+            "Review your past meals and track your eating patterns. Rate your meals, add notes, and learn from your nutrition journey. Use filters to find specific meals or time periods.",
+        };
+      case "/(tabs)/profile":
+        return {
+          title: "Profile & Settings",
+          description:
+            "Manage your personal information, dietary preferences, and app settings. Update your goals, allergies, and notification preferences to customize your experience.",
+        };
+      case "/(tabs)/devices":
+        return {
+          title: "Device Integration",
+          description:
+            "Connect your fitness trackers and health apps to get a complete picture of your wellness. Sync data from Apple Health, Google Fit, Fitbit, and other supported devices.",
+        };
+      case "/(tabs)/questionnaire":
+        return {
+          title: "Health Questionnaire",
+          description:
+            "Complete your health profile to receive personalized nutrition recommendations. This questionnaire helps us understand your goals, lifestyle, and dietary needs.",
+        };
+      default:
+        return {
+          title: "App Help",
+          description:
+            "Welcome to your nutrition tracking app! Use the navigation tabs to explore different features. Each page has specific help content available through this help button.",
+        };
+    }
+  }, [segments]);
+}
+
+// Fixed AppContent component
 const AppContent = () => {
-  const authState = useSelector((state: any) => state?.auth || {});
+  const authState = useSelector(selectAuthState);
   const questionnaireState = useSelector(
     (state: any) => state?.questionnaire || {}
   );
@@ -199,33 +285,19 @@ const AppContent = () => {
   return <StackScreens />;
 };
 
-function useHelpContent(): { title: string; description: string } | undefined {
-  const segments = useSegments();
-  const route = "/" + segments.join("/");
+// Fixed main component with proper help content integration
+const MainApp = () => {
+  const helpContent = useHelpContent();
 
-  switch (route) {
-    case "/(tabs)/route":
-      return {
-        title: "Route Help",
-        description: "This is help content for the Route tab.",
-      };
-    case "/(tabs)/calendar":
-      return {
-        title: "Calendar Help",
-        description: "Here's how to use your calendar.",
-      };
-    case "/(tabs)/statistics":
-      return {
-        title: "Statistics Help",
-        description: "View your health stats and progress here.",
-      };
-    default:
-      return undefined; // No help content for this route
-  }
-}
+  return (
+    <View style={styles.container}>
+      <LanguageToolbar helpContent={helpContent} />
+      <AppContent />
+    </View>
+  );
+};
 
 export default function RootLayout() {
-  const helpContent = useHelpContent();
   return (
     <I18nextProvider i18n={i18n}>
       <GestureHandlerRootView style={styles.root}>
@@ -234,10 +306,7 @@ export default function RootLayout() {
             <QueryClientProvider client={queryClient}>
               <PersistGate loading={<LoadingScreen />} persistor={persistor}>
                 <LanguageProvider>
-                  <View style={{ flex: 1 }}>
-                    <LanguageToolbar helpContent={helpContent} />
-                    <AppContent />
-                  </View>
+                  <MainApp />
                   <StatusBar style="auto" />
                 </LanguageProvider>
               </PersistGate>
@@ -251,6 +320,9 @@ export default function RootLayout() {
 
 const styles = StyleSheet.create({
   root: {
+    flex: 1,
+  },
+  container: {
     flex: 1,
   },
   loadingContainer: {

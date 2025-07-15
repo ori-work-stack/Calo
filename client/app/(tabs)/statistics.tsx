@@ -41,19 +41,12 @@ import {
   Award,
   Trophy,
   Star,
-  Medal,
   Crown,
-  Gem,
   Smile,
   Meh,
   Frown,
   Battery,
-  Coffee,
-  Moon,
   X,
-  ArrowUpDown,
-  BarChart2,
-  Compare,
 } from "lucide-react-native";
 import { useStatistics } from "@/hooks/useQueries";
 import { useTranslation } from "react-i18next";

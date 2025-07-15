@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   ScrollView,
   Animated,
   Dimensions,
+  Platform,
+  StatusBar,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -21,33 +23,39 @@ interface LanguageToolbarProps {
   };
 }
 
-const { width } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
 
 export default function LanguageToolbar({ helpContent }: LanguageToolbarProps) {
   const { language, setLanguage, t } = useLanguage();
   const [showHelp, setShowHelp] = useState(false);
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [animatedValue] = useState(new Animated.Value(0));
-  const [expandAnimation] = useState(new Animated.Value(0));
+
+  // Use useRef for animated values to prevent recreation on re-renders
+  const animatedValue = useRef(new Animated.Value(0)).current;
+  const expandAnimation = useRef(new Animated.Value(0)).current;
 
   const toggleLanguage = () => {
     setLanguage(language === "he" ? "en" : "he");
   };
 
   const toggleExpanded = () => {
-    setIsExpanded(!isExpanded);
+    const newValue = !isExpanded;
+    setIsExpanded(newValue);
+
     Animated.timing(expandAnimation, {
-      toValue: isExpanded ? 0 : 1,
+      toValue: newValue ? 1 : 0,
       duration: 300,
       useNativeDriver: false,
     }).start();
   };
 
   const toggleLanguageMenu = () => {
-    setShowLanguageMenu(!showLanguageMenu);
+    const newValue = !showLanguageMenu;
+    setShowLanguageMenu(newValue);
+
     Animated.timing(animatedValue, {
-      toValue: showLanguageMenu ? 0 : 1,
+      toValue: newValue ? 1 : 0,
       duration: 200,
       useNativeDriver: true,
     }).start();
@@ -60,7 +68,7 @@ export default function LanguageToolbar({ helpContent }: LanguageToolbarProps) {
 
   const expandedHeight = expandAnimation.interpolate({
     inputRange: [0, 1],
-    outputRange: [48, helpContent ? 144 : 96], // Adjust based on number of tools
+    outputRange: [48, helpContent ? 144 : 96],
   });
 
   const toolsRotation = expandAnimation.interpolate({
@@ -68,10 +76,98 @@ export default function LanguageToolbar({ helpContent }: LanguageToolbarProps) {
     outputRange: ["0deg", "180deg"],
   });
 
+  // Improved safe area calculation
+  const getTopOffset = () => {
+    const statusBarHeight = StatusBar.currentHeight || 0;
+    if (Platform.OS === "ios") {
+      return height > 800 ? 60 : 50;
+    }
+    return statusBarHeight + 20;
+  };
+
+  const renderHelpModalContent = () => {
+    return (
+      <View style={styles.helpModalContent}>
+        <LinearGradient
+          colors={["#4ECDC4", "#44A08D"]}
+          style={styles.helpModalHeader}
+        >
+          <Text style={styles.helpModalTitle}>{helpContent?.title}</Text>
+          <TouchableOpacity
+            onPress={() => setShowHelp(false)}
+            style={styles.closeButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="close" size={24} color="#fff" />
+          </TouchableOpacity>
+        </LinearGradient>
+
+        <ScrollView
+          style={styles.helpModalBody}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 20 }}
+        >
+          <Text style={styles.helpModalText}>{helpContent?.description}</Text>
+        </ScrollView>
+
+        <View style={styles.helpModalFooter}>
+          <TouchableOpacity
+            style={styles.gotItButton}
+            onPress={() => setShowHelp(false)}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={["#4ECDC4", "#44A08D"]}
+              style={styles.gotItGradient}
+            >
+              <Text style={styles.gotItText}>Got it!</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  const renderLanguageMenuContent = () => {
+    return (
+      <>
+        <Text style={styles.languageMenuTitle}>Select Language</Text>
+        {languages.map((lang) => (
+          <TouchableOpacity
+            key={lang.code}
+            style={[
+              styles.languageOption,
+              language === lang.code && styles.selectedLanguage,
+            ]}
+            onPress={() => {
+              setLanguage(lang.code);
+              setShowLanguageMenu(false);
+            }}
+            activeOpacity={0.8}
+            hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+          >
+            <Text style={styles.languageFlag}>{lang.flag}</Text>
+            <Text
+              style={[
+                styles.languageName,
+                language === lang.code && styles.selectedLanguageName,
+              ]}
+            >
+              {lang.name}
+            </Text>
+            {language === lang.code && (
+              <Ionicons name="checkmark" size={20} color="#4ECDC4" />
+            )}
+          </TouchableOpacity>
+        ))}
+      </>
+    );
+  };
+
   return (
     <>
       {/* Collapsible Toolbar */}
-      <View style={styles.toolbarContainer}>
+      <View style={[styles.toolbarContainer, { top: getTopOffset() }]}>
         <Animated.View style={[styles.toolbar, { height: expandedHeight }]}>
           <LinearGradient
             colors={["#4ECDC4", "#44A08D"]}
@@ -82,6 +178,7 @@ export default function LanguageToolbar({ helpContent }: LanguageToolbarProps) {
               style={styles.toolsButton}
               onPress={toggleExpanded}
               activeOpacity={0.8}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <Animated.View style={{ transform: [{ rotate: toolsRotation }] }}>
                 <Ionicons name="construct" size={20} color="#fff" />
@@ -111,6 +208,7 @@ export default function LanguageToolbar({ helpContent }: LanguageToolbarProps) {
                   style={styles.toolButton}
                   onPress={toggleLanguage}
                   activeOpacity={0.8}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
                   <Text style={styles.languageText}>
                     {language === "he" ? "🇺🇸" : "🇮🇱"}
@@ -123,6 +221,7 @@ export default function LanguageToolbar({ helpContent }: LanguageToolbarProps) {
                     style={styles.toolButton}
                     onPress={() => setShowHelp(true)}
                     activeOpacity={0.8}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
                     <Ionicons
                       name="help-circle-outline"
@@ -141,56 +240,31 @@ export default function LanguageToolbar({ helpContent }: LanguageToolbarProps) {
       {helpContent && (
         <Modal
           visible={showHelp}
-          transparent
+          transparent={true}
           animationType="slide"
           onRequestClose={() => setShowHelp(false)}
+          statusBarTranslucent={true}
         >
           <View style={styles.helpModalOverlay}>
-            <BlurView intensity={20} style={styles.blurBackground}>
-              <TouchableOpacity
-                style={styles.modalBackdrop}
-                onPress={() => setShowHelp(false)}
-                activeOpacity={1}
-              />
-
-              <View style={styles.helpModalContent}>
-                <LinearGradient
-                  colors={["#4ECDC4", "#44A08D"]}
-                  style={styles.helpModalHeader}
-                >
-                  <Text style={styles.helpModalTitle}>{helpContent.title}</Text>
-                  <TouchableOpacity
-                    onPress={() => setShowHelp(false)}
-                    style={styles.closeButton}
-                  >
-                    <Ionicons name="close" size={24} color="#fff" />
-                  </TouchableOpacity>
-                </LinearGradient>
-
-                <ScrollView
-                  style={styles.helpModalBody}
-                  showsVerticalScrollIndicator={false}
-                >
-                  <Text style={styles.helpModalText}>
-                    {helpContent.description}
-                  </Text>
-                </ScrollView>
-
-                <View style={styles.helpModalFooter}>
-                  <TouchableOpacity
-                    style={styles.gotItButton}
-                    onPress={() => setShowHelp(false)}
-                  >
-                    <LinearGradient
-                      colors={["#4ECDC4", "#44A08D"]}
-                      style={styles.gotItGradient}
-                    >
-                      <Text style={styles.gotItText}>Got it!</Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
-                </View>
+            {Platform.OS === "ios" ? (
+              <BlurView intensity={20} style={styles.blurBackground}>
+                <TouchableOpacity
+                  style={styles.modalBackdrop}
+                  onPress={() => setShowHelp(false)}
+                  activeOpacity={1}
+                />
+                {renderHelpModalContent()}
+              </BlurView>
+            ) : (
+              <View style={styles.androidModalBackground}>
+                <TouchableOpacity
+                  style={styles.modalBackdrop}
+                  onPress={() => setShowHelp(false)}
+                  activeOpacity={1}
+                />
+                {renderHelpModalContent()}
               </View>
-            </BlurView>
+            )}
           </View>
         </Modal>
       )}
@@ -198,9 +272,10 @@ export default function LanguageToolbar({ helpContent }: LanguageToolbarProps) {
       {/* Language Selection Menu */}
       <Modal
         visible={showLanguageMenu}
-        transparent
+        transparent={true}
         animationType="fade"
         onRequestClose={() => setShowLanguageMenu(false)}
+        statusBarTranslucent={true}
       >
         <View style={styles.languageModalOverlay}>
           <TouchableOpacity
@@ -210,36 +285,17 @@ export default function LanguageToolbar({ helpContent }: LanguageToolbarProps) {
           />
 
           <View style={styles.languageMenu}>
-            <BlurView intensity={80} style={styles.languageMenuContent}>
-              <Text style={styles.languageMenuTitle}>Select Language</Text>
-
-              {languages.map((lang) => (
-                <TouchableOpacity
-                  key={lang.code}
-                  style={[
-                    styles.languageOption,
-                    language === lang.code && styles.selectedLanguage,
-                  ]}
-                  onPress={() => {
-                    setLanguage(lang.code);
-                    setShowLanguageMenu(false);
-                  }}
-                >
-                  <Text style={styles.languageFlag}>{lang.flag}</Text>
-                  <Text
-                    style={[
-                      styles.languageName,
-                      language === lang.code && styles.selectedLanguageName,
-                    ]}
-                  >
-                    {lang.name}
-                  </Text>
-                  {language === lang.code && (
-                    <Ionicons name="checkmark" size={20} color="#4ECDC4" />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </BlurView>
+            {Platform.OS === "ios" ? (
+              <BlurView intensity={80} style={styles.languageMenuContent}>
+                {renderLanguageMenuContent()}
+              </BlurView>
+            ) : (
+              <View
+                style={[styles.languageMenuContent, styles.androidBlurFallback]}
+              >
+                {renderLanguageMenuContent()}
+              </View>
+            )}
           </View>
         </View>
       </Modal>
@@ -250,7 +306,6 @@ export default function LanguageToolbar({ helpContent }: LanguageToolbarProps) {
 const styles = StyleSheet.create({
   toolbarContainer: {
     position: "absolute",
-    top: 50,
     right: 20,
     zIndex: 1000,
   },
@@ -296,28 +351,40 @@ const styles = StyleSheet.create({
   languageText: {
     fontSize: 16,
   },
+  // Enhanced modal styles with better mobile support
   helpModalOverlay: {
     flex: 1,
     justifyContent: "flex-end",
+    backgroundColor: Platform.OS === "ios" ? "transparent" : "rgba(0,0,0,0.5)",
   },
   blurBackground: {
     flex: 1,
     justifyContent: "flex-end",
   },
+  androidModalBackground: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
   modalBackdrop: {
     flex: 1,
+    width: "100%",
   },
   helpModalContent: {
     backgroundColor: "white",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: "80%",
+    maxHeight: height * 0.8, // Use percentage of screen height
+    minHeight: 300, // Ensure minimum height
     overflow: "hidden",
     elevation: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -5 },
     shadowOpacity: 0.3,
     shadowRadius: 15,
+    // Ensure it's positioned correctly
+    width: "100%",
+    alignSelf: "center",
   },
   helpModalHeader: {
     flexDirection: "row",
@@ -325,22 +392,26 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 24,
     paddingBottom: 20,
+    // Ensure header doesn't get clipped
+    minHeight: 64,
   },
   helpModalTitle: {
     fontSize: 20,
     fontWeight: "bold",
     color: "#fff",
     flex: 1,
+    textAlign: "left",
   },
   closeButton: {
-    padding: 4,
-    borderRadius: 12,
+    padding: 8, // Increased padding for better touch target
+    borderRadius: 20,
     backgroundColor: "rgba(255,255,255,0.2)",
+    marginLeft: 12,
   },
   helpModalBody: {
     padding: 24,
     paddingTop: 0,
-    maxHeight: 300,
+    flex: 1, // Allow it to take available space
   },
   helpModalText: {
     fontSize: 16,
@@ -351,10 +422,12 @@ const styles = StyleSheet.create({
   helpModalFooter: {
     padding: 24,
     paddingTop: 16,
+    backgroundColor: "#f8f9fa", // Slight background to distinguish footer
   },
   gotItButton: {
     borderRadius: 16,
     overflow: "hidden",
+    minHeight: 48, // Ensure minimum touch target
   },
   gotItGradient: {
     paddingVertical: 16,
@@ -370,9 +443,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
   },
   languageMenu: {
-    width: width * 0.7,
+    width: Math.min(width * 0.8, 300),
+    maxWidth: width - 40, // Ensure it doesn't exceed screen width
     borderRadius: 20,
     overflow: "hidden",
     elevation: 15,
@@ -383,6 +458,10 @@ const styles = StyleSheet.create({
   },
   languageMenuContent: {
     padding: 20,
+    backgroundColor: "white", // Ensure background color
+  },
+  androidBlurFallback: {
+    backgroundColor: "rgba(255,255,255,0.95)",
   },
   languageMenuTitle: {
     fontSize: 18,
@@ -398,7 +477,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 12,
     marginBottom: 8,
-    backgroundColor: "rgba(255,255,255,0.1)",
+    backgroundColor: "rgba(0,0,0,0.05)", // More visible background
+    minHeight: 56, // Increased minimum touch target
   },
   selectedLanguage: {
     backgroundColor: "rgba(78, 205, 196, 0.1)",
