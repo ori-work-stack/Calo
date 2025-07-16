@@ -421,7 +421,8 @@ export const authAPI = {
 export const nutritionAPI = {
   analyzeMeal: async (
     imageBase64: string,
-    updateText: string | undefined
+    updateText: string | undefined,
+    language: string = "en"
   ): Promise<{ success: boolean; data?: MealAnalysisData; error?: string }> => {
     try {
       console.log("🔍 Making analyze meal API request...");
@@ -437,8 +438,9 @@ export const nutritionAPI = {
 
       const response = await api.post("/nutrition/analyze", {
         imageBase64: imageBase64,
-        language: "english",
+        language: language === "he" ? "hebrew" : "english",
         date: new Date().toISOString().split("T")[0],
+        updateText: updateText,
       });
 
       console.log("🎯 RAW ANALYZE API RESPONSE:");

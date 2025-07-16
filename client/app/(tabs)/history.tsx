@@ -28,6 +28,7 @@ import { useRTLStyles } from "../../hooks/useRTLStyle";
 import { useMealDataRefresh } from "@/hooks/useMealDataRefresh";
 import LanguageToolbar from "@/components/LanguageToolbar";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { ScrollView } from "react-native-gesture-handler";
 
 interface MealWithFeedback extends Meal {
   userRating?: number;
@@ -79,6 +80,68 @@ export default function HistoryScreen() {
   useEffect(() => {
     dispatch(fetchMeals());
   }, [dispatch]);
+
+  const getIngredientIcon = (ingredientName: string): string => {
+    const name = ingredientName.toLowerCase();
+    if (
+      name.includes("rice") ||
+      name.includes("quinoa") ||
+      name.includes("pasta") ||
+      name.includes("bread") ||
+      name.includes("oats")
+    )
+      return "leaf-outline";
+    if (
+      name.includes("chicken") ||
+      name.includes("beef") ||
+      name.includes("pork") ||
+      name.includes("fish") ||
+      name.includes("salmon") ||
+      name.includes("turkey")
+    )
+      return "restaurant-outline";
+    if (
+      name.includes("cheese") ||
+      name.includes("milk") ||
+      name.includes("yogurt") ||
+      name.includes("cream")
+    )
+      return "cafe-outline";
+    if (
+      name.includes("broccoli") ||
+      name.includes("carrot") ||
+      name.includes("peas") ||
+      name.includes("lettuce") ||
+      name.includes("spinach") ||
+      name.includes("tomato") ||
+      name.includes("pepper")
+    )
+      return "leaf";
+    if (
+      name.includes("oil") ||
+      name.includes("butter") ||
+      name.includes("avocado") ||
+      name.includes("nuts") ||
+      name.includes("seeds")
+    )
+      return "water-outline";
+    if (
+      name.includes("apple") ||
+      name.includes("banana") ||
+      name.includes("orange") ||
+      name.includes("berry") ||
+      name.includes("fruit")
+    )
+      return "nutrition-outline";
+    if (name.includes("egg")) return "ellipse-outline";
+    if (
+      name.includes("bean") ||
+      name.includes("lentil") ||
+      name.includes("chickpea")
+    )
+      return "fitness-outline";
+    return "nutrition-outline";
+  };
 
   useEffect(() => {
     applyFilters();
@@ -720,23 +783,74 @@ export default function HistoryScreen() {
         {/* Expanded Content */}
         {isExpanded && (
           <View style={styles.expandedContent}>
-            {/* Ingredients */}
+            {/* Enhanced Ingredients Display */}
             {item.ingredients && item.ingredients.length > 0 && (
               <View style={styles.ingredientsSection}>
-                <Text style={styles.ingredientsTitle}>
-                  {t("food_scanner.ingredients") || "Ingredients"} (
-                  {item.ingredients.length}):
-                </Text>
-                {item.ingredients.map((ingredient, index) => (
-                  <View key={index} style={styles.ingredientItem}>
-                    <Text style={styles.ingredientName}>{ingredient.name}</Text>
-                    {ingredient.calories && (
-                      <Text style={styles.ingredientCalories}>
-                        {Math.round(ingredient.calories)} cal
-                      </Text>
-                    )}
-                  </View>
-                ))}
+                <View style={styles.ingredientsHeader}>
+                  <Ionicons
+                    name="restaurant-outline"
+                    size={18}
+                    color="#4CAF50"
+                  />
+                  <Text style={styles.ingredientsTitle}>
+                    {t("food_scanner.ingredients") || "Ingredients"} (
+                    {item.ingredients.length})
+                  </Text>
+                </View>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.ingredientsScrollView}
+                >
+                  {item.ingredients.map((ingredient, index) => (
+                    <View key={index} style={styles.ingredientCard}>
+                      <View style={styles.ingredientIconWrapper}>
+                        <View style={styles.ingredientIconContainer}>
+                          <Ionicons
+                            name={getIngredientIcon(ingredient.name)}
+                            size={20}
+                            color="#4CAF50"
+                          />
+                        </View>
+                        <Text style={styles.ingredientName} numberOfLines={2}>
+                          {ingredient.name}
+                        </Text>
+                      </View>
+                      <View style={styles.ingredientNutritionGrid}>
+                        <View style={styles.nutritionItem}>
+                          <Text style={styles.nutritionValue}>
+                            {Math.round(ingredient.calories || 0)}
+                          </Text>
+                          <Text style={styles.nutritionUnit}>cal</Text>
+                        </View>
+                        <View style={styles.nutritionItem}>
+                          <Text style={styles.nutritionValue}>
+                            {Math.round(
+                              ingredient.protein || ingredient.protein || 0
+                            )}
+                            g
+                          </Text>
+                          <Text style={styles.nutritionUnit}>protein</Text>
+                        </View>
+                        <View style={styles.nutritionItem}>
+                          <Text style={styles.nutritionValue}>
+                            {Math.round(
+                              ingredient.carbs || ingredient.carbs || 0
+                            )}
+                            g
+                          </Text>
+                          <Text style={styles.nutritionUnit}>carbs</Text>
+                        </View>
+                        <View style={styles.nutritionItem}>
+                          <Text style={styles.nutritionValue}>
+                            {Math.round(ingredient.fat || ingredient.fat || 0)}g
+                          </Text>
+                          <Text style={styles.nutritionUnit}>fat</Text>
+                        </View>
+                      </View>
+                    </View>
+                  ))}
+                </ScrollView>
               </View>
             )}
 
@@ -1346,24 +1460,63 @@ const styles = StyleSheet.create({
   ingredientsSection: {
     padding: 15,
   },
+  ingredientsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+  },
   ingredientsTitle: {
     fontSize: 14,
     fontWeight: "600",
     color: "#333",
+    marginLeft: 8,
+  },
+  ingredientsScrollView: {
+    marginTop: 5,
+  },
+  ingredientCard: {
+    backgroundColor: "white",
+    borderRadius: 12,
+    padding: 12,
+    marginRight: 12,
+    width: 100,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: "#E8F5E8",
+  },
+  ingredientIconWrapper: {
+    alignItems: "center",
     marginBottom: 8,
   },
-  ingredientItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  ingredientIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#E8F5E8",
+    justifyContent: "center",
     alignItems: "center",
-    paddingVertical: 4,
-    borderBottomWidth: 0.5,
-    borderBottomColor: "#eee",
+    marginBottom: 4,
   },
   ingredientName: {
-    flex: 1,
-    fontSize: 13,
-    color: "#333",
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#2E7D32",
+    textAlign: "center",
+    lineHeight: 14,
+  },
+  ingredientNutritionGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+  },
+  nutritionUnit: {
+    fontSize: 8,
+    color: "#4CAF50",
+    marginTop: 1,
   },
   ingredientQuantity: {
     fontSize: 12,

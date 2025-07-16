@@ -131,10 +131,14 @@
     "connection_error_message": "בדוק את החיבור לאינטרנט ונסה שוב.",
     "correction_required": "אנא הכנס טקסט תיקון",
     "update_required": "אנא הכנס טקסט עדכון",
+    "ingredients_required": "אנא הזן רשימת מרכיבים",
     "save_required": "נדרש שמירה",
     "save_before_update": "אנא שמור את הארוחה לפני עדכון.",
     "delete_analysis": "מחיקת ניתוח",
-    "delete_confirmation": "האם אתה בטוח שברצונך למחוק את הניתוח?"
+    "delete_confirmation": "האם אתה בטוח שברצונך למחוק את הניתוח?",
+    "edit_ingredients": "עריכת מרכיבים",
+    "edit_ingredients_description": "ערוך את רשימת המרכיבים. הפרד מרכיבים בפסיקים.",
+    "enter_ingredients_list": "הזן רשימת מרכיבים (מופרדים בפסיקים)..."
   },
   "food_scanner": {
     "title": "סורק מזון",

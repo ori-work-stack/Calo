@@ -30,6 +30,7 @@ import { useTranslation } from "react-i18next";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
+import i18n from "@/src/i18n";
 
 const { width, height } = Dimensions.get("window");
 
@@ -52,6 +53,11 @@ export default function CameraScreen() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editText, setEditText] = useState("");
   const [isEditingAnalysis, setIsEditingAnalysis] = useState(false);
+
+  // Edit ingredients modal states
+  const [showEditIngredientsModal, setShowEditIngredientsModal] =
+    useState(false);
+  const [editableIngredients, setEditableIngredients] = useState<string>("");
 
   // Load pending meal on component mount
   useEffect(() => {
@@ -130,6 +136,68 @@ export default function CameraScreen() {
     }
   };
 
+  const getIngredientIcon = (ingredientName: string): string => {
+    const name = ingredientName.toLowerCase();
+    if (
+      name.includes("rice") ||
+      name.includes("quinoa") ||
+      name.includes("pasta") ||
+      name.includes("bread") ||
+      name.includes("oats")
+    )
+      return "leaf-outline";
+    if (
+      name.includes("chicken") ||
+      name.includes("beef") ||
+      name.includes("pork") ||
+      name.includes("fish") ||
+      name.includes("salmon") ||
+      name.includes("turkey")
+    )
+      return "restaurant-outline";
+    if (
+      name.includes("cheese") ||
+      name.includes("milk") ||
+      name.includes("yogurt") ||
+      name.includes("cream")
+    )
+      return "cafe-outline";
+    if (
+      name.includes("broccoli") ||
+      name.includes("carrot") ||
+      name.includes("peas") ||
+      name.includes("lettuce") ||
+      name.includes("spinach") ||
+      name.includes("tomato") ||
+      name.includes("pepper")
+    )
+      return "leaf";
+    if (
+      name.includes("oil") ||
+      name.includes("butter") ||
+      name.includes("avocado") ||
+      name.includes("nuts") ||
+      name.includes("seeds")
+    )
+      return "water-outline";
+    if (
+      name.includes("apple") ||
+      name.includes("banana") ||
+      name.includes("orange") ||
+      name.includes("berry") ||
+      name.includes("fruit")
+    )
+      return "nutrition-outline";
+    if (name.includes("egg")) return "ellipse-outline";
+    if (
+      name.includes("bean") ||
+      name.includes("lentil") ||
+      name.includes("chickpea")
+    )
+      return "fitness-outline";
+    return "nutrition-outline";
+  };
+
   const validateAndProcessImage = (base64Data: string): string | null => {
     try {
       if (!base64Data || base64Data.trim() === "") {
@@ -174,6 +242,10 @@ export default function CameraScreen() {
     try {
       console.log("🔍 Starting meal analysis with base64 data...");
 
+      // Get current language from i18n
+      const currentLanguage = i18n.language || "en";
+      console.log("🌐 Current language for analysis:", currentLanguage);
+
       const validatedBase64 = validateAndProcessImage(base64Image);
       if (!validatedBase64) {
         Alert.alert(t("common.error"), t("camera.analysis_failed"));
@@ -187,7 +259,10 @@ export default function CameraScreen() {
 
       console.log("📤 Dispatching analyze meal action...");
       const result = await dispatch(
-        analyzeMeal({ imageBase64: validatedBase64 })
+        analyzeMeal({
+          imageBase64: validatedBase64,
+          language: currentLanguage,
+        })
       );
 
       if (analyzeMeal.fulfilled.match(result)) {
@@ -207,6 +282,10 @@ export default function CameraScreen() {
       console.log("🔍 Re-analyzing image with additional text...");
       setIsEditingAnalysis(true);
 
+      // Get current language from i18n
+      const currentLanguage = i18n.language || "en";
+      console.log("🌐 Current language for analysis:", currentLanguage);
+
       // Use stored original image base64 instead of pendingMeal.image_base_64
       const imageToUse = originalImageBase64 || pendingMeal?.image_base_64;
 
@@ -225,6 +304,7 @@ export default function CameraScreen() {
         analyzeMeal({
           imageBase64: validatedBase64,
           updateText: additionalText,
+          language: currentLanguage,
         })
       );
 
@@ -381,6 +461,32 @@ export default function CameraScreen() {
       setEditText("");
     } catch (error) {
       console.error("💥 Edit analysis error:", error);
+      Alert.alert(t("common.error"), t("camera.re_analysis_failed"));
+    }
+  };
+
+  const handleEditIngredients = () => {
+    const currentIngredients = pendingMeal?.analysis?.ingredients || [];
+    const ingredientsText = currentIngredients
+      .map((ing) => `${ing.name}`)
+      .join(", ");
+    setEditableIngredients(ingredientsText);
+    setShowEditIngredientsModal(true);
+  };
+
+  const handleIngredientsSubmit = async () => {
+    if (!editableIngredients.trim()) {
+      Alert.alert(t("common.error"), t("camera.ingredients_required"));
+      return;
+    }
+
+    try {
+      setShowEditIngredientsModal(false);
+      const updateText = `Please update the ingredients list to: ${editableIngredients.trim()}. Re-analyze the meal with these exact ingredients and provide updated nutritional information.`;
+      await analyzeImageWithText(updateText);
+      setEditableIngredients("");
+    } catch (error) {
+      console.error("💥 Edit ingredients error:", error);
       Alert.alert(t("common.error"), t("camera.re_analysis_failed"));
     }
   };
@@ -563,8 +669,7 @@ export default function CameraScreen() {
                   ) ||
                     pendingMeal.analysis?.health_risk_notes?.includes(
                       "estimated"
-                    ) ||
-                    pendingMeal.analysis?.confidence <= 50) && (
+                    )) && (
                     <View style={styles.estimatedDataBadge}>
                       <Ionicons
                         name="information-circle"
@@ -643,59 +748,91 @@ export default function CameraScreen() {
                         <Text style={styles.ingredientsTitle}>
                           {t("camera.identified_ingredients")}
                         </Text>
+                        <TouchableOpacity
+                          style={styles.editIngredientsButton}
+                          onPress={() => setShowEditIngredientsModal(true)}
+                          disabled={isEditingAnalysis}
+                        >
+                          <Ionicons
+                            name="create-outline"
+                            size={16}
+                            color="#4CAF50"
+                          />
+                          <Text style={styles.editIngredientsText}>
+                            {t("camera.edit_ingredients")}
+                          </Text>
+                        </TouchableOpacity>
                       </View>
-                      {pendingMeal.analysis.ingredients.map(
-                        (ingredient, index) => (
-                          <View key={index} style={styles.ingredientCard}>
-                            <View style={styles.ingredientHeader}>
-                              <View style={styles.ingredientIconContainer}>
-                                <Ionicons
-                                  name="nutrition"
-                                  size={16}
-                                  color="#4CAF50"
-                                />
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        style={styles.ingredientsScrollView}
+                      >
+                        {pendingMeal.analysis.ingredients.map(
+                          (ingredient, index) => (
+                            <View key={index} style={styles.ingredientCard}>
+                              <View style={styles.ingredientIconWrapper}>
+                                <View style={styles.ingredientIconContainer}>
+                                  <Ionicons
+                                    name={
+                                      getIngredientIcon(ingredient.name) as any
+                                    }
+                                    size={24}
+                                    color="#4CAF50"
+                                  />
+                                </View>
+                                <Text
+                                  style={styles.ingredientName}
+                                  numberOfLines={2}
+                                >
+                                  {ingredient.name}
+                                </Text>
                               </View>
-                              <Text style={styles.ingredientName}>
-                                {ingredient.name}
-                              </Text>
+                              <View style={styles.ingredientNutritionGrid}>
+                                <View style={styles.nutritionItem}>
+                                  <Text style={styles.nutritionValue}>
+                                    {Math.round(ingredient.calories || 0)}
+                                  </Text>
+                                  <Text style={styles.nutritionUnit}>cal</Text>
+                                </View>
+                                <View style={styles.nutritionItem}>
+                                  <Text style={styles.nutritionValue}>
+                                    {Math.round(
+                                      ingredient.protein ||
+                                        ingredient.protein ||
+                                        0
+                                    )}
+                                    g
+                                  </Text>
+                                  <Text style={styles.nutritionUnit}>
+                                    protein
+                                  </Text>
+                                </View>
+                                <View style={styles.nutritionItem}>
+                                  <Text style={styles.nutritionValue}>
+                                    {Math.round(
+                                      ingredient.carbs || ingredient.carbs || 0
+                                    )}
+                                    g
+                                  </Text>
+                                  <Text style={styles.nutritionUnit}>
+                                    carbs
+                                  </Text>
+                                </View>
+                                <View style={styles.nutritionItem}>
+                                  <Text style={styles.nutritionValue}>
+                                    {Math.round(
+                                      ingredient.fat || ingredient.fat || 0
+                                    )}
+                                    g
+                                  </Text>
+                                  <Text style={styles.nutritionUnit}>fat</Text>
+                                </View>
+                              </View>
                             </View>
-                            <View style={styles.ingredientNutrition}>
-                              <View style={styles.ingredientDetail}>
-                                <Text style={styles.ingredientDetailValue}>
-                                  {Math.round(ingredient.calories || 0)}
-                                </Text>
-                                <Text style={styles.ingredientDetailLabel}>
-                                  {t("meals.calories")}
-                                </Text>
-                              </View>
-                              <View style={styles.ingredientDetail}>
-                                <Text style={styles.ingredientDetailValue}>
-                                  {Math.round(ingredient.protein || 0)}g
-                                </Text>
-                                <Text style={styles.ingredientDetailLabel}>
-                                  {t("meals.protein")}
-                                </Text>
-                              </View>
-                              <View style={styles.ingredientDetail}>
-                                <Text style={styles.ingredientDetailValue}>
-                                  {Math.round(ingredient.carbs || 0)}g
-                                </Text>
-                                <Text style={styles.ingredientDetailLabel}>
-                                  {t("meals.carbs")}
-                                </Text>
-                              </View>
-                              <View style={styles.ingredientDetail}>
-                                <Text style={styles.ingredientDetailValue}>
-                                  {Math.round(ingredient.fat || 0)}g
-                                </Text>
-                                <Text style={styles.ingredientDetailLabel}>
-                                  {t("meals.fat")}
-                                </Text>
-                              </View>
-                            </View>
-                          </View>
-                        )
-                      )}
+                          )
+                        )}
+                      </ScrollView>
                     </View>
                   )}
 
@@ -948,6 +1085,72 @@ export default function CameraScreen() {
                       style={[styles.modalButton, styles.submitButton]}
                       onPress={handleEditSubmit}
                       disabled={!editText.trim() || isEditingAnalysis}
+                    >
+                      {isEditingAnalysis ? (
+                        <ActivityIndicator color="white" size="small" />
+                      ) : (
+                        <Text style={styles.submitButtonText}>
+                          {t("camera.re_analyze")}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            </Modal>
+
+            {/* Edit Ingredients Modal */}
+            <Modal
+              visible={showEditIngredientsModal}
+              animationType="slide"
+              transparent={true}
+              onRequestClose={() => setShowEditIngredientsModal(false)}
+            >
+              <View style={styles.modalOverlay}>
+                <View style={styles.modalContent}>
+                  <View style={styles.modalHeader}>
+                    <Text style={styles.modalTitle}>
+                      {t("camera.edit_ingredients")}
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.modalCloseButton}
+                      onPress={() => setShowEditIngredientsModal(false)}
+                    >
+                      <Ionicons name="close" size={24} color="#666" />
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.modalSubtitle}>
+                    {t("camera.edit_ingredients_description")}
+                  </Text>
+
+                  <TextInput
+                    style={styles.updateInput}
+                    placeholder={t("camera.enter_ingredients_list")}
+                    value={editableIngredients}
+                    onChangeText={setEditableIngredients}
+                    multiline
+                    numberOfLines={6}
+                    textAlignVertical="top"
+                    autoFocus={true}
+                  />
+
+                  <View style={styles.modalButtons}>
+                    <TouchableOpacity
+                      style={[styles.modalButton, styles.cancelButton]}
+                      onPress={() => setShowEditIngredientsModal(false)}
+                      disabled={isEditingAnalysis}
+                    >
+                      <Text style={styles.cancelButtonText}>
+                        {t("common.cancel")}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.modalButton, styles.submitButton]}
+                      onPress={handleIngredientsSubmit}
+                      disabled={
+                        !editableIngredients.trim() || isEditingAnalysis
+                      }
                     >
                       {isEditingAnalysis ? (
                         <ActivityIndicator color="white" size="small" />
@@ -1822,5 +2025,37 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     marginLeft: 5,
+  },
+  editIngredientsButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#E8F5E8",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 8,
+  },
+  editIngredientsText: {
+    color: "#4CAF50",
+    fontSize: 11,
+    fontWeight: "600",
+    marginLeft: 4,
+  },
+  ingredientsScrollView: {
+    marginTop: 10,
+  },
+  ingredientIconWrapper: {
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  ingredientNutritionGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+  },
+  nutritionUnit: {
+    fontSize: 10,
+    color: "#4CAF50",
+    marginTop: 1,
   },
 });

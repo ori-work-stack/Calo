@@ -24,6 +24,11 @@ export async function optimizeImageForUpload(
     console.log("📏 Max dimensions:", maxWidth, "x", maxHeight);
     console.log("🎯 Quality:", quality);
 
+    // Validate input URI
+    if (!imageUri || imageUri.trim() === "") {
+      throw new Error("Invalid image URI provided");
+    }
+
     // Get image info first
     const imageInfo = await ImageManipulator.manipulateAsync(imageUri, [], {
       format: ImageManipulator.SaveFormat.JPEG,
@@ -31,8 +36,18 @@ export async function optimizeImageForUpload(
 
     console.log("📊 Original image info:", imageInfo);
 
-    // Calculate resize dimensions while maintaining aspect ratio
+    // Validate image dimensions
     const { width: originalWidth, height: originalHeight } = imageInfo;
+    if (
+      !originalWidth ||
+      !originalHeight ||
+      originalWidth < 10 ||
+      originalHeight < 10
+    ) {
+      throw new Error("Invalid image dimensions");
+    }
+
+    // Calculate resize dimensions while maintaining aspect ratio
     let { width: targetWidth, height: targetHeight } = imageInfo;
 
     if (originalWidth > maxWidth || originalHeight > maxHeight) {
@@ -47,6 +62,10 @@ export async function optimizeImageForUpload(
       }
     }
 
+    // Ensure minimum dimensions
+    targetWidth = Math.max(100, Math.round(targetWidth));
+    targetHeight = Math.max(100, Math.round(targetHeight));
+
     // Apply optimizations
     const manipulatorFormat =
       format === "jpeg"
@@ -60,8 +79,8 @@ export async function optimizeImageForUpload(
       [
         {
           resize: {
-            width: Math.round(targetWidth),
-            height: Math.round(targetHeight),
+            width: targetWidth,
+            height: targetHeight,
           },
         },
       ],
@@ -72,23 +91,72 @@ export async function optimizeImageForUpload(
       }
     );
 
+    const base64Result = manipulatedImage.base64;
+    if (!base64Result || base64Result.length < 1000) {
+      throw new Error("Image optimization produced invalid result");
+    }
+
+    // Check file size (approximate)
+    const estimatedSizeBytes = (base64Result.length * 3) / 4;
+    const maxSizeBytes = 10 * 1024 * 1024; // 10MB
+    if (estimatedSizeBytes > maxSizeBytes) {
+      console.warn(
+        "⚠️ Image still too large after optimization, attempting higher compression..."
+      );
+
+      // Try with higher compression
+      const recompressedImage = await ImageManipulator.manipulateAsync(
+        imageUri,
+        [
+          {
+            resize: {
+              width: Math.round(targetWidth * 0.8),
+              height: Math.round(targetHeight * 0.8),
+            },
+          },
+        ],
+        {
+          compress: 0.6,
+          format: manipulatorFormat,
+          base64: true,
+        }
+      );
+
+      const recompressedBase64 = recompressedImage.base64;
+      if (recompressedBase64 && recompressedBase64.length >= 1000) {
+        console.log("✅ Image recompressed successfully");
+        console.log(
+          "📏 Final dimensions:",
+          recompressedImage.width,
+          "x",
+          recompressedImage.height
+        );
+        console.log(
+          "📦 Final base64 size:",
+          recompressedBase64.length,
+          "characters"
+        );
+        return recompressedBase64;
+      }
+    }
+
     console.log("✅ Image optimized successfully");
     console.log(
-      "📏 New dimensions:",
+      "📏 Final dimensions:",
       manipulatedImage.width,
       "x",
       manipulatedImage.height
     );
-    console.log(
-      "📦 Base64 size:",
-      manipulatedImage.base64?.length || 0,
-      "characters"
-    );
+    console.log("📦 Final base64 size:", base64Result.length, "characters");
 
-    return manipulatedImage.base64 || "";
+    return base64Result;
   } catch (error) {
     console.error("💥 Image optimization failed:", error);
-    throw new Error("Failed to optimize image");
+    throw new Error(
+      `Failed to optimize image: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
   }
 }
 
