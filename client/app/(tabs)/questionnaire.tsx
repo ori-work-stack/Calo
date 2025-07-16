@@ -1,42 +1,22 @@
-import React, { useEffect, useState } from "react";
-import { View, ActivityIndicator, StyleSheet, Text } from "react-native";
-import { useRouter } from "expo-router";
-import { useTranslation } from "react-i18next";
+import React from "react";
+import { router } from "expo-router";
+import { useSelector } from "react-redux";
+import { RootState } from "@/src/store";
 
-export default function QuestionnaireTabScreen() {
-  const router = useRouter();
-  const { t } = useTranslation();
-  const [redirecting, setRedirecting] = useState(true);
+export default function TabsQuestionnaireScreen() {
+  const { user } = useSelector((state: RootState) => state.auth);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
+  React.useEffect(() => {
+    // Redirect to the main questionnaire screen
+    if (user?.is_questionnaire_completed) {
+      // If questionnaire is completed, go to edit mode
+      router.replace("/questionnaire?mode=edit");
+    } else {
+      // If not completed, go to regular questionnaire
       router.replace("/questionnaire");
-    }, 100); // Very short delay to show loading
+    }
+  }, [user]);
 
-    return () => clearTimeout(timer);
-  }, [router]);
-
-  return (
-    <View style={styles.container}>
-      <ActivityIndicator size="large" color="#4ECDC4" />
-      <Text style={styles.loadingText}>
-        {t("common.loading") || "Loading questionnaire..."}
-      </Text>
-    </View>
-  );
+  // Return null since we're redirecting immediately
+  return null;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f8f9fa",
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: "#666",
-    textAlign: "center",
-  },
-});

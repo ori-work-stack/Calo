@@ -26,6 +26,7 @@ import {
 } from "@/src/store/mealSlice";
 import { Ionicons } from "@expo/vector-icons";
 import { t } from "i18next";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function CameraScreen() {
   const dispatch = useDispatch<AppDispatch>();
@@ -39,6 +40,16 @@ export default function CameraScreen() {
   const [updateText, setUpdateText] = useState("");
   const [postedMealId, setPostedMealId] = useState<string | null>(null);
   const cameraRef = useRef<CameraView>(null);
+
+  // Edit analysis modal states
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editText, setEditText] = useState("");
+  const [isEditingAnalysis, setIsEditingAnalysis] = useState(false);
+
+  // Legacy states (keeping for compatibility)
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedComponents, setEditedComponents] = useState<string>("");
+  const [originalAnalysis, setOriginalAnalysis] = useState<string>("");
 
   // Load pending meal on component mount
   useEffect(() => {
@@ -67,43 +78,119 @@ export default function CameraScreen() {
     })();
   }, []);
 
-  if (!permission) {
-    return <View />;
-  }
+  // Load saved analysis on component mount
+  useEffect(() => {
+    loadSavedAnalysis();
+  }, []);
 
-  if (!permission.granted) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.message}>{t(`camera.permission`)}</Text>
-        <TouchableOpacity style={styles.button} onPress={requestPermission}>
-          <Text style={styles.buttonText}>Grant Permission</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  const takePicture = async () => {
-    if (cameraRef.current && !isAnalyzing) {
+  // Check if we have a persisted meal ID when component mounts or pendingMeal changes
+  useEffect(() => {
+    const checkPersistedMealId = async () => {
       try {
-        console.log("📸 Taking picture...");
-        const photo = await cameraRef.current.takePictureAsync({
-          quality: 0.8,
-          base64: true,
-        });
-
-        if (photo && photo.base64) {
-          console.log("✅ Picture taken, base64 length:", photo.base64.length);
-          setShowCamera(false);
-          setPostedMealId(null); // Reset posted meal ID
-          dispatch(analyzeMeal(photo.base64));
-        } else {
-          console.error("❌ No base64 data in photo");
-          Alert.alert("Error", "Failed to capture image data");
+        const savedMealId = await AsyncStorage.getItem("postedMealId");
+        if (savedMealId && pendingMeal) {
+          setPostedMealId(savedMealId);
         }
       } catch (error) {
-        console.error("💥 Camera error:", error);
-        Alert.alert("Error", "Failed to take picture");
+        console.error("Error loading persisted meal ID:", error);
       }
+    };
+
+    if (pendingMeal) {
+      checkPersistedMealId();
+    }
+  }, [pendingMeal]);
+
+  const loadSavedAnalysis = async () => {
+    try {
+      const savedData = await AsyncStorage.getItem("lastImageAnalysis");
+      if (savedData) {
+        const {
+          analysis: savedAnalysis,
+          userNotes: savedNotes,
+          image: savedImage,
+        } = JSON.parse(savedData);
+      }
+    } catch (error) {
+      console.error("Error loading saved analysis:", error);
+    }
+  };
+
+  const saveAnalysisData = async (
+    analysisText: string,
+    notes: string,
+    imageUri: string
+  ) => {
+    try {
+      const dataToSave = {
+        analysis: analysisText,
+        userNotes: notes,
+        image: imageUri,
+        timestamp: new Date().toISOString(),
+      };
+      await AsyncStorage.setItem(
+        "lastImageAnalysis",
+        JSON.stringify(dataToSave)
+      );
+    } catch (error) {
+      console.error("Error saving analysis:", error);
+    }
+  };
+
+  const saveMealId = async (mealId: string) => {
+    try {
+      await AsyncStorage.setItem("postedMealId", mealId);
+    } catch (error) {
+      console.error("Error saving meal ID:", error);
+    }
+  };
+
+  const clearMealId = async () => {
+    try {
+      await AsyncStorage.removeItem("postedMealId");
+    } catch (error) {
+      console.error("Error clearing meal ID:", error);
+    }
+  };
+
+  const analyzeImage = async (base64Image: string) => {
+    try {
+      console.log("🔍 Analyzing image...");
+      setPostedMealId(null); // Reset posted meal ID
+      await clearMealId(); // Clear persisted meal ID
+
+      // Save analysis data to AsyncStorage
+      await saveAnalysisData(base64Image, "", base64Image);
+
+      dispatch(analyzeMeal(base64Image));
+    } catch (error) {
+      console.error("💥 Analysis error:", error);
+      Alert.alert("Error", "Failed to analyze image");
+    }
+  };
+
+  const analyzeImageWithText = async (
+    base64Image: string,
+    additionalText: string
+  ) => {
+    try {
+      console.log("🔍 Re-analyzing image with additional text...");
+      setIsEditingAnalysis(true);
+
+      // Create a prompt that includes the additional text
+      const enhancedPrompt = `${additionalText}`;
+
+      // Save analysis data to AsyncStorage
+      await saveAnalysisData(base64Image, additionalText, base64Image);
+
+      // You might need to modify your analyzeMeal action to accept additional text
+      // For now, we'll dispatch with the base64 image and handle the text separately
+      dispatch(analyzeMeal(base64Image, enhancedPrompt));
+    } catch (error) {
+      console.error("💥 Analysis error:", error);
+      Alert.alert("Error", "Failed to re-analyze image");
+    } finally {
+      setIsEditingAnalysis(false);
     }
   };
 
@@ -131,8 +218,7 @@ export default function CameraScreen() {
 
         if (asset.base64) {
           console.log("✅ Image selected, base64 length:", asset.base64.length);
-          setPostedMealId(null);
-          dispatch(analyzeMeal(asset.base64));
+          await analyzeImage(asset.base64);
         } else {
           console.error("❌ No base64 data in selected image");
           Alert.alert(
@@ -148,29 +234,67 @@ export default function CameraScreen() {
       Alert.alert("Error", "Failed to open photo library. Please try again.");
     }
   };
+
   console.log(pendingMeal?.analysis?.ingredients, "this are ing for this meal");
+
   const handlePost = async () => {
     if (pendingMeal && !isPosting) {
+      console.log("📤 Posting meal...");
       const result = await dispatch(postMeal());
 
+      console.log("📤 Post result:", result);
+
       if (postMeal.fulfilled.match(result)) {
-        const mealId =
-          result.payload?.id || result.payload?.meal_id?.toString();
+        // Extract meal ID from the response - try multiple possible fields
+        const mealId = result.payload?.meal_id?.toString();
 
-        setPostedMealId(mealId);
-
-        Alert.alert(
-          "Success",
-          "Meal posted successfully! You can now update it if needed."
+        console.log("✅ Meal posted successfully with ID:", mealId);
+        console.log(
+          "✅ Full payload:",
+          JSON.stringify(result.payload, null, 2)
         );
+
+        if (mealId) {
+          setPostedMealId(mealId);
+          await saveMealId(mealId); // Persist the meal ID
+
+          Alert.alert(
+            "Success",
+            "Meal posted successfully! You can now update it if needed."
+          );
+        } else {
+          console.warn("⚠️ Meal posted but no ID returned");
+          console.warn(
+            "⚠️ Available payload keys:",
+            Object.keys(result.payload || {})
+          );
+
+          // Set a temporary ID to allow updates to work
+          const tempId = "temp_" + Date.now();
+          setPostedMealId(tempId);
+          await saveMealId(tempId);
+
+          Alert.alert(
+            "Success",
+            "Meal posted successfully! Update functionality is available."
+          );
+        }
       } else {
-        console.warn("Meal post failed:", result.payload);
+        console.error("❌ Meal post failed:", result.payload);
+        Alert.alert(
+          "Error",
+          "Failed to post meal: " + (result.payload || "Unknown error")
+        );
       }
     }
   };
 
   const handleUpdate = () => {
+    console.log("🔄 Update button pressed. Posted meal ID:", postedMealId);
+    console.log("🔄 Pending meal exists:", !!pendingMeal);
+
     if (!postedMealId) {
+      console.log("❌ No posted meal ID found");
       Alert.alert(
         "Post Required",
         "Please post the meal first before updating it.",
@@ -178,12 +302,24 @@ export default function CameraScreen() {
       );
       return;
     }
+
+    console.log("✅ Opening update modal");
     setShowUpdateModal(true);
     setUpdateText(""); // Reset update text when opening modal
   };
 
   const handleUpdateSubmit = async () => {
-    if (postedMealId && updateText.trim()) {
+    if (!postedMealId) {
+      Alert.alert("Error", "Cannot update - no meal ID found");
+      return;
+    }
+
+    if (!updateText.trim()) {
+      Alert.alert("Error", "Please enter update text");
+      return;
+    }
+
+    try {
       console.log("🔄 Submitting update with text:", updateText.trim());
       console.log("🆔 Meal ID:", postedMealId);
 
@@ -195,24 +331,34 @@ export default function CameraScreen() {
       );
 
       if (updateMeal.fulfilled.match(result)) {
+        console.log("✅ Update successful:", result.payload);
+
         Alert.alert("Success", "Meal updated successfully!");
+
         // Close modal and reset state
         setShowUpdateModal(false);
         setUpdateText("");
+
         // Clear the pending meal and posted meal ID
         dispatch(clearPendingMeal());
         setPostedMealId(null);
+        await clearMealId();
       } else {
         console.error("❌ Update failed:", result.payload);
-        Alert.alert(
-          "Error",
-          "Failed to update meal: " + (result.payload || "Unknown error")
-        );
+        const errorMessage =
+          result.payload?.message ||
+          result.payload?.error ||
+          result.payload ||
+          "Unknown error";
+
+        Alert.alert("Error", "Failed to update meal: " + errorMessage);
       }
-    } else if (!postedMealId) {
-      Alert.alert("Error", "Cannot update - no meal ID found");
-    } else {
-      Alert.alert("Error", "Please enter update text");
+    } catch (error) {
+      console.error("💥 Update error:", error);
+      Alert.alert(
+        "Error",
+        "An unexpected error occurred while updating the meal"
+      );
     }
   };
 
@@ -221,7 +367,7 @@ export default function CameraScreen() {
     setUpdateText("");
   };
 
-  const handleDiscard = () => {
+  const handleDiscard = async () => {
     Alert.alert(
       "Discard Analysis",
       "Are you sure you want to discard this analysis?",
@@ -230,13 +376,135 @@ export default function CameraScreen() {
         {
           text: "Discard",
           style: "destructive",
-          onPress: () => {
+          onPress: async () => {
             dispatch(clearPendingMeal());
             setPostedMealId(null);
+            await clearMealId();
           },
         },
       ]
     );
+  };
+
+  const resetCamera = async () => {
+    dispatch(clearPendingMeal());
+    setPostedMealId(null);
+    await clearMealId();
+    await AsyncStorage.removeItem("lastImageAnalysis");
+  };
+
+  // Fixed handleEditAnalysis function
+  const handleEditAnalysis = () => {
+    console.log("🔄 Edit analysis button pressed");
+    setEditText(""); // Reset edit text
+    setShowEditModal(true);
+  };
+
+  // Handle edit analysis submission
+  const handleEditSubmit = async () => {
+    if (!editText.trim()) {
+      Alert.alert("Error", "Please enter correction text");
+      return;
+    }
+
+    if (!pendingMeal?.image_base_64) {
+      Alert.alert("Error", "No image found to re-analyze");
+      return;
+    }
+
+    try {
+      console.log("🔄 Submitting edit with text:", editText.trim());
+
+      // Close modal first
+      setShowEditModal(false);
+
+      // Re-analyze the image with the additional text
+      await analyzeImageWithText(pendingMeal.image_base_64, editText.trim());
+
+      // Reset edit text
+      setEditText("");
+    } catch (error) {
+      console.error("💥 Edit analysis error:", error);
+      Alert.alert("Error", "Failed to re-analyze image");
+    }
+  };
+
+  const handleEditCancel = () => {
+    setShowEditModal(false);
+    setEditText("");
+  };
+
+  // Legacy confirmEdit function (keeping for compatibility)
+  const confirmEdit = async () => {
+    try {
+      if (editedComponents.trim() && originalAnalysis) {
+        // Create updated prompt for re-analysis
+        const updatePrompt = `התמונה נותחה בעבר וכללה: ${originalAnalysis}. המשתמש עדכן את הרכב המנה ל: ${editedComponents}. אנא בצע ניתוח קלורי מחדש.`;
+
+        // Save updated analysis data
+        await saveAnalysisData(
+          originalAnalysis,
+          editedComponents,
+          pendingMeal?.image_base_64 || ""
+        );
+
+        Alert.alert("הצלחה", "הניתוח עודכן בהצלחה");
+      }
+      setShowEditModal(false);
+    } catch (error) {
+      console.error("Error updating analysis:", error);
+      Alert.alert("שגיאה", "לא הצלחנו לעדכן את הניתוח");
+    }
+  };
+
+  const deleteAndRetake = () => {
+    Alert.alert(
+      "מחיקת תמונה",
+      "האם אתה בטוח שברצונך למחוק את התמונה ולצלם מחדש?",
+      [
+        { text: "ביטול", style: "cancel" },
+        { text: "מחק וצלם מחדש", onPress: resetCamera },
+      ]
+    );
+  };
+
+  if (!permission) {
+    return <View />;
+  }
+
+  if (!permission.granted) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.message}>{t(`camera.permission`)}</Text>
+        <TouchableOpacity style={styles.button} onPress={requestPermission}>
+          <Text style={styles.buttonText}>Grant Permission</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const takePicture = async () => {
+    if (cameraRef.current && !isAnalyzing) {
+      try {
+        console.log("📸 Taking picture...");
+        const photo = await cameraRef.current.takePictureAsync({
+          quality: 0.8,
+          base64: true,
+        });
+
+        if (photo && photo.base64) {
+          console.log("✅ Picture taken, base64 length:", photo.base64.length);
+          setShowCamera(false);
+          await analyzeImage(photo.base64);
+        } else {
+          console.error("❌ No base64 data in photo");
+          Alert.alert("Error", "Failed to capture image data");
+        }
+      } catch (error) {
+        console.error("💥 Camera error:", error);
+        Alert.alert("Error", "Failed to take picture");
+      }
+    }
   };
 
   if (showCamera) {
@@ -283,6 +551,12 @@ export default function CameraScreen() {
 
   if (pendingMeal) {
     const isPosted = !!postedMealId;
+    console.log(
+      "🔍 Rendering pending meal. Posted:",
+      isPosted,
+      "ID:",
+      postedMealId
+    );
 
     return (
       <ScrollView style={styles.container}>
@@ -398,7 +672,7 @@ export default function CameraScreen() {
             <TouchableOpacity
               style={[styles.actionButton, styles.discardButton]}
               onPress={handleDiscard}
-              disabled={isPosting || isUpdating}
+              disabled={isPosting || isUpdating || isEditingAnalysis}
               activeOpacity={0.7}
             >
               <Text style={styles.discardButtonText}>
@@ -406,11 +680,37 @@ export default function CameraScreen() {
               </Text>
             </TouchableOpacity>
 
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: "#FF9500" }]}
+              onPress={handleEditAnalysis}
+              disabled={isPosting || isUpdating || isEditingAnalysis}
+              activeOpacity={0.7}
+            >
+              {isEditingAnalysis ? (
+                <ActivityIndicator color="white" size="small" />
+              ) : (
+                <Text style={[styles.actionButtonText, { color: "white" }]}>
+                  ערוך ניתוח
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: "#FF3B30" }]}
+              onPress={deleteAndRetake}
+              disabled={isPosting || isUpdating || isEditingAnalysis}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.actionButtonText, { color: "white" }]}>
+                מחק וצלם מחדש
+              </Text>
+            </TouchableOpacity>
+
             {!isPosted ? (
               <TouchableOpacity
                 style={[styles.actionButton, styles.postButton]}
                 onPress={handlePost}
-                disabled={isPosting || isUpdating}
+                disabled={isPosting || isUpdating || isEditingAnalysis}
                 activeOpacity={0.7}
               >
                 {isPosting ? (
@@ -422,8 +722,10 @@ export default function CameraScreen() {
             ) : (
               <TouchableOpacity
                 style={[styles.actionButton, styles.updateButton]}
-                onPress={handleUpdate}
-                disabled={isPosting || isUpdating}
+                onPress={() => {
+                  handleUpdate();
+                }}
+                disabled={isPosting || isUpdating || isEditingAnalysis}
                 activeOpacity={0.7}
               >
                 {isUpdating ? (
@@ -488,48 +790,159 @@ export default function CameraScreen() {
             </View>
           </View>
         </Modal>
+
+        {/* Edit Analysis Modal */}
+        <Modal
+          visible={showEditModal}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={handleEditCancel}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>ערוך ניתוח</Text>
+              <Text style={styles.modalSubtitle}>
+                הוסף מידע או תיקון לגבי הארוחה (לדוגמה: "יש גם 2 פרוסות לחם" או
+                "בלי אורז")
+              </Text>
+
+              <TextInput
+                style={styles.updateInput}
+                placeholder="הזן תיקון או מידע נוסף על הארוחה..."
+                value={editText}
+                onChangeText={setEditText}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+                autoFocus={true}
+              />
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={handleEditCancel}
+                  disabled={isEditingAnalysis}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.cancelButtonText}>ביטול</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.submitButton]}
+                  onPress={handleEditSubmit}
+                  disabled={!editText.trim() || isEditingAnalysis}
+                  activeOpacity={0.7}
+                >
+                  {isEditingAnalysis ? (
+                    <ActivityIndicator color="white" size="small" />
+                  ) : (
+                    <Text style={styles.submitButtonText}>נתח מחדש</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </ScrollView>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{t(`camera.analyze_photo`)}</Text>
-      <Text style={styles.subtitle}>{t(`camera.description`)}</Text>
+      <View style={styles.headerSection}>
+        <Text style={styles.title}>{t(`camera.analyze_photo`)}</Text>
+        <Text style={styles.subtitle}>{t(`camera.description`)}</Text>
+      </View>
 
-      {isAnalyzing && (
+      {(isAnalyzing || isEditingAnalysis) && (
         <View style={styles.analyzingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.analyzingText}>Analyzing your meal...</Text>
+          <View style={styles.analyzingCard}>
+            <ActivityIndicator size="large" color="#007AFF" />
+            <Text style={styles.analyzingText}>
+              {isEditingAnalysis ? "מעדכן ניתוח..." : "מנתח את הארוחה שלך..."}
+            </Text>
+            <Text style={styles.analyzingSubtext}>זה עלול לקחת כמה שניות</Text>
+          </View>
         </View>
       )}
 
       <View style={styles.buttonContainer}>
         <TouchableOpacity
-          style={[styles.cameraButton, isAnalyzing && styles.buttonDisabled]}
+          style={[
+            styles.cameraButton,
+            (isAnalyzing || isEditingAnalysis) && styles.buttonDisabled,
+          ]}
           onPress={() => setShowCamera(true)}
-          disabled={isAnalyzing}
+          disabled={isAnalyzing || isEditingAnalysis}
           activeOpacity={0.7}
         >
-          <Ionicons name="camera" size={30} color="white" />
+          <View style={styles.buttonIconContainer}>
+            <Ionicons name="camera" size={32} color="white" />
+          </View>
           <Text style={styles.buttonText}>{t(`camera.take_photo`)}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.galleryButton, isAnalyzing && styles.buttonDisabled]}
+          style={[
+            styles.galleryButton,
+            (isAnalyzing || isEditingAnalysis) && styles.buttonDisabled,
+          ]}
           onPress={() => {
             console.log("🔘 Gallery button pressed!");
             pickImage();
           }}
-          disabled={isAnalyzing}
+          disabled={isAnalyzing || isEditingAnalysis}
           activeOpacity={0.7}
         >
-          <Ionicons name="images" size={30} color="#007AFF" />
+          <View style={styles.buttonIconContainer}>
+            <Ionicons name="images" size={32} color="#007AFF" />
+          </View>
           <Text style={styles.galleryButtonText}>
             {t(`camera.choose_from_gallery`)}
           </Text>
         </TouchableOpacity>
+
+        <View style={styles.tipCard}>
+          <Ionicons name="bulb-outline" size={24} color="#FF9500" />
+          <Text style={styles.tipText}>
+            💡 לתוצאות מיטביות, וודא שהאוכל מוצג בבירור ובתאורה טובה
+          </Text>
+        </View>
       </View>
+
+      {/* Edit Modal */}
+      <Modal
+        visible={showEditModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowEditModal(false)}>
+              <Text style={styles.modalCancelButton}>ביטול</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>ערוך רכיבי המנה</Text>
+            <TouchableOpacity onPress={confirmEdit}>
+              <Text style={styles.modalConfirmButton}>אשר</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.modalContent}>
+            <Text style={styles.modalLabel}>ניתוח מקורי:</Text>
+            <Text style={styles.originalAnalysisText}>{originalAnalysis}</Text>
+
+            <Text style={styles.modalLabel}>רכיבים מעודכנים:</Text>
+            <TextInput
+              style={styles.modalTextInput}
+              value={editedComponents}
+              onChangeText={setEditedComponents}
+              multiline
+              placeholder="ערוך את רכיבי המנה..."
+              textAlignVertical="top"
+            />
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -575,20 +988,27 @@ const styles = StyleSheet.create({
   captureButtonDisabled: {
     backgroundColor: "rgba(255,255,255,0.5)",
   },
+  headerSection: {
+    paddingTop: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 30,
+    backgroundColor: "#f8f9fa",
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+  },
   title: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: "bold",
     textAlign: "center",
-    marginTop: 50,
     marginBottom: 10,
-    color: "#333",
+    color: "#1a1a1a",
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 17,
     textAlign: "center",
     color: "#666",
-    marginBottom: 40,
-    paddingHorizontal: 20,
+    lineHeight: 24,
+    paddingHorizontal: 10,
   },
   message: {
     textAlign: "center",
@@ -597,7 +1017,8 @@ const styles = StyleSheet.create({
   buttonContainer: {
     flex: 1,
     justifyContent: "center",
-    paddingHorizontal: 40,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
   },
   button: {
     backgroundColor: "#007AFF",
@@ -608,53 +1029,103 @@ const styles = StyleSheet.create({
   },
   cameraButton: {
     backgroundColor: "#007AFF",
-    padding: 20,
-    borderRadius: 12,
+    padding: 24,
+    borderRadius: 16,
     alignItems: "center",
-    marginBottom: 20,
-    flexDirection: "row",
+    marginBottom: 16,
+    flexDirection: "column",
     justifyContent: "center",
-    minHeight: 60,
+    minHeight: 100,
+    shadowColor: "#007AFF",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   galleryButton: {
     borderWidth: 2,
     borderColor: "#007AFF",
     backgroundColor: "white",
-    padding: 20,
-    borderRadius: 12,
+    padding: 24,
+    borderRadius: 16,
     alignItems: "center",
-    flexDirection: "row",
+    flexDirection: "column",
     justifyContent: "center",
-    minHeight: 60,
-    elevation: 2, // Android shadow
-    shadowColor: "#000", // iOS shadow
+    minHeight: 100,
+    marginBottom: 20,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    elevation: 4,
+  },
+  buttonIconContainer: {
+    marginBottom: 8,
   },
   buttonDisabled: {
     opacity: 0.5,
   },
   buttonText: {
     color: "white",
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "bold",
-    marginLeft: 10,
+    textAlign: "center",
   },
   galleryButtonText: {
     color: "#007AFF",
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "bold",
-    marginLeft: 10,
+    textAlign: "center",
+  },
+  tipCard: {
+    backgroundColor: "#fff8e1",
+    padding: 16,
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    borderLeftWidth: 4,
+    borderLeftColor: "#FF9500",
+    marginTop: 10,
+  },
+  tipText: {
+    flex: 1,
+    fontSize: 14,
+    color: "#666",
+    marginLeft: 12,
+    lineHeight: 20,
+    textAlign: "right",
   },
   analyzingContainer: {
+    flex: 1,
+    justifyContent: "center",
     alignItems: "center",
-    marginVertical: 40,
+    paddingHorizontal: 20,
+  },
+  analyzingCard: {
+    backgroundColor: "white",
+    padding: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
+    width: "100%",
+    maxWidth: 300,
   },
   analyzingText: {
-    marginTop: 15,
-    fontSize: 16,
-    color: "#666",
+    marginTop: 20,
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#333",
+    textAlign: "center",
+  },
+  analyzingSubtext: {
+    marginTop: 8,
+    fontSize: 14,
+    color: "#999",
+    textAlign: "center",
   },
   analysisContainer: {
     padding: 20,
@@ -728,16 +1199,22 @@ const styles = StyleSheet.create({
   },
   actionButtons: {
     flexDirection: "row",
+    flexWrap: "wrap",
     justifyContent: "space-between",
+    gap: 8,
   },
   actionButton: {
     flex: 1,
-    padding: 15,
+    minWidth: "45%",
+    padding: 12,
     borderRadius: 8,
     alignItems: "center",
-    marginHorizontal: 3,
-    minHeight: 50,
+    minHeight: 45,
     justifyContent: "center",
+  },
+  actionButtonText: {
+    fontSize: 14,
+    fontWeight: "bold",
   },
   discardButton: {
     backgroundColor: "#f8f9fa",
@@ -869,5 +1346,49 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 4,
     overflow: "hidden",
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  modalCancelButton: {
+    color: "#007AFF",
+    fontSize: 16,
+  },
+  modalConfirmButton: {
+    color: "#007AFF",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  modalLabel: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 10,
+    marginTop: 20,
+  },
+  originalAnalysisText: {
+    fontSize: 14,
+    color: "#666",
+    backgroundColor: "#f5f5f5",
+    padding: 15,
+    borderRadius: 10,
+    lineHeight: 20,
+  },
+  modalTextInput: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 10,
+    padding: 15,
+    minHeight: 200,
+    fontSize: 16,
+    textAlignVertical: "top",
   },
 });

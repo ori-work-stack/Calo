@@ -1,292 +1,264 @@
+import AppleHealthKit, {
+  HealthKitPermissions,
+  HealthInputOptions,
+} from "react-native-health";
 import { Platform } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-// Health data types
+const permissions: HealthKitPermissions = {
+  permissions: {
+    read: [
+      AppleHealthKit.Constants.Permissions.Steps,
+      AppleHealthKit.Constants.Permissions.FlightsClimbed,
+      AppleHealthKit.Constants.Permissions.DistanceWalkingRunning,
+      AppleHealthKit.Constants.Permissions.ActiveEnergyBurned,
+      AppleHealthKit.Constants.Permissions.HeartRate,
+      AppleHealthKit.Constants.Permissions.Weight,
+      AppleHealthKit.Constants.Permissions.Height,
+      AppleHealthKit.Constants.Permissions.BodyMassIndex,
+    ],
+    write: [],
+  },
+};
+
 export interface HealthData {
   steps: number;
   caloriesBurned: number;
+  heartRate: number;
+  distance: number;
   activeMinutes: number;
-  heartRate?: number;
-  weight?: number;
-  bodyFat?: number;
-  sleepHours?: number;
-  date: string;
-  distance?: number;
+  date: Date;
 }
 
-export interface HealthPermissions {
-  steps: boolean;
-  calories: boolean;
-  heartRate: boolean;
-  weight: boolean;
-  sleep: boolean;
-}
+export class HealthKitService {
+  static initHealthKit(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (Platform.OS !== "ios") {
+        reject(new Error("HealthKit is only available on iOS"));
+        return;
+      }
 
-class HealthKitService {
-  private isInitialized = false;
-  private healthKit: any = null;
+      AppleHealthKit.initHealthKit(permissions, (error: string) => {
+        if (error) {
+          reject(new Error(error));
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
 
-  async initialize(): Promise<boolean> {
+  static async getDailyHealthData(
+    date: Date = new Date()
+  ): Promise<HealthData> {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const options = {
+      startDate: startOfDay.toISOString(),
+      endDate: endOfDay.toISOString(),
+    };
+
     try {
-      if (Platform.OS === "ios") {
-        // Check if react-native-health is available
-        try {
-          const AppleHealthKit = require("react-native-health").default;
-          this.healthKit = AppleHealthKit;
-        } catch (importError) {
-          console.log("📱 react-native-health not available, using mock data");
-          this.isInitialized = true;
-          return true;
-        }
+      const [steps, calories, heartRate, distance] = await Promise.all([
+        this.getSteps(options),
+        this.getActiveCalories(options),
+        this.getHeartRate(options),
+        this.getDistance(options),
+      ]);
 
-        const permissions = {
-          permissions: {
-            read: [
-              "Steps",
-              "ActiveEnergyBurned",
-              "BasalEnergyBurned",
-              "HeartRate",
-              "BodyMass",
-              "BodyFatPercentage",
-              "SleepAnalysis",
-              "DistanceWalkingRunning",
-            ],
-            write: [],
-          },
-        };
-
-        return new Promise((resolve) => {
-          this.healthKit.initHealthKit(permissions, (error: any) => {
-            if (error) {
-              console.error("HealthKit initialization failed:", error);
-              // Fall back to mock data
-              this.isInitialized = true;
-              resolve(true);
-            } else {
-              console.log("✅ HealthKit initialized successfully");
-              this.isInitialized = true;
-              resolve(true);
-            }
-          });
-        });
-      } else {
-        console.log("📱 Non-iOS platform - using mock health data");
-        this.isInitialized = true;
-        return true;
-      }
-    } catch (error) {
-      console.error("💥 Health service initialization error:", error);
-      // Fall back to mock data
-      this.isInitialized = true;
-      return true;
-    }
-  }
-
-  async checkPermissions(): Promise<HealthPermissions> {
-    return {
-      steps: this.isInitialized,
-      calories: this.isInitialized,
-      heartRate: this.isInitialized,
-      weight: this.isInitialized,
-      sleep: this.isInitialized,
-    };
-  }
-
-  async requestPermissions(): Promise<boolean> {
-    return await this.initialize();
-  }
-
-  async getStepsForDate(date: string): Promise<number> {
-    if (!this.isInitialized) {
-      return 0;
-    }
-
-    if (Platform.OS !== "ios" || !this.healthKit) {
-      // Return realistic mock data
-      return Math.floor(Math.random() * 5000) + 3000;
-    }
-
-    return new Promise((resolve) => {
-      const options = {
+      const healthData: HealthData = {
+        steps: steps || 0,
+        caloriesBurned: calories || 0,
+        heartRate: heartRate || 0,
+        distance: distance || 0,
+        activeMinutes: Math.floor((steps || 0) / 100), // Estimate active minutes
         date: date,
-        includeManuallyAdded: false,
       };
 
-      this.healthKit.getStepCount(options, (error: any, results: any) => {
-        if (error) {
-          console.error("Error getting steps:", error);
-          // Return mock data on error
-          resolve(Math.floor(Math.random() * 5000) + 3000);
-        } else {
-          resolve(results.value || 0);
-        }
-      });
-    });
-  }
+      // Cache the data
+      await this.cacheHealthData(healthData);
 
-  async getCaloriesForDate(date: string): Promise<number> {
-    if (!this.isInitialized) {
-      return 0;
-    }
-
-    if (Platform.OS !== "ios" || !this.healthKit) {
-      // Return realistic mock data
-      return Math.floor(Math.random() * 800) + 1200;
-    }
-
-    return new Promise((resolve) => {
-      const options = {
-        startDate: new Date(date).toISOString(),
-        endDate: new Date(
-          new Date(date).getTime() + 24 * 60 * 60 * 1000
-        ).toISOString(),
-      };
-
-      // Get active calories
-      this.healthKit.getActiveEnergyBurned(
-        options,
-        (error: any, results: any[]) => {
-          if (error) {
-            console.error("Error getting active calories:", error);
-            resolve(Math.floor(Math.random() * 800) + 1200);
-          } else {
-            const totalActive = results.reduce(
-              (sum, entry) => sum + entry.value,
-              0
-            );
-
-            // Get basal calories
-            this.healthKit.getBasalEnergyBurned(
-              options,
-              (error: any, basalResults: any[]) => {
-                if (error) {
-                  console.error("Error getting basal calories:", error);
-                  resolve(totalActive + 1200); // Add estimated BMR
-                } else {
-                  const totalBasal = basalResults.reduce(
-                    (sum, entry) => sum + entry.value,
-                    0
-                  );
-                  resolve(totalActive + totalBasal);
-                }
-              }
-            );
-          }
-        }
+      return healthData;
+    } catch (error) {
+      console.error("Error fetching health data:", error);
+      // Return cached data if available
+      return (
+        (await this.getCachedHealthData(date)) ||
+        this.getDefaultHealthData(date)
       );
-    });
+    }
   }
 
-  async getHeartRateForDate(date: string): Promise<number | null> {
-    if (!this.isInitialized) {
+  private static async cacheHealthData(data: HealthData): Promise<void> {
+    try {
+      const key = `health_data_${data.date.toDateString()}`;
+      await AsyncStorage.setItem(key, JSON.stringify(data));
+    } catch (error) {
+      console.error("Error caching health data:", error);
+    }
+  }
+
+  private static async getCachedHealthData(
+    date: Date
+  ): Promise<HealthData | null> {
+    try {
+      const key = `health_data_${date.toDateString()}`;
+      const cached = await AsyncStorage.getItem(key);
+      return cached ? JSON.parse(cached) : null;
+    } catch (error) {
+      console.error("Error getting cached health data:", error);
       return null;
     }
-
-    if (Platform.OS !== "ios" || !this.healthKit) {
-      // Return realistic mock data
-      return Math.floor(Math.random() * 30) + 65;
-    }
-
-    return new Promise((resolve) => {
-      const options = {
-        startDate: new Date(date).toISOString(),
-        endDate: new Date(
-          new Date(date).getTime() + 24 * 60 * 60 * 1000
-        ).toISOString(),
-      };
-
-      this.healthKit.getHeartRateSamples(
-        options,
-        (error: any, results: any[]) => {
-          if (error) {
-            console.error("Error getting heart rate:", error);
-            resolve(Math.floor(Math.random() * 30) + 65);
-          } else if (results.length === 0) {
-            resolve(Math.floor(Math.random() * 30) + 65);
-          } else {
-            // Calculate average heart rate
-            const average =
-              results.reduce((sum, entry) => sum + entry.value, 0) /
-              results.length;
-            resolve(Math.round(average));
-          }
-        }
-      );
-    });
   }
 
-  async getWeightForDate(date: string): Promise<number | null> {
-    if (!this.isInitialized) {
-      return null;
-    }
-
-    if (Platform.OS !== "ios" || !this.healthKit) {
-      // Return realistic mock data
-      return 70 + Math.random() * 10;
-    }
-
-    return new Promise((resolve) => {
-      const options = {
-        startDate: new Date(date).toISOString(),
-        endDate: new Date(
-          new Date(date).getTime() + 24 * 60 * 60 * 1000
-        ).toISOString(),
-      };
-
-      this.healthKit.getWeightSamples(options, (error: any, results: any[]) => {
-        if (error) {
-          console.error("Error getting weight:", error);
-          resolve(70 + Math.random() * 10);
-        } else if (results.length === 0) {
-          resolve(70 + Math.random() * 10);
-        } else {
-          // Get the most recent weight
-          const latestWeight = results[results.length - 1];
-          resolve(latestWeight.value);
-        }
-      });
-    });
-  }
-
-  async getHealthDataForDate(date: string): Promise<HealthData> {
-    console.log("📊 Getting health data for date:", date);
-
-    const [steps, calories, heartRate, weight] = await Promise.all([
-      this.getStepsForDate(date),
-      this.getCaloriesForDate(date),
-      this.getHeartRateForDate(date),
-      this.getWeightForDate(date),
-    ]);
-
-    // Calculate active minutes based on steps (rough estimate)
-    const activeMinutes = Math.round(steps / 100); // Rough estimate: 100 steps per minute
-
-    const healthData: HealthData = {
-      steps,
-      caloriesBurned: Math.round(calories),
-      activeMinutes,
-      heartRate: heartRate || undefined,
-      weight: weight || undefined,
-      distance: steps * 0.0008, // Rough estimate: 0.8m per step
-      date,
+  private static getDefaultHealthData(date: Date): HealthData {
+    return {
+      steps: 0,
+      caloriesBurned: 0,
+      heartRate: 0,
+      distance: 0,
+      activeMinutes: 0,
+      date: date,
     };
-
-    console.log("✅ Health data retrieved:", healthData);
-    return healthData;
   }
 
-  async isAvailable(): Promise<boolean> {
-    if (Platform.OS === "ios") {
-      try {
-        require("react-native-health");
-        return true;
-      } catch {
-        // react-native-health not installed, but we can still provide mock data
-        return true;
+  static generateAIHealthPrompt(
+    healthData: HealthData,
+    userGoals?: any
+  ): string {
+    return `
+      Daily Health Data Analysis:
+      - Steps: ${healthData.steps} steps
+      - Calories Burned: ${healthData.caloriesBurned} calories
+      - Average Heart Rate: ${healthData.heartRate} bpm
+      - Distance: ${(healthData.distance / 1000).toFixed(2)} km
+      - Active Minutes: ${healthData.activeMinutes} minutes
+      - Date: ${healthData.date.toLocaleDateString()}
+
+      ${
+        userGoals
+          ? `User Goals:
+      - Daily Calories: ${userGoals.daily_calories || "Not set"}
+      - Protein: ${userGoals.protein_goal || "Not set"}g
+      - Carbs: ${userGoals.carbs_goal || "Not set"}g
+      - Fat: ${userGoals.fat_goal || "Not set"}g`
+          : ""
       }
+
+      Based on this activity data and nutritional goals, please provide:
+      1. Personalized meal recommendations for today
+      2. Caloric adjustments based on activity level
+      3. Hydration recommendations
+      4. Recovery nutrition suggestions if the activity level is high
+
+      Please be specific and practical in your recommendations.
+    `;
+  }
+
+  private static getSteps(options: HealthInputOptions): Promise<number> {
+    return new Promise((resolve, reject) => {
+      AppleHealthKit.getStepCount(
+        options,
+        (callbackError: string, results: any) => {
+          if (callbackError) {
+            reject(new Error(callbackError));
+          } else {
+            resolve(results?.value || 0);
+          }
+        }
+      );
+    });
+  }
+
+  private static getActiveCalories(
+    options: HealthInputOptions
+  ): Promise<number> {
+    return new Promise((resolve, reject) => {
+      AppleHealthKit.getActiveEnergyBurned(
+        options,
+        (callbackError: string, results: any) => {
+          if (callbackError) {
+            reject(new Error(callbackError));
+          } else {
+            resolve(results?.value || 0);
+          }
+        }
+      );
+    });
+  }
+
+  private static getHeartRate(options: HealthInputOptions): Promise<number> {
+    return new Promise((resolve, reject) => {
+      AppleHealthKit.getHeartRateSamples(
+        options,
+        (callbackError: string, results: any) => {
+          if (callbackError) {
+            reject(new Error(callbackError));
+          } else {
+            const samples = results || [];
+            if (samples.length > 0) {
+              const average =
+                samples.reduce(
+                  (sum: number, sample: any) => sum + sample.value,
+                  0
+                ) / samples.length;
+              resolve(Math.round(average));
+            } else {
+              resolve(0);
+            }
+          }
+        }
+      );
+    });
+  }
+
+  private static getDistance(options: HealthInputOptions): Promise<number> {
+    return new Promise((resolve, reject) => {
+      AppleHealthKit.getDistanceWalkingRunning(
+        options,
+        (callbackError: string, results: any) => {
+          if (callbackError) {
+            reject(new Error(callbackError));
+          } else {
+            resolve(results?.value || 0);
+          }
+        }
+      );
+    });
+  }
+
+  static async syncWithAI(apiUrl: string, userId: string): Promise<string> {
+    try {
+      const healthData = await this.getDailyHealthData();
+
+      const response = await fetch(
+        `${apiUrl}/chat/health-based-recommendation`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userId,
+            healthData,
+            prompt: this.generateAIHealthPrompt(healthData),
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to get AI recommendations");
+      }
+
+      const data = await response.json();
+      return data.recommendation;
+    } catch (error) {
+      console.error("Error syncing health data with AI:", error);
+      throw error;
     }
-    // Always return true to provide mock data on other platforms
-    return true;
   }
 }
-
-export const healthKitService = new HealthKitService();

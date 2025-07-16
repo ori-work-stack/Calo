@@ -88,6 +88,7 @@ export class ChatService {
 - אתה לא נותן ייעוץ רפואי מוסמך
 - במקרי בעיות בריאותיות חמורות - הפנה לרופא
 - תמיד הדגש שזה ייעוץ כללי ולא תחליף לייעוץ מקצועי
+- אם המשתמש יש אלרגיות - לעולם אל תציע מזונות המכילים אלרגנים אלה!
 
 🎯 התמחויות שלך:
 - המלצות תזונתיות מבוססות מדע
@@ -103,6 +104,7 @@ export class ChatService {
 - You do not provide licensed medical advice
 - For serious health issues - refer to a doctor
 - Always emphasize this is general advice and not a substitute for professional consultation
+- If the user has allergies - NEVER suggest foods containing those allergens!
 
 🎯 Your specialties:
 - Science-based nutritional recommendations
@@ -122,7 +124,9 @@ export class ChatService {
           userContext.todayIntake?.protein || 0
         }ג חלבון
 הגבלות תזונתיות: ${userContext.restrictions?.join(", ") || "אין"}
-אלרגיות: ${userContext.allergies?.join(", ") || "אין"}
+אלרגיות: ${
+          userContext.allergies?.join(", ") || "אין"
+        } - חשוב ביותר: לעולם אל תציע מזונות עם אלרגנים אלה!
 `
       : isHebrew
       ? "מידע על המשתמש לא זמין"
@@ -136,9 +140,10 @@ export class ChatService {
 - אם נשאלת על מזון ספציפי - תן ניתוח מפורט
 - המלץ על ארוחות בהתאם ליעדים ולהגבלות
 - תמיד שמור על טון ידידותי ומקצועי
+- בדוק אלרגיות לפני כל המלצה!
 
 עבור שאלות על מזון: תן מידע על קלוריות, חלבון, פחמימות, שומן, ויתמינים.
-עבור המלצות ארוחות: קח בחשבון יעדים, הגבלות ומה שנותר לצריכה היום.
+עבור המלצות ארוחות: קח בחשבון יעדים, הגבלות, אלרגיות ומה שנותר לצריכה היום.
 עבור שאלות בישול: תן הצעות לשיפור התזונתי של המתכון.`
       : `
 🔄 Response instructions:
@@ -147,9 +152,10 @@ export class ChatService {
 - If asked about specific food - give detailed analysis
 - Recommend meals according to goals and restrictions
 - Always maintain a friendly and professional tone
+- Check allergies before any recommendation!
 
 For food questions: provide information about calories, protein, carbs, fat, and vitamins.
-For meal recommendations: consider goals, restrictions and what's left to consume today.
+For meal recommendations: consider goals, restrictions, allergies and what's left to consume today.
 For cooking questions: give suggestions for nutritional improvement of the recipe.`;
 
     return basePrompt + contextInfo + instructions;
@@ -184,7 +190,7 @@ For cooking questions: give suggestions for nutritional improvement of the recip
         { calories: 0, protein: 0, carbs: 0, fat: 0 }
       );
 
-      // Get user questionnaire for restrictions
+      // Get user questionnaire for restrictions and allergies
       const questionnaire = await prisma.userQuestionnaire.findFirst({
         where: { user_id: userId },
       });
@@ -202,7 +208,9 @@ For cooking questions: give suggestions for nutritional improvement of the recip
         restrictions: questionnaire?.dietary_style
           ? [questionnaire.dietary_style]
           : [],
-        allergies: questionnaire?.allergies || [],
+        allergies: Array.isArray(questionnaire?.allergies)
+          ? questionnaire.allergies
+          : questionnaire?.allergies_text || [],
       };
     } catch (error) {
       console.error("Error getting user context:", error);
@@ -307,6 +315,126 @@ For cooking questions: give suggestions for nutritional improvement of the recip
       });
     } catch (error) {
       console.error("Error clearing chat history:", error);
+    }
+  }
+
+  static async processHealthBasedRecommendation(
+    userId: string,
+    healthData: any,
+    customPrompt?: string
+  ): Promise<string> {
+    try {
+      // Get user's complete profile
+      const user = await prisma.user.findUnique({
+        where: { user_id: userId },
+        include: {
+          questionnaires: true,
+          nutritionPlans: true,
+        },
+      });
+
+      if (!user) {
+        throw new Error("User not found");
+      }
+
+      // Get the latest questionnaire
+      const questionnaire = user.questionnaires?.[0];
+
+      // Create comprehensive health-based prompt
+      const healthPrompt =
+        customPrompt ||
+        `
+        Health & Activity Analysis:
+        - Steps Today: ${healthData.steps} steps
+        - Calories Burned: ${healthData.caloriesBurned} calories
+        - Average Heart Rate: ${healthData.heartRate} bpm
+        - Distance Covered: ${(healthData.distance / 1000).toFixed(2)} km
+        - Active Minutes: ${healthData.activeMinutes} minutes
+
+        User Profile:
+        - Daily Calorie Goal: ${
+          user.nutritionPlans?.[0]?.goal_calories || "Not set"
+        }
+        - Protein Goal: ${
+          user.nutritionPlans?.[0]?.goal_protein_g || "Not set"
+        }g
+        - Carbs Goal: ${user.nutritionPlans?.[0]?.goal_carbs_g || "Not set"}g
+        - Fat Goal: ${user.nutritionPlans?.[0]?.goal_fats_g || "Not set"}g
+
+        Personal Health Information:
+        ${
+          questionnaire?.allergies?.length
+            ? `- ALLERGIES: ${questionnaire.allergies.join(
+                ", "
+              )} (CRITICAL: Never suggest foods containing these allergens!)`
+            : ""
+        }
+        ${
+          questionnaire?.medical_conditions_text?.length
+            ? `- Medical Conditions: ${questionnaire.medical_conditions_text.join(
+                ", "
+              )}`
+            : ""
+        }
+        ${
+          questionnaire?.dietary_style
+            ? `- Dietary Style: ${questionnaire.dietary_style}`
+            : ""
+        }
+        ${
+          questionnaire?.physical_activity_level
+            ? `- Regular Activity Level: ${questionnaire.physical_activity_level}`
+            : ""
+        }
+
+        Based on today's activity data and the user's health profile, provide:
+        1. Personalized meal recommendations that match their activity level
+        2. Caloric adjustments based on calories burned
+        3. Hydration recommendations based on activity
+        4. Recovery nutrition if the activity was intense
+        5. Any warnings about foods to avoid due to allergies/conditions
+
+        Be specific, safe, and practical in your recommendations. Answer in Hebrew.
+      `;
+
+      // Process with OpenAI
+      if (!process.env.OPENAI_API_KEY || !openai) {
+        return `על בסיס הפעילות שלך היום (${healthData.steps} צעדים, ${
+          healthData.caloriesBurned
+        } קלוריות שנשרפו), מומלץ:
+        1. להגדיל את צריכת המים ל-${Math.ceil(
+          healthData.activeMinutes / 10
+        )} כוסות נוספות
+        2. לאכול ארוחה עשירה בחלבון לשיקום השרירים
+        3. לצרוך פחמימות איכותיות למילוי מאגרי האנרגיה
+
+        הערה: זוהי המלצה כללית. לייעוץ אישי, יש להוסיף מפתח OpenAI.`;
+      }
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content:
+              "אתה יועץ תזונה מקצועי הנותן המלצות מותאמות אישית על בסיס נתוני פעילות גופנית ופרופיל בריאותי. תן תשובות בעברית, בטוחות ומעשיות. אם יש אלרגיות - לעולם אל תציע מזונות המכילים אלרגנים אלה.",
+          },
+          {
+            role: "user",
+            content: healthPrompt,
+          },
+        ],
+        max_tokens: 500,
+        temperature: 0.7,
+      });
+
+      return (
+        completion.choices[0]?.message?.content ||
+        "לא הצלחתי ליצור המלצות מותאמות אישית."
+      );
+    } catch (error) {
+      console.error("Error in health-based recommendation:", error);
+      throw error;
     }
   }
 }

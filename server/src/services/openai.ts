@@ -290,10 +290,56 @@ Language: ${language}`;
             Math.max(0, Number(parsed.confidence) * 100 || 75)
           ),
           ingredients: Array.isArray(parsed.ingredients)
-            ? parsed.ingredients
+            ? parsed.ingredients.map((ing: any) => {
+                if (typeof ing === "string") {
+                  return {
+                    name: ing,
+                    calories: 0,
+                    protein_g: 0,
+                    carbs_g: 0,
+                    fats_g: 0,
+                  };
+                }
+                return {
+                  name: ing.name || "Unknown",
+                  calories: Math.max(0, Number(ing.calories) || 0),
+                  protein_g: Math.max(
+                    0,
+                    Number(ing.protein_g) || Number(ing.protein) || 0
+                  ),
+                  carbs_g: Math.max(
+                    0,
+                    Number(ing.carbs_g) || Number(ing.carbs) || 0
+                  ),
+                  fats_g: Math.max(
+                    0,
+                    Number(ing.fats_g) ||
+                      Number(ing.fat) ||
+                      Number(ing.fats) ||
+                      0
+                  ),
+                  fiber_g: ing.fiber_g
+                    ? Math.max(0, Number(ing.fiber_g))
+                    : undefined,
+                  sugar_g: ing.sugar_g
+                    ? Math.max(0, Number(ing.sugar_g))
+                    : undefined,
+                  sodium_mg: ing.sodium_mg
+                    ? Math.max(0, Number(ing.sodium_mg))
+                    : undefined,
+                };
+              })
             : typeof parsed.ingredients === "string"
-            ? [parsed.ingredients]
-            : parsed.ingredients_list || parsed.ingredient_list || [],
+            ? [
+                {
+                  name: parsed.ingredients,
+                  calories: 0,
+                  protein_g: 0,
+                  carbs_g: 0,
+                  fats_g: 0,
+                },
+              ]
+            : [],
           servingSize: parsed.servingSize || "1 serving",
           cookingMethod: parsed.cookingMethod || "Unknown",
           healthNotes: parsed.healthNotes || "",
@@ -463,10 +509,56 @@ Language for response: ${language}`;
             )
           ),
           ingredients: Array.isArray(parsed.ingredients)
-            ? parsed.ingredients
+            ? parsed.ingredients.map((ing: any) => {
+                if (typeof ing === "string") {
+                  return {
+                    name: ing,
+                    calories: 0,
+                    protein_g: 0,
+                    carbs_g: 0,
+                    fats_g: 0,
+                  };
+                }
+                return {
+                  name: ing.name || "Unknown",
+                  calories: Math.max(0, Number(ing.calories) || 0),
+                  protein_g: Math.max(
+                    0,
+                    Number(ing.protein_g) || Number(ing.protein) || 0
+                  ),
+                  carbs_g: Math.max(
+                    0,
+                    Number(ing.carbs_g) || Number(ing.carbs) || 0
+                  ),
+                  fats_g: Math.max(
+                    0,
+                    Number(ing.fats_g) ||
+                      Number(ing.fat) ||
+                      Number(ing.fats) ||
+                      0
+                  ),
+                  fiber_g: ing.fiber_g
+                    ? Math.max(0, Number(ing.fiber_g))
+                    : undefined,
+                  sugar_g: ing.sugar_g
+                    ? Math.max(0, Number(ing.sugar_g))
+                    : undefined,
+                  sodium_mg: ing.sodium_mg
+                    ? Math.max(0, Number(ing.sodium_mg))
+                    : undefined,
+                };
+              })
             : typeof parsed.ingredients === "string"
-            ? [parsed.ingredients]
-            : parsed.ingredients_list || parsed.ingredient_list || [],
+            ? [
+                {
+                  name: parsed.ingredients,
+                  calories: 0,
+                  protein_g: 0,
+                  carbs_g: 0,
+                  fats_g: 0,
+                },
+              ]
+            : [],
           servingSize: parsed.servingSize || originalAnalysis.servingSize,
           cookingMethod: parsed.cookingMethod || originalAnalysis.cookingMethod,
           healthNotes: parsed.healthNotes || originalAnalysis.healthNotes,
@@ -988,18 +1080,21 @@ Language for response: ${language}`;
         "Generated as a healthy alternative that meets your nutritional needs",
     };
   }
-}
 
-export async function generateDailyMenu(
-  userPreferences: any,
-  previousMeals: any[] = []
-) {
-  // Create variation context from previous meals
-  const recentMeals = previousMeals.slice(-7); // Last 7 days
-  const usedIngredients = recentMeals.flatMap((meal) => meal.ingredients || []);
-  const usedCuisines = recentMeals.map((meal) => meal.cuisine).filter(Boolean);
+  private static async generateDailyMenu(
+    userPreferences: any,
+    previousMeals: any[] = []
+  ) {
+    // Create variation context from previous meals
+    const recentMeals = previousMeals.slice(-7); // Last 7 days
+    const usedIngredients = recentMeals.flatMap(
+      (meal) => meal.ingredients || []
+    );
+    const usedCuisines = recentMeals
+      .map((meal) => meal.cuisine)
+      .filter(Boolean);
 
-  const prompt = `Generate a diverse daily menu for a user with the following preferences:
+    const prompt = `Generate a diverse daily menu for a user with the following preferences:
 ${JSON.stringify(userPreferences)}
 
 IMPORTANT VARIATION REQUIREMENTS:
@@ -1012,23 +1107,24 @@ IMPORTANT VARIATION REQUIREMENTS:
 
 Please provide breakfast, lunch, and dinner with detailed ingredients and nutritional information.`;
 
-  const response = await openai?.chat.completions.create({
-    model: "gpt-3.5-turbo",
-    messages: [{ role: "user", content: prompt }],
-    temperature: 0.9, // Increase creativity
-  });
+    const response = await openai?.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.9, // Increase creativity
+    });
 
-  if (!response) {
-    console.error("OpenAI API error: No response received.");
-    return "Fallback menu: Salad for lunch, Pasta for dinner";
+    if (!response) {
+      console.error("OpenAI API error: No response received.");
+      return "Fallback menu: Salad for lunch, Pasta for dinner";
+    }
+
+    const content = response.choices[0]?.message?.content;
+
+    if (!content) {
+      console.error("OpenAI API error: Empty response content.");
+      return "Fallback menu: Salad for lunch, Pasta for dinner";
+    }
+
+    return content;
   }
-
-  const content = response.choices[0]?.message?.content;
-
-  if (!content) {
-    console.error("OpenAI API error: Empty response content.");
-    return "Fallback menu: Salad for lunch, Pasta for dinner";
-  }
-
-  return content;
 }

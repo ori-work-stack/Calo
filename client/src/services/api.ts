@@ -420,7 +420,8 @@ export const authAPI = {
 
 export const nutritionAPI = {
   analyzeMeal: async (
-    imageBase64: string
+    imageBase64: string,
+    updateText: string | undefined
   ): Promise<{ success: boolean; data?: MealAnalysisData; error?: string }> => {
     try {
       console.log("🔍 Making analyze meal API request...");

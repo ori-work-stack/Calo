@@ -31,6 +31,7 @@ import { fetchMeals } from "../../src/store/mealSlice";
 import { Meal } from "../../src/types";
 import { useTranslation } from "react-i18next";
 import { useLanguage } from "@/src/i18n/context/LanguageContext";
+import { GlobalStyles, Spacing, Typography } from "@/src/styles/globalStyles";
 
 interface UserStats {
   totalMeals: number;
@@ -722,6 +723,29 @@ const HomeScreen = React.memo(() => {
 export default HomeScreen;
 
 const styles = StyleSheet.create({
+  ...GlobalStyles,
+  titleContainer: {
+    ...GlobalStyles.row,
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  stepContainer: {
+    ...GlobalStyles.card,
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  reactLogo: {
+    height: 178,
+    width: 290,
+    bottom: 0,
+    left: 0,
+    position: "absolute",
+  },
+  welcomeText: {
+    ...Typography.h2,
+    textAlign: "center",
+    marginBottom: Spacing.lg,
+  },
   container: {
     flex: 1,
     backgroundColor: "#f8f9fa",
@@ -741,12 +765,6 @@ const styles = StyleSheet.create({
   },
   headerText: {
     flex: 1,
-  },
-  welcomeText: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#fff",
-    marginBottom: 4,
   },
   dateText: {
     fontSize: 14,

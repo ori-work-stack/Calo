@@ -2,23 +2,31 @@ import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
   TextInput,
+  StyleSheet,
   Alert,
-  ActivityIndicator,
+  Platform,
   Modal,
+  ActivityIndicator,
 } from "react-native";
-import { useDispatch, useSelector } from "react-redux";
+import { Ionicons } from "@expo/vector-icons";
+import { Picker } from "@react-native-picker/picker";
 import { router, useLocalSearchParams } from "expo-router";
+import { useColorScheme } from "@/hooks/useColorScheme";
+import { Colors } from "@/constants/Colors";
+import { useLocalizedText } from "@/components/LocalizedText";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getQuestionnaire, submitQuestionnaire } from "@/src/services/api";
+import { useLanguage } from "@/src/i18n/context/LanguageContext";
+import { useDispatch, useSelector } from "react-redux";
 import { RootState, AppDispatch } from "@/src/store";
 import {
   saveQuestionnaire,
   fetchQuestionnaire,
   clearError,
 } from "@/src/store/questionnaireSlice";
-import { Ionicons } from "@expo/vector-icons";
 import DynamicListInput from "@/components/DynamicListInputs";
 
 interface QuestionnaireData {
@@ -216,6 +224,11 @@ const UPLOAD_FREQUENCIES = [
 ];
 
 export default function QuestionnaireScreen() {
+  const colorScheme = useColorScheme();
+  const t = useLocalizedText();
+  const queryClient = useQueryClient();
+  const { currentLanguage, changeLanguage } = useLanguage();
+  const [showLanguagePicker, setShowLanguagePicker] = useState(false);
   const dispatch = useDispatch<AppDispatch>();
   const { user } = useSelector((state: RootState) => state.auth);
   const { questionnaire, isSaving, isLoading, error } = useSelector(
@@ -1722,6 +1735,14 @@ export default function QuestionnaireScreen() {
     }
   };
 
+  const handleNext = () => {
+    if (currentStep < totalSteps) {
+      setCurrentStep(currentStep + 1);
+    } else {
+      handleSubmit();
+    }
+  };
+
   // Show loading while fetching data in edit mode
   if (isEditMode && isLoading && !dataLoaded) {
     return (
@@ -1733,15 +1754,31 @@ export default function QuestionnaireScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-          <Ionicons name="arrow-back" size={24} color="#007AFF" />
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: Colors[colorScheme ?? "light"].background },
+      ]}
+    >
+      <View
+        style={[
+          styles.header,
+          { backgroundColor: Colors[colorScheme ?? "light"].tint },
+        ]}
+      >
+        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>
-          {isEditMode ? "עריכת נתונים אישיים" : "בניית תוכנית אישית"}
-        </Text>
-        <View style={styles.placeholder} />
+        <Text style={styles.headerTitle}>{t("questionnaire.title")}</Text>
+        <TouchableOpacity
+          onPress={() => setShowLanguagePicker(true)}
+          style={styles.languageButton}
+        >
+          <Ionicons name="language" size={24} color="white" />
+          <Text style={styles.languageText}>
+            {currentLanguage === "he" ? "עב" : "EN"}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {renderProgress()}
@@ -1757,54 +1794,122 @@ export default function QuestionnaireScreen() {
         </View>
       </ScrollView>
 
-      <View style={styles.navigation}>
-        {currentStep < totalSteps ? (
-          <TouchableOpacity
-            style={[
-              styles.nextButton,
-              !canProceed() && styles.nextButtonDisabled,
-            ]}
-            onPress={() => setCurrentStep(currentStep + 1)}
-            disabled={!canProceed()}
-          >
-            <Text style={styles.nextButtonText}>המשך</Text>
-            <Ionicons name="arrow-forward" size={20} color="white" />
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={[styles.finishButton, isSaving && styles.nextButtonDisabled]}
-            onPress={handleSubmit}
-            disabled={isSaving}
-          >
-            {isSaving ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <>
-                <Text style={styles.finishButtonText}>
-                  {isEditMode ? "שמור שינויים" : "צור תוכנית אישית"}
-                </Text>
-                <Ionicons name="checkmark" size={20} color="white" />
-              </>
-            )}
-          </TouchableOpacity>
-        )}
+      <View style={styles.navigationButtons}>
+        <TouchableOpacity
+          style={[styles.navButton, styles.backNavButton]}
+          onPress={handleBack}
+          disabled={isSaving}
+        >
+          <Text style={styles.backNavButtonText}>חזור</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.navButton,
+            styles.nextNavButton,
+            (!canProceed() || isSaving) && styles.navButtonDisabled,
+          ]}
+          onPress={handleNext}
+          disabled={!canProceed() || isSaving}
+        >
+          {isSaving ? (
+            <ActivityIndicator color="white" size="small" />
+          ) : (
+            <Text style={styles.nextNavButtonText}>
+              {currentStep === totalSteps ? "שמור" : "המשך"}
+            </Text>
+          )}
+        </TouchableOpacity>
       </View>
 
-      {/* Tip Modal */}
+      {/* Language Picker Modal */}
       <Modal
-        visible={!!showTip}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowTip("")}
+        visible={showLanguagePicker}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowLanguagePicker(false)}
       >
-        <View style={styles.tipModalOverlay}>
-          <View style={styles.tipModalContent}>
-            <Text style={styles.tipText}>{showTip}</Text>
+        <View style={styles.modalOverlay}>
+          <View
+            style={[
+              styles.modalContent,
+              { backgroundColor: Colors[colorScheme ?? "light"].background },
+            ]}
+          >
+            <View style={styles.modalHeader}>
+              <Text
+                style={[
+                  styles.modalTitle,
+                  { color: Colors[colorScheme ?? "light"].text },
+                ]}
+              >
+                {t("settings.language")}
+              </Text>
+              <TouchableOpacity onPress={() => setShowLanguagePicker(false)}>
+                <Ionicons
+                  name="close"
+                  size={24}
+                  color={Colors[colorScheme ?? "light"].text}
+                />
+              </TouchableOpacity>
+            </View>
+
             <TouchableOpacity
-              style={styles.tipCloseButton}
-              onPress={() => setShowTip("")}
+              style={[
+                styles.languageOption,
+                currentLanguage === "he" && {
+                  backgroundColor: Colors[colorScheme ?? "light"].tint + "20",
+                },
+              ]}
+              onPress={() => {
+                changeLanguage("he");
+                setShowLanguagePicker(false);
+              }}
             >
-              <Text style={styles.tipCloseText}>הבנתי</Text>
+              <Text
+                style={[
+                  styles.languageOptionText,
+                  { color: Colors[colorScheme ?? "light"].text },
+                ]}
+              >
+                עברית
+              </Text>
+              {currentLanguage === "he" && (
+                <Ionicons
+                  name="checkmark"
+                  size={20}
+                  color={Colors[colorScheme ?? "light"].tint}
+                />
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.languageOption,
+                currentLanguage === "en" && {
+                  backgroundColor: Colors[colorScheme ?? "light"].tint + "20",
+                },
+              ]}
+              onPress={() => {
+                changeLanguage("en");
+                setShowLanguagePicker(false);
+              }}
+            >
+              <Text
+                style={[
+                  styles.languageOptionText,
+                  { color: Colors[colorScheme ?? "light"].text },
+                ]}
+              >
+                English
+              </Text>
+              {currentLanguage === "en" && (
+                <Ionicons
+                  name="checkmark"
+                  size={20}
+                  color={Colors[colorScheme ?? "light"].tint}
+                />
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -1816,196 +1921,139 @@ export default function QuestionnaireScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8f9fa",
-  },
-  loadingContainer: {
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: "#666",
-  },
-  containerRTL: {
-    direction: "rtl",
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    paddingTop: Platform.OS === "ios" ? 50 : 20,
+    paddingBottom: 15,
     paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 20,
-    backgroundColor: "white",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e9ecef",
   },
   backButton: {
-    padding: 8,
+    padding: 5,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#333",
+    color: "white",
   },
-  placeholder: {
-    width: 40,
+  languageButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 5,
+  },
+  languageText: {
+    color: "white",
+    fontSize: 12,
+    marginLeft: 4,
+    fontWeight: "bold",
   },
   progressContainer: {
     paddingHorizontal: 20,
     paddingVertical: 15,
-    backgroundColor: "white",
   },
   progressBar: {
-    height: 6,
-    backgroundColor: "#e9ecef",
-    borderRadius: 3,
-    marginBottom: 8,
+    height: 8,
+    backgroundColor: "#e0e0e0",
+    borderRadius: 4,
+    overflow: "hidden",
   },
   progressFill: {
     height: "100%",
     backgroundColor: "#007AFF",
-    borderRadius: 3,
+    borderRadius: 4,
   },
   progressText: {
-    fontSize: 14,
-    color: "#666",
     textAlign: "center",
-  },
-  progress: {
+    marginTop: 8,
     fontSize: 14,
     color: "#666",
-  },
-  progressRTL: {
-    textAlign: "right",
   },
   content: {
     flex: 1,
+    padding: 20,
   },
   stepContainer: {
-    padding: 20,
+    marginBottom: 20,
   },
   stepTitle: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#333",
     marginBottom: 8,
-    textAlign: "center",
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
     color: "#333",
-    marginBottom: 8,
-  },
-  titleRTL: {
     textAlign: "right",
   },
   stepDescription: {
     fontSize: 16,
     color: "#666",
-    textAlign: "center",
-    marginBottom: 30,
+    marginBottom: 20,
+    textAlign: "right",
     lineHeight: 22,
   },
-  questionText: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 24,
-    lineHeight: 24,
-  },
-  questionTextRTL: {
-    textAlign: "right",
-  },
   inputGroup: {
-    marginBottom: 25,
+    marginBottom: 20,
   },
   inputLabel: {
     fontSize: 16,
     fontWeight: "600",
+    marginBottom: 8,
     color: "#333",
-    marginBottom: 10,
+    textAlign: "right",
   },
   textInput: {
     borderWidth: 1,
     borderColor: "#ddd",
-    borderRadius: 12,
-    padding: 15,
+    borderRadius: 8,
+    padding: 12,
     fontSize: 16,
     backgroundColor: "white",
-  },
-  textInputRTL: {
     textAlign: "right",
-  },
-  textArea: {
-    minHeight: 100,
-    textAlignVertical: "top",
-  },
-  optionsContainer: {
-    marginTop: 10,
   },
   optionGroup: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
+    gap: 8,
   },
   optionButton: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 25,
-    borderWidth: 2,
-    borderColor: "#e9ecef",
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+    padding: 12,
     backgroundColor: "white",
-    marginBottom: 8,
-  },
-  optionButtonRTL: {
-    flexDirection: "row-reverse",
   },
   optionButtonSelected: {
-    borderColor: "#007AFF",
     backgroundColor: "#007AFF",
-  },
-  selectedOption: {
     borderColor: "#007AFF",
-    backgroundColor: "#f0f8ff",
   },
   optionText: {
-    fontSize: 14,
-    color: "#333",
-    fontWeight: "500",
-  },
-  optionTextRTL: {
+    fontSize: 16,
     textAlign: "right",
+    color: "#333",
   },
   optionTextSelected: {
     color: "white",
-  },
-  selectedOptionText: {
-    color: "#007AFF",
     fontWeight: "600",
   },
   checkboxGroup: {
-    gap: 15,
+    gap: 8,
   },
   checkboxItem: {
     flexDirection: "row",
     alignItems: "center",
+    padding: 8,
+    backgroundColor: "white",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#ddd",
   },
   checkbox: {
-    width: 24,
-    height: 24,
+    width: 20,
+    height: 20,
     borderWidth: 2,
     borderColor: "#ddd",
-    borderRadius: 6,
-    marginRight: 12,
+    borderRadius: 4,
+    marginLeft: 10,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "white",
   },
   checkboxChecked: {
     backgroundColor: "#007AFF",
@@ -2013,22 +2061,31 @@ const styles = StyleSheet.create({
   },
   checkboxLabel: {
     fontSize: 16,
+    flex: 1,
+    textAlign: "right",
     color: "#333",
   },
   switchRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    padding: 12,
+    backgroundColor: "white",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#ddd",
   },
   switchLabel: {
     fontSize: 16,
     color: "#333",
+    textAlign: "right",
+    flex: 1,
   },
   switch: {
     width: 50,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: "#e9ecef",
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#ddd",
     padding: 2,
     justifyContent: "center",
   },
@@ -2036,121 +2093,107 @@ const styles = StyleSheet.create({
     backgroundColor: "#007AFF",
   },
   switchThumb: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: "white",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    alignSelf: "flex-start",
   },
   switchThumbActive: {
     alignSelf: "flex-end",
   },
   additionalInfo: {
-    margin: 20,
+    marginTop: 20,
     padding: 15,
-    backgroundColor: "#e3f2fd",
-    borderRadius: 12,
+    backgroundColor: "#f8f9fa",
+    borderRadius: 8,
     borderLeftWidth: 4,
     borderLeftColor: "#007AFF",
   },
   additionalInfoText: {
     fontSize: 14,
-    color: "#1565c0",
+    color: "#666",
+    textAlign: "right",
     lineHeight: 20,
   },
-  errorText: {
-    color: "#FF3B30",
-    fontSize: 14,
-    textAlign: "center",
-    marginBottom: 10,
-  },
-  navigation: {
+  navigationButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     padding: 20,
+    paddingBottom: Platform.OS === "ios" ? 35 : 20,
     backgroundColor: "white",
     borderTopWidth: 1,
-    borderTopColor: "#e9ecef",
-  },
-  navigationRTL: {
-    flexDirection: "row-reverse",
+    borderTopColor: "#eee",
   },
   navButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
+    flex: 1,
+    paddingVertical: 15,
     borderRadius: 8,
-  },
-  navButtonText: {
-    fontSize: 16,
-    color: "#007AFF",
-    marginLeft: 4,
-  },
-  nextButton: {
-    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    marginHorizontal: 5,
+  },
+  backNavButton: {
+    backgroundColor: "#f8f9fa",
+    borderWidth: 1,
+    borderColor: "#ddd",
+  },
+  nextNavButton: {
     backgroundColor: "#007AFF",
-    paddingVertical: 16,
-    borderRadius: 12,
-    gap: 8,
   },
-  nextButtonDisabled: {
-    backgroundColor: "#ccc",
+  navButtonDisabled: {
+    opacity: 0.5,
   },
-  nextButtonText: {
+  backNavButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+  },
+  nextNavButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
     color: "white",
-    fontSize: 18,
-    fontWeight: "bold",
   },
-  finishButton: {
-    flexDirection: "row",
-    alignItems: "center",
+  loadingContainer: {
+    flex: 1,
     justifyContent: "center",
-    backgroundColor: "#28a745",
-    paddingVertical: 16,
-    borderRadius: 12,
-    gap: 8,
+    alignItems: "center",
   },
-  finishButtonText: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "bold",
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: "#666",
   },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  tipModalOverlay: {
+  modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
+  },
+  modalContent: {
+    width: "80%",
+    borderRadius: 10,
     padding: 20,
   },
-  tipModalContent: {
-    backgroundColor: "white",
-    borderRadius: 12,
-    padding: 20,
-    maxWidth: 300,
-  },
-  tipText: {
-    fontSize: 16,
-    color: "#333",
-    textAlign: "center",
-    marginBottom: 20,
-    lineHeight: 22,
-  },
-  tipCloseButton: {
-    backgroundColor: "#007AFF",
-    paddingVertical: 12,
-    borderRadius: 8,
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
+    marginBottom: 20,
   },
-  tipCloseText: {
-    color: "white",
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  languageOption: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 15,
+    borderRadius: 8,
+    marginVertical: 5,
+  },
+  languageOptionText: {
     fontSize: 16,
-    fontWeight: "600",
   },
 });
