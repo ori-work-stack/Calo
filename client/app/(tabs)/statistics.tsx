@@ -132,6 +132,7 @@ export default function StatisticsScreen() {
     isLoading,
     error,
     refetch,
+    data,
   } = useStatistics(selectedPeriod);
 
   // Safely extract statistics data with fallbacks
@@ -533,154 +534,132 @@ export default function StatisticsScreen() {
       return [];
     }
 
-    return statisticsData.dailyBreakdown.map((day) => ({
-      date: day.date,
-      calories: day.calories || 0,
-      protein: day.protein_g || 0,
-      carbs: day.carbs_g || 0,
-      fats: day.fats_g || 0,
-      water: day.liquids_ml || 0,
-      weight: day.weight_kg,
-      mood: (day.mood as "happy" | "neutral" | "sad") || "neutral",
-      energy: (day.energy as "high" | "medium" | "low") || "medium",
-      satiety:
-        (day.satiety as "very_full" | "satisfied" | "hungry") || "satisfied",
-      mealQuality: day.meal_quality || 3,
+    return statisticsData.dailyBreakdown.map(
+      (day: {
+        date: any;
+        calories: any;
+        protein_g: any;
+        carbs_g: any;
+        fats_g: any;
+        liquids_ml: any;
+        weight_kg: any;
+        mood: string;
+        energy: string;
+        satiety: string;
+        meal_quality: any;
+      }) => ({
+        date: day.date,
+        calories: day.calories || 0,
+        protein: day.protein_g || 0,
+        carbs: day.carbs_g || 0,
+        fats: day.fats_g || 0,
+        water: day.liquids_ml || 0,
+        weight: day.weight_kg,
+        mood: (day.mood as "happy" | "neutral" | "sad") || "neutral",
+        energy: (day.energy as "high" | "medium" | "low") || "medium",
+        satiety:
+          (day.satiety as "very_full" | "satisfied" | "hungry") || "satisfied",
+        mealQuality: day.meal_quality || 3,
+      })
+    );
+  };
+
+  // Generate achievements from real API data
+  const generateAchievements = (): Achievement[] => {
+    if (!statisticsData?.achievements) return [];
+
+    return statisticsData.achievements.map((achievement: any) => ({
+      id: achievement.id,
+      title: achievement.title,
+      description: achievement.description,
+      icon: getAchievementIcon(achievement.category),
+      color: getAchievementColor(achievement.category),
+      progress: achievement.progress,
+      maxProgress: achievement.max_progress,
+      unlocked: achievement.unlocked,
+      category: achievement.category,
     }));
   };
 
-  // Generate achievements from real data
-  const generateAchievements = (): Achievement[] => {
-    const currentStreak = statisticsData?.currentStreak || 0;
-    const proteinGoalDays = statisticsData?.proteinGoalDays || 0;
-    const hydrationGoalDays = statisticsData?.hydrationGoalDays || 0;
-    const balancedMealDays = statisticsData?.balancedMealDays || 0;
-    const fiberGoalDays = statisticsData?.fiberGoalDays || 0;
+  // Generate badges from real API data
+  const generateBadges = (): Badge[] => {
+    if (!statisticsData?.badges) return [];
 
-    return [
-      {
-        id: "streak_7",
-        title: language === "he" ? "רצף של 7 ימים" : "7-Day Streak",
-        description:
-          language === "he"
-            ? "עמד ביעדים 7 ימים רצופים"
-            : "Met goals for 7 consecutive days",
-        icon: <Flame size={24} color="#E74C3C" />,
-        color: "#E74C3C",
-        progress: Math.min(currentStreak, 7),
-        maxProgress: 7,
-        unlocked: currentStreak >= 7,
-        category: "streak",
-      },
-      {
-        id: "streak_30",
-        title: language === "he" ? "רצף של 30 ימים" : "30-Day Streak",
-        description:
-          language === "he"
-            ? "עמד ביעדים 30 ימים רצופים"
-            : "Met goals for 30 consecutive days",
-        icon: <Crown size={24} color="#F39C12" />,
-        color: "#F39C12",
-        progress: Math.min(currentStreak, 30),
-        maxProgress: 30,
-        unlocked: currentStreak >= 30,
-        category: "streak",
-      },
-      {
-        id: "protein_master",
-        title: language === "he" ? "מאסטר חלבון" : "Protein Master",
-        description:
-          language === "he"
-            ? "עמד ביעד החלבון 20 ימים"
-            : "Met protein goal for 20 days",
-        icon: <Zap size={24} color="#9B59B6" />,
-        color: "#9B59B6",
-        progress: Math.min(proteinGoalDays, 20),
-        maxProgress: 20,
-        unlocked: proteinGoalDays >= 20,
-        category: "goal",
-      },
-      {
-        id: "hydration_hero",
-        title: language === "he" ? "גיבור הידרציה" : "Hydration Hero",
-        description:
-          language === "he"
-            ? "שתה 2.5 ליטר מים 14 ימים רצופים"
-            : "Drank 2.5L water for 14 consecutive days",
-        icon: <Droplets size={24} color="#3498DB" />,
-        color: "#3498DB",
-        progress: Math.min(hydrationGoalDays, 14),
-        maxProgress: 14,
-        unlocked: hydrationGoalDays >= 14,
-        category: "goal",
-      },
-      {
-        id: "balanced_eater",
-        title: language === "he" ? "אוכל מאוזן" : "Balanced Eater",
-        description:
-          language === "he"
-            ? "איזן מקרו נוטריינטים 10 ימים"
-            : "Balanced macronutrients for 10 days",
-        icon: <Scale size={24} color="#16A085" />,
-        color: "#16A085",
-        progress: Math.min(balancedMealDays, 10),
-        maxProgress: 10,
-        unlocked: balancedMealDays >= 10,
-        category: "improvement",
-      },
-      {
-        id: "fiber_friend",
-        title: language === "he" ? "חבר הסיבים" : "Fiber Friend",
-        description:
-          language === "he"
-            ? "צרך 25 גרם סיבים 7 ימים"
-            : "Consumed 25g fiber for 7 days",
-        icon: <Leaf size={24} color="#27AE60" />,
-        color: "#27AE60",
-        progress: Math.min(fiberGoalDays, 7),
-        maxProgress: 7,
-        unlocked: fiberGoalDays >= 7,
-        category: "improvement",
-      },
-    ];
+    return statisticsData.badges.map((badge: any) => ({
+      id: badge.id,
+      name: badge.name,
+      icon: getBadgeIcon(badge.name),
+      color: getBadgeColor(badge.rarity),
+      earnedDate: new Date(badge.earned_date).toLocaleDateString(),
+      rarity: badge.rarity.toLowerCase(),
+    }));
   };
 
-  // Generate badges
-  const generateBadges = (): Badge[] => {
-    return [
-      {
-        id: "nutrition_ninja",
-        name: language === "he" ? "נינג׳ה תזונה" : "Nutrition Ninja",
-        icon: <Star size={20} color="#F39C12" />,
-        color: "#F39C12",
-        earnedDate: "2024-01-15",
-        rarity: "epic",
-      },
-      {
-        id: "water_warrior",
-        name: language === "he" ? "לוחם המים" : "Water Warrior",
-        icon: <Droplets size={20} color="#3498DB" />,
-        color: "#3498DB",
-        earnedDate: "2024-01-10",
-        rarity: "rare",
-      },
-      {
-        id: "protein_pro",
-        name: language === "he" ? "מקצוען חלבון" : "Protein Pro",
-        icon: <Zap size={20} color="#9B59B6" />,
-        color: "#9B59B6",
-        earnedDate: "2024-01-08",
-        rarity: "common",
-      },
-      {
-        id: "streak_star",
-        name: language === "he" ? "כוכב הרצף" : "Streak Star",
-        icon: <Flame size={20} color="#E74C3C" />,
-        color: "#E74C3C",
-        earnedDate: "2024-01-12",
-        rarity: "legendary",
-      },
-    ];
+  // Helper functions for icons and colors
+  const getAchievementIcon = (category: string) => {
+    switch (category) {
+      case "STREAK":
+        return <Flame size={24} color="#E74C3C" />;
+      case "GOAL":
+        return <Target size={24} color="#16A085" />;
+      case "IMPROVEMENT":
+        return <TrendingUp size={24} color="#9B59B6" />;
+      case "CONSISTENCY":
+        return <Star size={24} color="#F39C12" />;
+      default:
+        return <Award size={24} color="#95A5A6" />;
+    }
+  };
+
+  const getAchievementColor = (category: string) => {
+    switch (category) {
+      case "STREAK":
+        return "#E74C3C";
+      case "GOAL":
+        return "#16A085";
+      case "IMPROVEMENT":
+        return "#9B59B6";
+      case "CONSISTENCY":
+        return "#F39C12";
+      default:
+        return "#95A5A6";
+    }
+  };
+
+  const getBadgeIcon = (name: string) => {
+    if (
+      name.toLowerCase().includes("water") ||
+      name.toLowerCase().includes("מים")
+    ) {
+      return <Droplets size={20} color="#3498DB" />;
+    } else if (
+      name.toLowerCase().includes("protein") ||
+      name.toLowerCase().includes("חלבון")
+    ) {
+      return <Zap size={20} color="#9B59B6" />;
+    } else if (
+      name.toLowerCase().includes("streak") ||
+      name.toLowerCase().includes("רצף")
+    ) {
+      return <Flame size={20} color="#E74C3C" />;
+    } else {
+      return <Star size={20} color="#F39C12" />;
+    }
+  };
+
+  const getBadgeColor = (rarity: string) => {
+    switch (rarity?.toLowerCase()) {
+      case "common":
+        return "#95A5A6";
+      case "rare":
+        return "#3498DB";
+      case "epic":
+        return "#9B59B6";
+      case "legendary":
+        return "#F39C12";
+      default:
+        return "#95A5A6";
+    }
   };
 
   const [metrics, setMetrics] = useState<NutritionMetric[]>([]);
@@ -690,11 +669,10 @@ export default function StatisticsScreen() {
 
   // Update metrics when data changes
   useEffect(() => {
-    if (hasData || !isLoading) {
-      setMetrics(generateNutritionMetrics());
-      setWeeklyData(generateWeeklyData());
-    }
-  }, [statisticsData, hasData, isLoading]);
+    // Always generate metrics and weekly data, even with limited data
+    setMetrics(generateNutritionMetrics());
+    setWeeklyData(generateWeeklyData());
+  }, [statisticsData, isLoading]);
 
   // Refresh handler
   const handleRefresh = async () => {
@@ -1096,8 +1074,8 @@ export default function StatisticsScreen() {
           </View>
         )}
 
-        {/* Show content only if we have data or are using fallback */}
-        {(hasData || metrics.length > 0) && (
+        {/* Always show content, use fallback data when needed */}
+        {
           <>
             {/* Gamification Dashboard */}
             <View style={styles.section}>
@@ -1601,7 +1579,7 @@ export default function StatisticsScreen() {
               </View>
             </View>
           </>
-        )}
+        }
 
         {/* Achievements Modal */}
         <Modal

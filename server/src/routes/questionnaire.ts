@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "../lib/database";
 import { authenticateToken, AuthRequest } from "../middleware/auth";
 import { questionnaireSchema } from "../types/questionnaire";
+import { DailyGoalsService } from "../services/dailyGoal";
 
 const router = Router();
 
@@ -512,6 +513,14 @@ router.post("/", authenticateToken, async (req: AuthRequest, res) => {
     }
 
     console.log("✅ Questionnaire saved successfully");
+
+    // Create or update daily goals based on questionnaire
+    try {
+      await DailyGoalsService.createOrUpdateDailyGoals(userId);
+      console.log("✅ Daily goals created/updated successfully");
+    } catch (error) {
+      console.log("⚠️ Daily goals creation failed:", error);
+    }
 
     // Send response immediately
     res.json({

@@ -1,11 +1,195 @@
-import { Router } from "express";
-import { NutritionService } from "../services/nutrition";
+import { Router, Response } from "express";
 import { authenticateToken, AuthRequest } from "../middleware/auth";
-import { mealAnalysisSchema, mealUpdateSchema } from "../types/nutrition";
 import { prisma } from "../lib/database";
 import { z } from "zod";
+import { mealAnalysisSchema, mealUpdateSchema } from "../types/nutrition";
+import { NutritionService } from "../services/nutrition";
 
 const router = Router();
+
+const waterIntakeSchema = z.object({
+  cups: z.number().min(1).max(25),
+  date: z.string().optional(),
+});
+
+// Track water intake
+router.post(
+  "/water-intake",
+  authenticateToken,
+  async (req: AuthRequest, res: Response) => {
+    const userId = req.user?.user_id;
+
+    if (!userId) {
+      return res.status(401).json({ error: "User not authenticated" });
+    }
+
+    try {
+      const { cups, date } = waterIntakeSchema.parse(req.body);
+      const trackingDate = date ? new Date(date) : new Date();
+      const milliliters = cups * 250;
+
+      // Set date to start of day for consistent comparison
+      const startOfDay = new Date(
+        trackingDate.getFullYear(),
+        trackingDate.getMonth(),
+        trackingDate.getDate()
+      );
+      const endOfDay = new Date(
+        trackingDate.getFullYear(),
+        trackingDate.getMonth(),
+        trackingDate.getDate() + 1
+      );
+
+      // Check if water intake record exists for today
+      const existingRecord = await prisma.waterIntake.findFirst({
+        where: {
+          user_id: userId,
+          date: {
+            gte: startOfDay,
+            lt: endOfDay,
+          },
+        },
+      });
+
+      let waterRecord;
+      let xpAwarded = 0;
+      let badgeAwarded = null;
+
+      if (existingRecord) {
+        waterRecord = await prisma.waterIntake.update({
+          where: { id: existingRecord.id },
+          data: {
+            cups_consumed: cups,
+            milliliters_consumed: milliliters,
+            updated_at: new Date(),
+          },
+        });
+      } else {
+        waterRecord = await prisma.waterIntake.create({
+          data: {
+            user_id: userId,
+            date: startOfDay,
+            cups_consumed: cups,
+            milliliters_consumed: milliliters,
+          },
+        });
+      }
+
+      // Award XP and badge if 16+ cups (only if not already awarded today)
+      if (cups >= 16) {
+        // Check if user already has scuba diver badge for today
+        const existingBadge = await prisma.userBadge.findFirst({
+          where: {
+            user_id: userId,
+            badge_id: "scuba_diver",
+            earned_date: {
+              gte: startOfDay,
+              lt: endOfDay,
+            },
+          },
+        });
+
+        if (!existingBadge) {
+          // Create scuba diver badge if it doesn't exist
+          await prisma.badge.upsert({
+            where: { id: "scuba_diver" },
+            update: {},
+            create: {
+              id: "scuba_diver",
+              name: "Scuba Diver",
+              description: "Drank 16+ cups of water in a day",
+              icon: "🤿",
+              rarity: "RARE",
+              points_awarded: 100,
+              category: "hydration",
+            },
+          });
+
+          // Award badge to user
+          await prisma.userBadge.create({
+            data: {
+              user_id: userId,
+              badge_id: "scuba_diver",
+              earned_date: new Date(),
+            },
+          });
+
+          // Update user XP and total points
+          await prisma.user.update({
+            where: { user_id: userId },
+            data: {
+              current_xp: {
+                increment: 100,
+              },
+              total_points: {
+                increment: 100,
+              },
+            },
+          });
+
+          xpAwarded = 100;
+          badgeAwarded = "scuba_diver";
+        }
+      }
+
+      res.json({
+        success: true,
+        data: waterRecord,
+        xpAwarded,
+        badgeAwarded,
+      });
+    } catch (error) {
+      console.error("Error tracking water intake:", error);
+      res.status(500).json({ error: "Failed to track water intake" });
+    }
+  }
+);
+
+// Get water intake for a specific date
+router.get(
+  "/water-intake/:date",
+  authenticateToken,
+  async (req: AuthRequest, res: Response) => {
+    const userId = req.user?.user_id;
+    const { date } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({ error: "User not authenticated" });
+    }
+
+    try {
+      const trackingDate = new Date(date);
+      const startOfDay = new Date(
+        trackingDate.getFullYear(),
+        trackingDate.getMonth(),
+        trackingDate.getDate()
+      );
+      const endOfDay = new Date(
+        trackingDate.getFullYear(),
+        trackingDate.getMonth(),
+        trackingDate.getDate() + 1
+      );
+
+      const waterRecord = await prisma.waterIntake.findFirst({
+        where: {
+          user_id: userId,
+          date: {
+            gte: startOfDay,
+            lt: endOfDay,
+          },
+        },
+      });
+
+      res.json({
+        success: true,
+        data: waterRecord || { cups_consumed: 0, milliliters_consumed: 0 },
+      });
+    } catch (error) {
+      console.error("Error fetching water intake:", error);
+      res.status(500).json({ error: "Failed to fetch water intake" });
+    }
+  }
+);
 
 // Apply auth middleware to all routes
 router.use(authenticateToken);

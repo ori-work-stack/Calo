@@ -39,6 +39,29 @@ export class StatisticsService {
 
       const dailyCalorieGoal = nutritionPlan?.goal_calories || 2000;
 
+      // Calculate XP and level from meal quality
+      const totalXP = this.calculateTotalXP(meals);
+      const level = Math.floor(totalXP / 1000) + 1;
+      const currentXP = totalXP % 1000;
+
+      // Calculate goal achievement days
+      const goalAchievementDays = this.calculateGoalAchievementDays(
+        meals,
+        dailyCalorieGoal
+      );
+
+      // Get previous period data for comparison
+      const previousPeriodStart = new Date(startDate);
+      previousPeriodStart.setDate(previousPeriodStart.getDate() - daysBack);
+      const previousMeals = await prisma.meal.findMany({
+        where: {
+          user_id: userId,
+          created_at: { gte: previousPeriodStart, lt: startDate },
+        },
+      });
+
+      const previousStats = this.calculatePreviousStats(previousMeals);
+
       // Calculate statistics
       const stats = this.calculateStatistics(meals, dailyCalorieGoal);
 
@@ -60,10 +83,22 @@ export class StatisticsService {
         recommendations = this.getDefaultRecommendations();
       }
 
+      // Get user badges and achievements
+      const badgesAndAchievements = await this.getUserBadgesAndAchievements(
+        userId
+      );
+
       const result = {
         ...stats,
         insights,
         recommendations,
+        totalPoints: totalXP,
+        level,
+        currentXP,
+        ...goalAchievementDays,
+        ...previousStats,
+        badges: badgesAndAchievements.badges,
+        achievements: badgesAndAchievements.achievements,
       };
 
       console.log(`📊 Statistics generated successfully for user: ${userId}`);
@@ -262,6 +297,39 @@ export class StatisticsService {
       expectedMealsPerWeek - actualMealsThisWeek
     );
 
+    // Calculate streak days
+    const { currentStreak, bestStreak } = this.calculateStreaks(
+      dailyTotals,
+      dailyCalorieGoal
+    );
+
+    // Calculate mood, energy, and meal quality averages
+    const moodStats = this.calculateMoodStats(meals);
+    const energyStats = this.calculateEnergyStats(meals);
+    const mealQualityStats = this.calculateMealQualityStats(meals);
+
+    // Calculate daily breakdown for frontend
+    const dailyBreakdown = Array.from(dailyData.entries()).map(
+      ([date, dayMeals]) => ({
+        date,
+        calories: dayMeals.reduce((sum, meal) => sum + (meal.calories || 0), 0),
+        protein_g: dayMeals.reduce(
+          (sum, meal) => sum + (meal.protein_g || 0),
+          0
+        ),
+        carbs_g: dayMeals.reduce((sum, meal) => sum + (meal.carbs_g || 0), 0),
+        fats_g: dayMeals.reduce((sum, meal) => sum + (meal.fats_g || 0), 0),
+        liquids_ml: dayMeals.reduce(
+          (sum, meal) => sum + (meal.liquids_ml || 0),
+          0
+        ),
+        mood: this.getMostFrequentMood(dayMeals),
+        energy: this.getMostFrequentEnergy(dayMeals),
+        satiety: this.getMostFrequentSatiety(dayMeals),
+        meal_quality: this.getAverageMealQuality(dayMeals),
+      })
+    );
+
     return {
       average_calories_daily,
       calorie_goal_achievement_percent,
@@ -283,6 +351,305 @@ export class StatisticsService {
       missed_meals_alert,
       nutrition_score,
       weekly_trends,
+      currentStreak,
+      bestStreak,
+      dailyBreakdown,
+      moodStats,
+      energyStats,
+      mealQualityStats,
+    };
+  }
+
+  private static calculateStreaks(
+    dailyTotals: any[],
+    dailyCalorieGoal: number
+  ): { currentStreak: number; bestStreak: number } {
+    let currentStreak = 0;
+    let bestStreak = 0;
+    let tempStreak = 0;
+
+    // Sort by date descending for current streak
+    const sortedDays = [...dailyTotals].reverse();
+
+    for (const day of sortedDays) {
+      const goalMet =
+        day.calories >= dailyCalorieGoal * 0.8 &&
+        day.calories <= dailyCalorieGoal * 1.2;
+
+      if (goalMet) {
+        tempStreak++;
+        if (currentStreak === 0) currentStreak = tempStreak;
+      } else {
+        if (tempStreak > bestStreak) bestStreak = tempStreak;
+        tempStreak = 0;
+        if (currentStreak === 0) break;
+      }
+    }
+
+    if (tempStreak > bestStreak) bestStreak = tempStreak;
+    if (currentStreak === 0) currentStreak = tempStreak;
+
+    return { currentStreak, bestStreak };
+  }
+
+  private static calculateMoodStats(meals: any[]): {
+    happy: number;
+    neutral: number;
+    sad: number;
+  } {
+    const moodCounts = { happy: 0, neutral: 0, sad: 0 };
+
+    meals.forEach((meal) => {
+      if (meal.mood) {
+        moodCounts[meal.mood as keyof typeof moodCounts]++;
+      }
+    });
+
+    return moodCounts;
+  }
+
+  private static calculateEnergyStats(meals: any[]): {
+    high: number;
+    medium: number;
+    low: number;
+  } {
+    const energyCounts = { high: 0, medium: 0, low: 0 };
+
+    meals.forEach((meal) => {
+      if (meal.energy) {
+        energyCounts[meal.energy as keyof typeof energyCounts]++;
+      }
+    });
+
+    return energyCounts;
+  }
+
+  private static calculateMealQualityStats(meals: any[]): {
+    average: number;
+    distribution: number[];
+  } {
+    const qualityScores = meals
+      .map((meal) => meal.meal_quality || 5)
+      .filter((score) => score > 0);
+    const average =
+      qualityScores.reduce((sum, score) => sum + score, 0) /
+        qualityScores.length || 5;
+
+    const distribution = Array(10).fill(0);
+    qualityScores.forEach((score) => {
+      distribution[score - 1]++;
+    });
+
+    return { average, distribution };
+  }
+
+  private static getMostFrequentMood(dayMeals: any[]): string {
+    const moodCounts = { happy: 0, neutral: 0, sad: 0 };
+    dayMeals.forEach((meal) => {
+      if (meal.mood) moodCounts[meal.mood as keyof typeof moodCounts]++;
+    });
+
+    return Object.entries(moodCounts).sort(([, a], [, b]) => b - a)[0][0];
+  }
+
+  private static getMostFrequentEnergy(dayMeals: any[]): string {
+    const energyCounts = { high: 0, medium: 0, low: 0 };
+    dayMeals.forEach((meal) => {
+      if (meal.energy) energyCounts[meal.energy as keyof typeof energyCounts]++;
+    });
+
+    return Object.entries(energyCounts).sort(([, a], [, b]) => b - a)[0][0];
+  }
+
+  private static getMostFrequentSatiety(dayMeals: any[]): string {
+    const satietyCounts = { very_full: 0, satisfied: 0, hungry: 0 };
+    dayMeals.forEach((meal) => {
+      if (meal.satiety)
+        satietyCounts[meal.satiety as keyof typeof satietyCounts]++;
+    });
+
+    return Object.entries(satietyCounts).sort(([, a], [, b]) => b - a)[0][0];
+  }
+
+  private static getAverageMealQuality(dayMeals: any[]): number {
+    const qualities = dayMeals.map((meal) => meal.meal_quality || 5);
+    return (
+      qualities.reduce((sum, quality) => sum + quality, 0) / qualities.length
+    );
+  }
+
+  private static calculateTotalXP(meals: any[]): number {
+    return meals.reduce((totalXP, meal) => {
+      const quality = meal.meal_quality || 5;
+      let xp = 0;
+
+      if (quality >= 1 && quality <= 3) {
+        xp = 50;
+      } else if (quality >= 4 && quality <= 6) {
+        xp = 75;
+      } else if (quality >= 7 && quality <= 8) {
+        xp = 100;
+      } else if (quality >= 9 && quality <= 10) {
+        xp = 150;
+      }
+
+      return totalXP + xp;
+    }, 0);
+  }
+
+  private static calculateGoalAchievementDays(
+    meals: any[],
+    dailyCalorieGoal: number
+  ): {
+    proteinGoalDays: number;
+    hydrationGoalDays: number;
+    balancedMealDays: number;
+    fiberGoalDays: number;
+    perfectDays: number;
+    weeklyStreak: number;
+  } {
+    // Group meals by day
+    const dailyData = new Map<string, any[]>();
+    meals.forEach((meal) => {
+      const day = meal.created_at.toISOString().split("T")[0];
+      if (!dailyData.has(day)) {
+        dailyData.set(day, []);
+      }
+      dailyData.get(day)!.push(meal);
+    });
+
+    const days = Array.from(dailyData.values());
+
+    const proteinGoalDays = days.filter((dayMeals) => {
+      const totalProtein = dayMeals.reduce(
+        (sum, meal) => sum + (meal.protein_g || 0),
+        0
+      );
+      return totalProtein >= 120; // Protein goal
+    }).length;
+
+    const hydrationGoalDays = days.filter((dayMeals) => {
+      const totalFluids = dayMeals.reduce(
+        (sum, meal) => sum + (meal.liquids_ml || 0),
+        0
+      );
+      return totalFluids >= 2500; // Hydration goal
+    }).length;
+
+    const balancedMealDays = days.filter((dayMeals) => {
+      const totalCalories = dayMeals.reduce(
+        (sum, meal) => sum + (meal.calories || 0),
+        0
+      );
+      const totalProtein = dayMeals.reduce(
+        (sum, meal) => sum + (meal.protein_g || 0),
+        0
+      );
+      const totalCarbs = dayMeals.reduce(
+        (sum, meal) => sum + (meal.carbs_g || 0),
+        0
+      );
+      const totalFats = dayMeals.reduce(
+        (sum, meal) => sum + (meal.fats_g || 0),
+        0
+      );
+
+      return (
+        totalCalories >= dailyCalorieGoal * 0.8 &&
+        totalCalories <= dailyCalorieGoal * 1.2 &&
+        totalProtein >= 120 * 0.8 &&
+        totalCarbs >= 200 * 0.8 &&
+        totalFats >= 60 * 0.8
+      );
+    }).length;
+
+    const fiberGoalDays = days.filter((dayMeals) => {
+      const totalFiber = dayMeals.reduce(
+        (sum, meal) => sum + (meal.fiber_g || 0),
+        0
+      );
+      return totalFiber >= 25; // Fiber goal
+    }).length;
+
+    const perfectDays = days.filter((dayMeals) => {
+      const avgQuality =
+        dayMeals.reduce((sum, meal) => sum + (meal.meal_quality || 5), 0) /
+        dayMeals.length;
+      return avgQuality >= 9;
+    }).length;
+
+    const weeklyStreak = Math.min(7, proteinGoalDays); // Simplified weekly streak calculation
+
+    return {
+      proteinGoalDays,
+      hydrationGoalDays,
+      balancedMealDays,
+      fiberGoalDays,
+      perfectDays,
+      weeklyStreak,
+    };
+  }
+
+  private static calculatePreviousStats(previousMeals: any[]): {
+    previous_calories_daily?: number;
+    previous_protein_daily?: number;
+    previous_carbs_daily?: number;
+    previous_fats_daily?: number;
+    previous_fiber_daily?: number;
+    previous_sodium_daily?: number;
+    previous_sugar_daily?: number;
+    previous_fluids_daily?: number;
+  } {
+    if (previousMeals.length === 0) return {};
+
+    const dailyData = new Map<string, any[]>();
+    previousMeals.forEach((meal) => {
+      const day = meal.created_at.toISOString().split("T")[0];
+      if (!dailyData.has(day)) {
+        dailyData.set(day, []);
+      }
+      dailyData.get(day)!.push(meal);
+    });
+
+    const days = Array.from(dailyData.values());
+    const totalDays = days.length;
+
+    const dailyTotals = days.map((dayMeals) => ({
+      calories: dayMeals.reduce((sum, meal) => sum + (meal.calories || 0), 0),
+      protein: dayMeals.reduce((sum, meal) => sum + (meal.protein_g || 0), 0),
+      carbs: dayMeals.reduce((sum, meal) => sum + (meal.carbs_g || 0), 0),
+      fats: dayMeals.reduce((sum, meal) => sum + (meal.fats_g || 0), 0),
+      fiber: dayMeals.reduce((sum, meal) => sum + (meal.fiber_g || 0), 0),
+      sodium: dayMeals.reduce((sum, meal) => sum + (meal.sodium_mg || 0), 0),
+      sugar: dayMeals.reduce((sum, meal) => sum + (meal.sugar_g || 0), 0),
+      fluids: dayMeals.reduce((sum, meal) => sum + (meal.liquids_ml || 0), 0),
+    }));
+
+    return {
+      previous_calories_daily: Math.round(
+        dailyTotals.reduce((sum, day) => sum + day.calories, 0) / totalDays
+      ),
+      previous_protein_daily: Math.round(
+        dailyTotals.reduce((sum, day) => sum + day.protein, 0) / totalDays
+      ),
+      previous_carbs_daily: Math.round(
+        dailyTotals.reduce((sum, day) => sum + day.carbs, 0) / totalDays
+      ),
+      previous_fats_daily: Math.round(
+        dailyTotals.reduce((sum, day) => sum + day.fats, 0) / totalDays
+      ),
+      previous_fiber_daily: Math.round(
+        dailyTotals.reduce((sum, day) => sum + day.fiber, 0) / totalDays
+      ),
+      previous_sodium_daily: Math.round(
+        dailyTotals.reduce((sum, day) => sum + day.sodium, 0) / totalDays
+      ),
+      previous_sugar_daily: Math.round(
+        dailyTotals.reduce((sum, day) => sum + day.sugar, 0) / totalDays
+      ),
+      previous_fluids_daily: Math.round(
+        dailyTotals.reduce((sum, day) => sum + day.fluids, 0) / totalDays
+      ),
     };
   }
 
@@ -311,6 +678,53 @@ export class StatisticsService {
     score += Math.max(0, 15 - Math.max(0, (metrics.sodiumIntake - 2300) / 100));
 
     return Math.round(Math.min(100, Math.max(0, score)));
+  }
+
+  // Get user badges and achievements
+  static async getUserBadgesAndAchievements(userId: string) {
+    try {
+      const badges = await prisma.userBadge.findMany({
+        where: { user_id: userId },
+        include: {
+          badge: true,
+        },
+        orderBy: { earned_date: "desc" },
+      });
+
+      const achievements = await prisma.userAchievement.findMany({
+        where: { user_id: userId },
+        include: {
+          achievement: true,
+        },
+        orderBy: { unlocked_date: "desc" },
+      });
+
+      return {
+        badges: badges.map((ub) => ({
+          id: ub.badge.id,
+          name: ub.badge.name,
+          description: ub.badge.description,
+          icon: ub.badge.icon,
+          rarity: ub.badge.rarity,
+          points_awarded: ub.badge.points_awarded,
+          earned_date: ub.earned_date,
+        })),
+        achievements: achievements.map((ua) => ({
+          id: ua.achievement.id,
+          title: ua.achievement.title,
+          description: ua.achievement.description,
+          category: ua.achievement.category,
+          progress: ua.progress,
+          max_progress: ua.achievement.max_progress,
+          unlocked: ua.unlocked,
+          unlocked_date: ua.unlocked_date,
+          points_awarded: ua.achievement.points_awarded,
+        })),
+      };
+    } catch (error) {
+      console.error("Error fetching badges and achievements:", error);
+      return { badges: [], achievements: [] };
+    }
   }
 
   private static getEmptyStatistics(): Omit<

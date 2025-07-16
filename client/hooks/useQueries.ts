@@ -9,6 +9,7 @@ import {
   authAPI,
   calendarAPI,
   userAPI,
+  api,
 } from "@/src/services/api";
 import { MealAnalysisData, Meal } from "@/src/types";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -456,5 +457,14 @@ export const useUserProfile = () => {
     queryKey: queryKeys.userProfile,
     queryFn: () => userAPI.getUserProfile(),
     staleTime: 10 * 60 * 1000,
+  });
+};
+
+export const useDailyGoals = () => {
+  return useQuery({
+    queryKey: ["dailyGoals"],
+    queryFn: () => api.get("/daily-goals"),
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 30 * 60 * 1000, // 30 minutes
   });
 };

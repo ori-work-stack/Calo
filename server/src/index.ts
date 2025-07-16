@@ -8,16 +8,19 @@ import dotenv from "dotenv";
 import { errorHandler } from "./middleware/errorHandler";
 import { authRoutes } from "./routes/auth";
 import { nutritionRoutes } from "./routes/nutrition";
-import { calendarRoutes } from "./routes/calendar";
-import { deviceRoutes } from "./routes/devices";
-import { questionnaireRoutes } from "./routes/questionnaire";
 import { userRoutes } from "./routes/user";
-import statisticsRoutes from "./routes/statistics";
+import { questionnaireRoutes } from "./routes/questionnaire";
+import chatRoutes from "./routes/chat";
+import { deviceRoutes } from "./routes/devices";
 import { mealPlansRoutes } from "./routes/mealPlans";
 import { recommendedMenuRoutes } from "./routes/recommendedMenu";
-import chatRoutes from "./routes/chat";
+import { calendarRoutes } from "./routes/calendar";
+import statisticsRoutes from "./routes/statistics";
 import foodScannerRoutes from "./routes/foodScanner";
+import { healthRoutes } from "./routes/health";
+import { CronJobService } from "./services/cronJobs";
 import "./services/cron";
+import { dailyGoalsRoutes } from "./routes/dailyGoal";
 
 // Load environment variables
 dotenv.config();
@@ -143,6 +146,7 @@ apiRouter.use("/meal-plans", mealPlansRoutes);
 apiRouter.use("/chat", chatRoutes);
 apiRouter.use("/food-scanner", foodScannerRoutes);
 apiRouter.use("/", statisticsRoutes);
+apiRouter.use("/daily-goals", dailyGoalsRoutes);
 
 app.use("/api", apiRouter);
 
@@ -199,6 +203,11 @@ const server = app.listen(config.port, "0.0.0.0", () => {
       "Note: AI features are using mock data. Add OPENAI_API_KEY to enable real AI analysis."
     );
   }
+  // Initialize cron jobs
+  CronJobService.initializeCronJobs();
+
+  // Create daily goals for existing users
+  CronJobService.createDailyGoalsForAllUsers();
 });
 
 // Handle process termination

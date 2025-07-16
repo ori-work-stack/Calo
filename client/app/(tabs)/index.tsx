@@ -72,6 +72,8 @@ const HomeScreen = React.memo(() => {
   const [refreshing, setRefreshing] = useState(false);
   const [isDataLoading, setIsDataLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [waterCups, setWaterCups] = useState(0);
+  const [waterLoading, setWaterLoading] = useState(false);
 
   const { t } = useTranslation();
   const { isRTL } = useLanguage();
@@ -232,6 +234,68 @@ const HomeScreen = React.memo(() => {
     router.push("/(tabs)/camera");
   }, []);
 
+  // Water tracking functions
+  const loadWaterIntake = useCallback(async () => {
+    if (!user?.user_id) return;
+
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      const response = await api.get(`/nutrition/water-intake/${today}`);
+      if (response.data.success) {
+        setWaterCups(response.data.data.cups_consumed || 0);
+      }
+    } catch (error) {
+      console.error("Error loading water intake:", error);
+    }
+  }, [user?.user_id]);
+
+  const updateWaterIntake = useCallback(
+    async (cups: number) => {
+      if (!user?.user_id) return;
+
+      // Update UI immediately for better UX
+      setWaterCups(cups);
+
+      // Then sync with server in background
+      try {
+        const response = await api.post("/nutrition/water-intake", {
+          cups,
+          date: new Date().toISOString().split("T")[0],
+        });
+
+        if (response.data.success) {
+          // Show badge notification if earned
+          if (response.data.badgeAwarded) {
+            console.log("Badge earned: Scuba Diver! 🤿");
+            // You can add a toast notification here
+          }
+
+          // Update XP if awarded
+          if (response.data.xpAwarded > 0) {
+            console.log(`XP earned: ${response.data.xpAwarded}`);
+          }
+        }
+      } catch (error) {
+        console.error("Error updating water intake:", error);
+        // Revert UI change on error
+        loadWaterIntake();
+      }
+    },
+    [user?.user_id, loadWaterIntake]
+  );
+
+  const incrementWater = useCallback(() => {
+    if (waterCups < 25 && !waterLoading) {
+      updateWaterIntake(waterCups + 1);
+    }
+  }, [waterCups, updateWaterIntake, waterLoading]);
+
+  const decrementWater = useCallback(() => {
+    if (waterCups > 0 && !waterLoading) {
+      updateWaterIntake(waterCups - 1);
+    }
+  }, [waterCups, updateWaterIntake, waterLoading]);
+
   // EFFECTS SECTION - All useEffect and useFocusEffect hooks go here
   useEffect(() => {
     updateDailyGoals();
@@ -241,8 +305,9 @@ const HomeScreen = React.memo(() => {
   useEffect(() => {
     if (user?.user_id && initialLoading) {
       loadAllData(true);
+      loadWaterIntake();
     }
-  }, [user?.user_id, loadAllData, initialLoading]);
+  }, [user?.user_id, loadAllData, initialLoading, loadWaterIntake]);
 
   // Optimized focus effect with throttling
   useFocusEffect(
@@ -363,6 +428,90 @@ const HomeScreen = React.memo(() => {
               {userStats?.streakDays || 0} {t("home.streak_days")}
             </Text>
           </View>
+        </View>
+      </LinearGradient>
+    </View>
+  ));
+
+  const WaterTrackingCard = React.memo(() => (
+    <View style={styles.waterCard}>
+      <LinearGradient
+        colors={["#3498DB", "#2980B9"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.waterGradient}
+      >
+        <View style={styles.waterHeader}>
+          <Ionicons name="water" size={24} color="#fff" />
+          <Text style={styles.waterLabel}>Daily Water Intake</Text>
+          <View style={styles.waterBadge}>
+            <Text style={styles.waterBadgeText}>
+              {waterCups >= 16 ? "🤿" : "💧"}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.waterContent}>
+          <Text style={styles.waterValue}>{waterCups} / 25 cups</Text>
+          <Text style={styles.waterTarget}>
+            {(waterCups * 250).toLocaleString()} ml
+          </Text>
+        </View>
+
+        <View style={styles.waterControls}>
+          <TouchableOpacity
+            style={[styles.waterButton, { opacity: waterCups <= 0 ? 0.5 : 1 }]}
+            onPress={decrementWater}
+            disabled={waterCups <= 0 || waterLoading}
+          >
+            <Ionicons name="remove" size={24} color="#fff" />
+          </TouchableOpacity>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.cupsContainer}
+            contentContainerStyle={styles.cupsContent}
+          >
+            {Array.from({ length: 25 }, (_, i) => (
+              <TouchableOpacity
+                key={i}
+                style={[
+                  styles.cupIcon,
+                  { opacity: i < waterCups ? 1 : 0.3 },
+                  i < waterCups && styles.cupIconFilled,
+                ]}
+                onPress={() => updateWaterIntake(i + 1)}
+                disabled={waterLoading}
+              >
+                <Ionicons
+                  name="water"
+                  size={20}
+                  color={i < waterCups ? "#fff" : "#87CEEB"}
+                />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          <TouchableOpacity
+            style={[styles.waterButton, { opacity: waterCups >= 25 ? 0.5 : 1 }]}
+            onPress={incrementWater}
+            disabled={waterCups >= 25 || waterLoading}
+          >
+            <Ionicons name="add" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.waterFooter}>
+          <View style={styles.waterDetail}>
+            <Ionicons name="trophy" size={16} color="#fff" />
+            <Text style={styles.waterDetailText}>
+              {waterCups >= 16
+                ? "Goal Achieved! 🎉"
+                : `${16 - waterCups} more for bonus`}
+            </Text>
+          </View>
+          <Text style={styles.waterXP}>{waterCups >= 16 ? "+100 XP" : ""}</Text>
         </View>
       </LinearGradient>
     </View>
@@ -489,6 +638,7 @@ const HomeScreen = React.memo(() => {
         <View style={styles.mainContent}>
           <CalorieCard />
           <NutritionCard />
+          <WaterTrackingCard />
 
           {/* Quick Actions */}
           <View style={styles.section}>
@@ -871,5 +1021,106 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 16,
     color: "#666",
+  },
+  waterCard: {
+    marginBottom: 20,
+    borderRadius: 16,
+    overflow: "hidden",
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  waterGradient: {
+    padding: 20,
+  },
+  waterHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  waterLabel: {
+    fontSize: 16,
+    color: "#fff",
+    marginLeft: 8,
+    fontWeight: "600",
+    flex: 1,
+  },
+  waterBadge: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  waterBadgeText: {
+    fontSize: 16,
+  },
+  waterContent: {
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  waterValue: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: "#fff",
+  },
+  waterTarget: {
+    fontSize: 14,
+    color: "#fff",
+    opacity: 0.9,
+    marginTop: 4,
+  },
+  waterControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  waterButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  cupsContainer: {
+    flex: 1,
+    marginHorizontal: 10,
+  },
+  cupsContent: {
+    alignItems: "center",
+    paddingHorizontal: 5,
+  },
+  cupIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginHorizontal: 2,
+  },
+  cupIconFilled: {
+    backgroundColor: "rgba(255,255,255,0.4)",
+  },
+  waterFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  waterDetail: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  waterDetailText: {
+    fontSize: 12,
+    color: "#fff",
+    marginLeft: 4,
+  },
+  waterXP: {
+    fontSize: 12,
+    color: "#fff",
+    fontWeight: "600",
   },
 });
