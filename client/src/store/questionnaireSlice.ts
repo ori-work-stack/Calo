@@ -45,12 +45,25 @@ export const saveQuestionnaire = createAsyncThunk(
   "questionnaire/save",
   async (
     questionnaireData: QuestionnaireData & { isEditMode?: boolean },
-    { rejectWithValue, dispatch }
+    { rejectWithValue, dispatch, getState }
   ) => {
     try {
-      const response = await questionnaireAPI.saveQuestionnaire(
-        questionnaireData
-      );
+      const state = getState() as { questionnaire: QuestionnaireState };
+      const existingQuestionnaire = state.questionnaire.questionnaire;
+
+      // If in edit mode and we have existing data, merge the changes
+      let dataToSave = questionnaireData;
+      if (questionnaireData.isEditMode && existingQuestionnaire) {
+        // Merge existing data with new data, keeping unchanged fields
+        dataToSave = {
+          ...existingQuestionnaire,
+          ...questionnaireData,
+          // Preserve the edit mode flag
+          isEditMode: questionnaireData.isEditMode,
+        };
+      }
+
+      const response = await questionnaireAPI.saveQuestionnaire(dataToSave);
 
       // Only update questionnaire completion status if not in edit mode
       if (!questionnaireData.isEditMode) {

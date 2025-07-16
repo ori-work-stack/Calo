@@ -258,21 +258,30 @@ export default function QuestionnaireScreen() {
     sleep_hours_per_night: null,
   });
 
-  // Load existing questionnaire data if in edit mode - simplified
+  // Load existing questionnaire data if in edit mode or if user has completed questionnaire
   React.useEffect(() => {
-    if (isEditMode && !dataLoaded && !isLoading) {
+    const shouldFetchData =
+      isEditMode || (user?.is_questionnaire_completed && !dataLoaded);
+
+    if (shouldFetchData && !isLoading) {
       console.log("📖 Getting questionnaire...");
       dispatch(fetchQuestionnaire()).finally(() => {
         setDataLoaded(true);
       });
-    } else if (!isEditMode) {
+    } else if (!isEditMode && !user?.is_questionnaire_completed) {
       setDataLoaded(true);
     }
-  }, [dispatch, isEditMode]);
+  }, [
+    dispatch,
+    isEditMode,
+    user?.is_questionnaire_completed,
+    dataLoaded,
+    isLoading,
+  ]);
 
-  // Map questionnaire data to form when available - simplified
+  // Map questionnaire data to form when available
   React.useEffect(() => {
-    if (isEditMode && questionnaire && dataLoaded) {
+    if (questionnaire && dataLoaded) {
       console.log("📋 Mapping questionnaire data to form:", questionnaire);
 
       // Helper function to safely convert values
@@ -417,14 +426,23 @@ export default function QuestionnaireScreen() {
       };
 
       setFormData(mappedData);
-      setDataLoaded(true);
       console.log("✅ Form data mapped successfully");
-    } else if (isEditMode && !questionnaire && !isLoading && !dataLoaded) {
-      // If we're in edit mode but no questionnaire data and not loading, still set dataLoaded to true
-      console.log("⚠️ No questionnaire data found in edit mode");
-      setDataLoaded(true);
+    } else if (
+      (isEditMode || user?.is_questionnaire_completed) &&
+      !questionnaire &&
+      !isLoading &&
+      dataLoaded
+    ) {
+      // If we're in edit mode or user has completed questionnaire but no questionnaire data
+      console.log("⚠️ No questionnaire data found for editing");
     }
-  }, [questionnaire, dataLoaded, isEditMode, isLoading]);
+  }, [
+    questionnaire,
+    dataLoaded,
+    isEditMode,
+    isLoading,
+    user?.is_questionnaire_completed,
+  ]);
 
   const handleArrayToggle = (
     array: string[],
@@ -1677,8 +1695,12 @@ export default function QuestionnaireScreen() {
     }
   };
 
-  // Show loading while fetching data in edit mode
-  if (isEditMode && isLoading && !dataLoaded) {
+  // Show loading while fetching data in edit mode or for users with completed questionnaire
+  if (
+    (isEditMode || user?.is_questionnaire_completed) &&
+    isLoading &&
+    !dataLoaded
+  ) {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
         <ActivityIndicator size="large" color="#007AFF" />
