@@ -148,7 +148,7 @@ export default function CameraScreen() {
       Alert.alert("Error", "Failed to open photo library. Please try again.");
     }
   };
-  console.log(pendingMeal?.analysis?.ingredients,"this are ing for this meal");
+  console.log(pendingMeal?.analysis?.ingredients, "this are ing for this meal");
   const handlePost = async () => {
     if (pendingMeal && !isPosting) {
       const result = await dispatch(postMeal());
@@ -360,7 +360,7 @@ export default function CameraScreen() {
                   {pendingMeal.analysis.ingredients.map((ingredient, index) => (
                     <View key={index} style={styles.ingredientItem}>
                       <Text style={styles.ingredientName}>
-                        🥗 {ingredient}
+                        🥗 {ingredient.name}
                       </Text>
                       <View style={styles.ingredientNutrition}>
                         <Text style={styles.ingredientDetail}>
@@ -429,7 +429,7 @@ export default function CameraScreen() {
                 {isUpdating ? (
                   <ActivityIndicator color="white" size="small" />
                 ) : (
-                  <Text style={styles.updateButtonText}>Update Meal</Text>
+                  <Text style={styles.updateButtonText}>Update Analysis</Text>
                 )}
               </TouchableOpacity>
             )}

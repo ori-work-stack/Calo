@@ -192,19 +192,22 @@ export const processImage = async (imageUri: string): Promise<string> => {
 
 export const analyzeMeal = createAsyncThunk(
   "meal/analyzeMeal",
-  async (imageBase64: string, { rejectWithValue }) => {
+  async (
+    params: { imageBase64: string; updateText?: string },
+    { rejectWithValue }
+  ) => {
     try {
       console.log("Starting meal analysis with base64 data...");
 
       // Validate input
-      if (!imageBase64 || imageBase64.trim() === "") {
+      if (!params.imageBase64 || params.imageBase64.trim() === "") {
         throw new Error("Image data is empty or invalid");
       }
 
       // Clean base64 string - handle both raw base64 and data URLs
-      let cleanBase64 = imageBase64;
-      if (imageBase64.startsWith("data:")) {
-        cleanBase64 = imageBase64.split(",")[1];
+      let cleanBase64 = params.imageBase64;
+      if (params.imageBase64.startsWith("data:")) {
+        cleanBase64 = params.imageBase64.split(",")[1];
       }
 
       // Create data URL for API call
@@ -213,7 +216,10 @@ export const analyzeMeal = createAsyncThunk(
       console.log("Data URL length:", dataUrl.length);
 
       // Make the API call with proper error handling
-      const response = await nutritionAPI.analyzeMeal(dataUrl);
+      const response = await nutritionAPI.analyzeMeal(
+        dataUrl,
+        params.updateText
+      );
       console.log("API response received:", response);
 
       if (response && response.success && response.data) {
