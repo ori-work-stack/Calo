@@ -2,31 +2,23 @@ import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
+  StyleSheet,
   ScrollView,
   TouchableOpacity,
   TextInput,
-  StyleSheet,
   Alert,
-  Platform,
-  Modal,
   ActivityIndicator,
+  Modal,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { Picker } from "@react-native-picker/picker";
-import { router, useLocalSearchParams } from "expo-router";
-import { useColorScheme } from "@/hooks/useColorScheme";
-import { Colors } from "@/constants/Colors";
-import { useLocalizedText } from "@/components/LocalizedText";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getQuestionnaire, submitQuestionnaire } from "@/src/services/api";
-import { useLanguage } from "@/src/i18n/context/LanguageContext";
 import { useDispatch, useSelector } from "react-redux";
+import { router, useLocalSearchParams } from "expo-router";
 import { RootState, AppDispatch } from "@/src/store";
 import {
   saveQuestionnaire,
   fetchQuestionnaire,
   clearError,
 } from "@/src/store/questionnaireSlice";
+import { Ionicons } from "@expo/vector-icons";
 import DynamicListInput from "@/components/DynamicListInputs";
 
 interface QuestionnaireData {
@@ -110,12 +102,11 @@ const MAIN_GOALS = [
   { key: "WEIGHT_LOSS", label: "ירידה במשקל" },
   { key: "WEIGHT_GAIN", label: "עלייה במסת שריר" },
   { key: "WEIGHT_MAINTENANCE", label: "שמירה על משקל" },
-  { key: "GENERAL_HEALTH", label: "בריאות כללית" },
   { key: "MEDICAL_CONDITION", label: "מטרה רפואית" },
-  { key: "SPORTS_PERFORMANCE", label: "ביצועי ספורט" },
   { key: "ALERTNESS", label: "שיפור ערנות" },
   { key: "ENERGY", label: "הגדלת אנרגיה" },
   { key: "SLEEP_QUALITY", label: "איכות שינה" },
+  { key: "SPORTS_PERFORMANCE", label: "ביצועי ספורט" },
   { key: "OTHER", label: "אחר" },
 ];
 
@@ -178,57 +169,7 @@ const REGULAR_DRINKS = [
   "משקאות דיאט",
 ];
 
-const COMMITMENT_LEVELS = [
-  { key: "קל", label: "קל" },
-  { key: "ממוצע", label: "ממוצע" },
-  { key: "קפדני", label: "קפדני" },
-];
-
-const COOKING_PREFERENCES = [
-  { key: "מבושל", label: "מבושל" },
-  { key: "קל הכנה", label: "קל הכנה" },
-  { key: "מוכן מראש", label: "מוכן מראש" },
-  { key: "ללא בישול", label: "ללא בישול" },
-];
-
-const GENDERS = [
-  { key: "זכר", label: "זכר" },
-  { key: "נקבה", label: "נקבה" },
-  { key: "אחר", label: "אחר" },
-];
-
-const SMOKING_STATUS_OPTIONS = [
-  { key: "NO", label: "לא מעשן" },
-  { key: "YES", label: "מעשן" },
-];
-
-const NOTIFICATION_PREFERENCES = [
-  { key: "DAILY", label: "יומי" },
-  { key: "WEEKLY", label: "שבועי" },
-  { key: "NONE", label: "ללא" },
-];
-
-const PROGRAM_DURATIONS = [
-  { key: "SHORT_TERM", label: "חודש" },
-  { key: "MEDIUM_TERM", label: "3 חודשים" },
-  { key: "LONG_TERM", label: "6 חודשים" },
-  { key: "YEARLY", label: "שנה" },
-  { key: "UNLIMITED", label: "ללא הגבלה" },
-];
-
-const UPLOAD_FREQUENCIES = [
-  { key: "EVERY_MEAL", label: "כל ארוחה" },
-  { key: "DAILY", label: "פעם ביום" },
-  { key: "SEVERAL_TIMES_WEEK", label: "כמה פעמים בשבוע" },
-  { key: "WEEKLY", label: "פעם בשבוע" },
-];
-
 export default function QuestionnaireScreen() {
-  const colorScheme = useColorScheme();
-  const t = useLocalizedText();
-  const queryClient = useQueryClient();
-  const { currentLanguage, changeLanguage } = useLanguage();
-  const [showLanguagePicker, setShowLanguagePicker] = useState(false);
   const dispatch = useDispatch<AppDispatch>();
   const { user } = useSelector((state: RootState) => state.auth);
   const { questionnaire, isSaving, isLoading, error } = useSelector(
@@ -355,11 +296,6 @@ export default function QuestionnaireScreen() {
         return [];
       };
       const safeBoolean = (value: any) => Boolean(value);
-      const safeNumber = (value: any) => {
-        if (value === null || value === undefined || value === "") return null;
-        const num = typeof value === "string" ? parseFloat(value) : value;
-        return isNaN(num) ? null : num;
-      };
 
       // Parse meal_times if it's a string
       const parseMealTimes = (mealTimes: any) => {
@@ -450,8 +386,7 @@ export default function QuestionnaireScreen() {
         past_diet_difficulties: safeArray(questionnaire.past_diet_difficulties),
 
         // Additional schema fields
-        program_duration:
-          safeString(questionnaire.program_duration) || "MEDIUM_TERM",
+        program_duration: safeString(questionnaire.program_duration),
         meal_timing_restrictions: safeString(
           questionnaire.meal_timing_restrictions
         ),
@@ -476,7 +411,9 @@ export default function QuestionnaireScreen() {
         ),
         family_medical_history: safeArray(questionnaire.family_medical_history),
         smoking_status: questionnaire.smoking_status as "YES" | "NO" | null,
-        sleep_hours_per_night: safeNumber(questionnaire.sleep_hours_per_night),
+        sleep_hours_per_night: questionnaire.sleep_hours_per_night as
+          | number
+          | null,
       };
 
       setFormData(mappedData);
@@ -540,20 +477,15 @@ export default function QuestionnaireScreen() {
       if (cleanFormData.fasting_hours === "")
         cleanFormData.fasting_hours = null;
 
-      // Ensure meal_timing_restrictions is a string, not array
-      if (Array.isArray(cleanFormData.meal_timing_restrictions)) {
-        cleanFormData.meal_timing_restrictions =
-          cleanFormData.meal_timing_restrictions.join(", ");
-      }
-
-      // Ensure notifications_preference is valid enum value or null
+      // Convert sleep_hours_per_night from string to number
       if (
-        cleanFormData.notifications_preference &&
-        !["DAILY", "WEEKLY", "NONE"].includes(
-          cleanFormData.notifications_preference
-        )
+        cleanFormData.sleep_hours_per_night === "" ||
+        cleanFormData.sleep_hours_per_night === null
       ) {
-        cleanFormData.notifications_preference = null;
+        cleanFormData.sleep_hours_per_night = null;
+      } else if (typeof cleanFormData.sleep_hours_per_night === "string") {
+        const parsed = parseFloat(cleanFormData.sleep_hours_per_night);
+        cleanFormData.sleep_hours_per_night = isNaN(parsed) ? null : parsed;
       }
 
       // For edit mode, we want to preserve the questionnaire completion status
@@ -635,22 +567,22 @@ export default function QuestionnaireScreen() {
       <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>מגדר *</Text>
         <View style={styles.optionGroup}>
-          {GENDERS.map((option) => (
+          {["זכר", "נקבה", "אחר"].map((option) => (
             <TouchableOpacity
-              key={option.key}
+              key={option}
               style={[
                 styles.optionButton,
-                formData.gender === option.key && styles.optionButtonSelected,
+                formData.gender === option && styles.optionButtonSelected,
               ]}
-              onPress={() => setFormData({ ...formData, gender: option.key })}
+              onPress={() => setFormData({ ...formData, gender: option })}
             >
               <Text
                 style={[
                   styles.optionText,
-                  formData.gender === option.key && styles.optionTextSelected,
+                  formData.gender === option && styles.optionTextSelected,
                 ]}
               >
-                {option.label}
+                {option}
               </Text>
             </TouchableOpacity>
           ))}
@@ -795,26 +727,26 @@ export default function QuestionnaireScreen() {
       <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>באיזו רמת מחויבות תרצה לפעול?</Text>
         <View style={styles.optionGroup}>
-          {COMMITMENT_LEVELS.map((level) => (
+          {["קל", "ממוצע", "קפדני"].map((level) => (
             <TouchableOpacity
-              key={level.key}
+              key={level}
               style={[
                 styles.optionButton,
-                formData.commitment_level === level.key &&
+                formData.commitment_level === level &&
                   styles.optionButtonSelected,
               ]}
               onPress={() =>
-                setFormData({ ...formData, commitment_level: level.key })
+                setFormData({ ...formData, commitment_level: level })
               }
             >
               <Text
                 style={[
                   styles.optionText,
-                  formData.commitment_level === level.key &&
+                  formData.commitment_level === level &&
                     styles.optionTextSelected,
                 ]}
               >
-                {level.label}
+                {level}
               </Text>
             </TouchableOpacity>
           ))}
@@ -1100,26 +1032,26 @@ export default function QuestionnaireScreen() {
       <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>העדפת הכנה</Text>
         <View style={styles.optionGroup}>
-          {COOKING_PREFERENCES.map((pref) => (
+          {["מבושל", "קל הכנה", "מוכן מראש", "ללא בישול"].map((pref) => (
             <TouchableOpacity
-              key={pref.key}
+              key={pref}
               style={[
                 styles.optionButton,
-                formData.cooking_preference === pref.key &&
+                formData.cooking_preference === pref &&
                   styles.optionButtonSelected,
               ]}
               onPress={() =>
-                setFormData({ ...formData, cooking_preference: pref.key })
+                setFormData({ ...formData, cooking_preference: pref })
               }
             >
               <Text
                 style={[
                   styles.optionText,
-                  formData.cooking_preference === pref.key &&
+                  formData.cooking_preference === pref &&
                     styles.optionTextSelected,
                 ]}
               >
-                {pref.label}
+                {pref}
               </Text>
             </TouchableOpacity>
           ))}
@@ -1216,38 +1148,40 @@ export default function QuestionnaireScreen() {
         <Text style={styles.inputLabel}>כמה שעות שינה בלילה?</Text>
         <TextInput
           style={styles.textInput}
-          value={formData.sleep_hours_per_night?.toString() || ""}
-          onChangeText={(text) => {
-            const value = text ? parseFloat(text) : null;
-            setFormData({ ...formData, sleep_hours_per_night: value });
-          }}
+          value={formData.sleep_hours_per_night || ""}
+          onChangeText={(text) =>
+            setFormData({ ...formData, sleep_hours_per_night: text || null })
+          }
           keyboardType="numeric"
-          placeholder="לדוגמה: 7.5"
+          placeholder="לדוגמה: 7-8 שעות"
         />
       </View>
 
       <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>סטטוס עישון</Text>
         <View style={styles.optionGroup}>
-          {SMOKING_STATUS_OPTIONS.map((status) => (
+          {[
+            { label: "לא מעשן", value: "NO" },
+            { label: "מעשן", value: "YES" },
+          ].map((status) => (
             <TouchableOpacity
-              key={status.key}
+              key={status.value}
               style={[
                 styles.optionButton,
-                formData.smoking_status === status.key &&
+                formData.smoking_status === status.value &&
                   styles.optionButtonSelected,
               ]}
               onPress={() =>
                 setFormData({
                   ...formData,
-                  smoking_status: status.key as "YES" | "NO",
+                  smoking_status: status.value as "YES" | "NO",
                 })
               }
             >
               <Text
                 style={[
                   styles.optionText,
-                  formData.smoking_status === status.key &&
+                  formData.smoking_status === status.value &&
                     styles.optionTextSelected,
                 ]}
               >
@@ -1300,58 +1234,62 @@ export default function QuestionnaireScreen() {
       <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>משך התוכנית המועדף</Text>
         <View style={styles.optionGroup}>
-          {PROGRAM_DURATIONS.map((duration) => (
-            <TouchableOpacity
-              key={duration.key}
-              style={[
-                styles.optionButton,
-                formData.program_duration === duration.key &&
-                  styles.optionButtonSelected,
-              ]}
-              onPress={() =>
-                setFormData({ ...formData, program_duration: duration.key })
-              }
-            >
-              <Text
+          {["חודש", "3 חודשים", "6 חודשים", "שנה", "ללא הגבלה"].map(
+            (duration) => (
+              <TouchableOpacity
+                key={duration}
                 style={[
-                  styles.optionText,
-                  formData.program_duration === duration.key &&
-                    styles.optionTextSelected,
+                  styles.optionButton,
+                  formData.program_duration === duration &&
+                    styles.optionButtonSelected,
                 ]}
+                onPress={() =>
+                  setFormData({ ...formData, program_duration: duration })
+                }
               >
-                {duration.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+                <Text
+                  style={[
+                    styles.optionText,
+                    formData.program_duration === duration &&
+                      styles.optionTextSelected,
+                  ]}
+                >
+                  {duration}
+                </Text>
+              </TouchableOpacity>
+            )
+          )}
         </View>
       </View>
 
       <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>תדירות העלאת ארוחות</Text>
         <View style={styles.optionGroup}>
-          {UPLOAD_FREQUENCIES.map((freq) => (
-            <TouchableOpacity
-              key={freq.key}
-              style={[
-                styles.optionButton,
-                formData.upload_frequency === freq.key &&
-                  styles.optionButtonSelected,
-              ]}
-              onPress={() =>
-                setFormData({ ...formData, upload_frequency: freq.key })
-              }
-            >
-              <Text
+          {["כל ארוחה", "פעם ביום", "כמה פעמים בשבוע", "פעם בשבוע"].map(
+            (freq) => (
+              <TouchableOpacity
+                key={freq}
                 style={[
-                  styles.optionText,
-                  formData.upload_frequency === freq.key &&
-                    styles.optionTextSelected,
+                  styles.optionButton,
+                  formData.upload_frequency === freq &&
+                    styles.optionButtonSelected,
                 ]}
+                onPress={() =>
+                  setFormData({ ...formData, upload_frequency: freq })
+                }
               >
-                {freq.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+                <Text
+                  style={[
+                    styles.optionText,
+                    formData.upload_frequency === freq &&
+                      styles.optionTextSelected,
+                  ]}
+                >
+                  {freq}
+                </Text>
+              </TouchableOpacity>
+            )
+          )}
         </View>
       </View>
 
@@ -1425,18 +1363,22 @@ export default function QuestionnaireScreen() {
       <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>העדפות התראות</Text>
         <View style={styles.optionGroup}>
-          {NOTIFICATION_PREFERENCES.map((pref) => (
+          {[
+            { label: "יומי", value: "DAILY" },
+            { label: "שבועי", value: "WEEKLY" },
+            { label: "ללא", value: "NONE" },
+          ].map((pref) => (
             <TouchableOpacity
-              key={pref.key}
+              key={pref.value}
               style={[
                 styles.optionButton,
-                formData.notifications_preference === pref.key &&
+                formData.notifications_preference === pref.value &&
                   styles.optionButtonSelected,
               ]}
               onPress={() =>
                 setFormData({
                   ...formData,
-                  notifications_preference: pref.key as
+                  notifications_preference: pref.value as
                     | "DAILY"
                     | "WEEKLY"
                     | "NONE",
@@ -1446,7 +1388,7 @@ export default function QuestionnaireScreen() {
               <Text
                 style={[
                   styles.optionText,
-                  formData.notifications_preference === pref.key &&
+                  formData.notifications_preference === pref.value &&
                     styles.optionTextSelected,
                 ]}
               >
@@ -1735,14 +1677,6 @@ export default function QuestionnaireScreen() {
     }
   };
 
-  const handleNext = () => {
-    if (currentStep < totalSteps) {
-      setCurrentStep(currentStep + 1);
-    } else {
-      handleSubmit();
-    }
-  };
-
   // Show loading while fetching data in edit mode
   if (isEditMode && isLoading && !dataLoaded) {
     return (
@@ -1754,31 +1688,15 @@ export default function QuestionnaireScreen() {
   }
 
   return (
-    <View
-      style={[
-        styles.container,
-        { backgroundColor: Colors[colorScheme ?? "light"].background },
-      ]}
-    >
-      <View
-        style={[
-          styles.header,
-          { backgroundColor: Colors[colorScheme ?? "light"].tint },
-        ]}
-      >
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="white" />
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+          <Ionicons name="arrow-back" size={24} color="#007AFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t("questionnaire.title")}</Text>
-        <TouchableOpacity
-          onPress={() => setShowLanguagePicker(true)}
-          style={styles.languageButton}
-        >
-          <Ionicons name="language" size={24} color="white" />
-          <Text style={styles.languageText}>
-            {currentLanguage === "he" ? "עב" : "EN"}
-          </Text>
-        </TouchableOpacity>
+        <Text style={styles.headerTitle}>
+          {isEditMode ? "עריכת נתונים אישיים" : "בניית תוכנית אישית"}
+        </Text>
+        <View style={styles.placeholder} />
       </View>
 
       {renderProgress()}
@@ -1794,122 +1712,54 @@ export default function QuestionnaireScreen() {
         </View>
       </ScrollView>
 
-      <View style={styles.navigationButtons}>
-        <TouchableOpacity
-          style={[styles.navButton, styles.backNavButton]}
-          onPress={handleBack}
-          disabled={isSaving}
-        >
-          <Text style={styles.backNavButtonText}>חזור</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.navButton,
-            styles.nextNavButton,
-            (!canProceed() || isSaving) && styles.navButtonDisabled,
-          ]}
-          onPress={handleNext}
-          disabled={!canProceed() || isSaving}
-        >
-          {isSaving ? (
-            <ActivityIndicator color="white" size="small" />
-          ) : (
-            <Text style={styles.nextNavButtonText}>
-              {currentStep === totalSteps ? "שמור" : "המשך"}
-            </Text>
-          )}
-        </TouchableOpacity>
+      <View style={styles.navigation}>
+        {currentStep < totalSteps ? (
+          <TouchableOpacity
+            style={[
+              styles.nextButton,
+              !canProceed() && styles.nextButtonDisabled,
+            ]}
+            onPress={() => setCurrentStep(currentStep + 1)}
+            disabled={!canProceed()}
+          >
+            <Text style={styles.nextButtonText}>המשך</Text>
+            <Ionicons name="arrow-forward" size={20} color="white" />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[styles.finishButton, isSaving && styles.nextButtonDisabled]}
+            onPress={handleSubmit}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <>
+                <Text style={styles.finishButtonText}>
+                  {isEditMode ? "שמור שינויים" : "צור תוכנית אישית"}
+                </Text>
+                <Ionicons name="checkmark" size={20} color="white" />
+              </>
+            )}
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* Language Picker Modal */}
+      {/* Tip Modal */}
       <Modal
-        visible={showLanguagePicker}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowLanguagePicker(false)}
+        visible={!!showTip}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowTip("")}
       >
-        <View style={styles.modalOverlay}>
-          <View
-            style={[
-              styles.modalContent,
-              { backgroundColor: Colors[colorScheme ?? "light"].background },
-            ]}
-          >
-            <View style={styles.modalHeader}>
-              <Text
-                style={[
-                  styles.modalTitle,
-                  { color: Colors[colorScheme ?? "light"].text },
-                ]}
-              >
-                {t("settings.language")}
-              </Text>
-              <TouchableOpacity onPress={() => setShowLanguagePicker(false)}>
-                <Ionicons
-                  name="close"
-                  size={24}
-                  color={Colors[colorScheme ?? "light"].text}
-                />
-              </TouchableOpacity>
-            </View>
-
+        <View style={styles.tipModalOverlay}>
+          <View style={styles.tipModalContent}>
+            <Text style={styles.tipText}>{showTip}</Text>
             <TouchableOpacity
-              style={[
-                styles.languageOption,
-                currentLanguage === "he" && {
-                  backgroundColor: Colors[colorScheme ?? "light"].tint + "20",
-                },
-              ]}
-              onPress={() => {
-                changeLanguage("he");
-                setShowLanguagePicker(false);
-              }}
+              style={styles.tipCloseButton}
+              onPress={() => setShowTip("")}
             >
-              <Text
-                style={[
-                  styles.languageOptionText,
-                  { color: Colors[colorScheme ?? "light"].text },
-                ]}
-              >
-                עברית
-              </Text>
-              {currentLanguage === "he" && (
-                <Ionicons
-                  name="checkmark"
-                  size={20}
-                  color={Colors[colorScheme ?? "light"].tint}
-                />
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.languageOption,
-                currentLanguage === "en" && {
-                  backgroundColor: Colors[colorScheme ?? "light"].tint + "20",
-                },
-              ]}
-              onPress={() => {
-                changeLanguage("en");
-                setShowLanguagePicker(false);
-              }}
-            >
-              <Text
-                style={[
-                  styles.languageOptionText,
-                  { color: Colors[colorScheme ?? "light"].text },
-                ]}
-              >
-                English
-              </Text>
-              {currentLanguage === "en" && (
-                <Ionicons
-                  name="checkmark"
-                  size={20}
-                  color={Colors[colorScheme ?? "light"].tint}
-                />
-              )}
+              <Text style={styles.tipCloseText}>הבנתי</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1921,139 +1771,196 @@ export default function QuestionnaireScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "#f8f9fa",
+  },
+  loadingContainer: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: "#666",
+  },
+  containerRTL: {
+    direction: "rtl",
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingTop: Platform.OS === "ios" ? 50 : 20,
-    paddingBottom: 15,
     paddingHorizontal: 20,
+    paddingTop: 50,
+    paddingBottom: 20,
+    backgroundColor: "white",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e9ecef",
   },
   backButton: {
-    padding: 5,
+    padding: 8,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "white",
+    color: "#333",
   },
-  languageButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 5,
-  },
-  languageText: {
-    color: "white",
-    fontSize: 12,
-    marginLeft: 4,
-    fontWeight: "bold",
+  placeholder: {
+    width: 40,
   },
   progressContainer: {
     paddingHorizontal: 20,
     paddingVertical: 15,
+    backgroundColor: "white",
   },
   progressBar: {
-    height: 8,
-    backgroundColor: "#e0e0e0",
-    borderRadius: 4,
-    overflow: "hidden",
+    height: 6,
+    backgroundColor: "#e9ecef",
+    borderRadius: 3,
+    marginBottom: 8,
   },
   progressFill: {
     height: "100%",
     backgroundColor: "#007AFF",
-    borderRadius: 4,
+    borderRadius: 3,
   },
   progressText: {
+    fontSize: 14,
+    color: "#666",
     textAlign: "center",
-    marginTop: 8,
+  },
+  progress: {
     fontSize: 14,
     color: "#666",
   },
+  progressRTL: {
+    textAlign: "right",
+  },
   content: {
     flex: 1,
-    padding: 20,
   },
   stepContainer: {
-    marginBottom: 20,
+    padding: 20,
   },
   stepTitle: {
     fontSize: 24,
     fontWeight: "bold",
-    marginBottom: 8,
     color: "#333",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 8,
+  },
+  titleRTL: {
     textAlign: "right",
   },
   stepDescription: {
     fontSize: 16,
     color: "#666",
-    marginBottom: 20,
-    textAlign: "right",
+    textAlign: "center",
+    marginBottom: 30,
     lineHeight: 22,
   },
+  questionText: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 24,
+    lineHeight: 24,
+  },
+  questionTextRTL: {
+    textAlign: "right",
+  },
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: 25,
   },
   inputLabel: {
     fontSize: 16,
     fontWeight: "600",
-    marginBottom: 8,
     color: "#333",
-    textAlign: "right",
+    marginBottom: 10,
   },
   textInput: {
     borderWidth: 1,
     borderColor: "#ddd",
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 12,
+    padding: 15,
     fontSize: 16,
     backgroundColor: "white",
+  },
+  textInputRTL: {
     textAlign: "right",
+  },
+  textArea: {
+    minHeight: 100,
+    textAlignVertical: "top",
+  },
+  optionsContainer: {
+    marginTop: 10,
   },
   optionGroup: {
-    gap: 8,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
   },
   optionButton: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    padding: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    borderWidth: 2,
+    borderColor: "#e9ecef",
     backgroundColor: "white",
+    marginBottom: 8,
+  },
+  optionButtonRTL: {
+    flexDirection: "row-reverse",
   },
   optionButtonSelected: {
-    backgroundColor: "#007AFF",
     borderColor: "#007AFF",
+    backgroundColor: "#007AFF",
+  },
+  selectedOption: {
+    borderColor: "#007AFF",
+    backgroundColor: "#f0f8ff",
   },
   optionText: {
-    fontSize: 16,
-    textAlign: "right",
+    fontSize: 14,
     color: "#333",
+    fontWeight: "500",
+  },
+  optionTextRTL: {
+    textAlign: "right",
   },
   optionTextSelected: {
     color: "white",
+  },
+  selectedOptionText: {
+    color: "#007AFF",
     fontWeight: "600",
   },
   checkboxGroup: {
-    gap: 8,
+    gap: 15,
   },
   checkboxItem: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 8,
-    backgroundColor: "white",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#ddd",
   },
   checkbox: {
-    width: 20,
-    height: 20,
+    width: 24,
+    height: 24,
     borderWidth: 2,
     borderColor: "#ddd",
-    borderRadius: 4,
-    marginLeft: 10,
+    borderRadius: 6,
+    marginRight: 12,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "white",
   },
   checkboxChecked: {
     backgroundColor: "#007AFF",
@@ -2061,31 +1968,22 @@ const styles = StyleSheet.create({
   },
   checkboxLabel: {
     fontSize: 16,
-    flex: 1,
-    textAlign: "right",
     color: "#333",
   },
   switchRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 12,
-    backgroundColor: "white",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#ddd",
   },
   switchLabel: {
     fontSize: 16,
     color: "#333",
-    textAlign: "right",
-    flex: 1,
   },
   switch: {
     width: 50,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "#ddd",
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "#e9ecef",
     padding: 2,
     justifyContent: "center",
   },
@@ -2093,107 +1991,121 @@ const styles = StyleSheet.create({
     backgroundColor: "#007AFF",
   },
   switchThumb: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: "white",
-    alignSelf: "flex-start",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   switchThumbActive: {
     alignSelf: "flex-end",
   },
   additionalInfo: {
-    marginTop: 20,
+    margin: 20,
     padding: 15,
-    backgroundColor: "#f8f9fa",
-    borderRadius: 8,
+    backgroundColor: "#e3f2fd",
+    borderRadius: 12,
     borderLeftWidth: 4,
     borderLeftColor: "#007AFF",
   },
   additionalInfoText: {
     fontSize: 14,
-    color: "#666",
-    textAlign: "right",
+    color: "#1565c0",
     lineHeight: 20,
   },
-  navigationButtons: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  errorText: {
+    color: "#FF3B30",
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: 10,
+  },
+  navigation: {
     padding: 20,
-    paddingBottom: Platform.OS === "ios" ? 35 : 20,
     backgroundColor: "white",
     borderTopWidth: 1,
-    borderTopColor: "#eee",
+    borderTopColor: "#e9ecef",
+  },
+  navigationRTL: {
+    flexDirection: "row-reverse",
   },
   navButton: {
-    flex: 1,
-    paddingVertical: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
     borderRadius: 8,
+  },
+  navButtonText: {
+    fontSize: 16,
+    color: "#007AFF",
+    marginLeft: 4,
+  },
+  nextButton: {
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginHorizontal: 5,
-  },
-  backNavButton: {
-    backgroundColor: "#f8f9fa",
-    borderWidth: 1,
-    borderColor: "#ddd",
-  },
-  nextNavButton: {
     backgroundColor: "#007AFF",
+    paddingVertical: 16,
+    borderRadius: 12,
+    gap: 8,
   },
-  navButtonDisabled: {
-    opacity: 0.5,
+  nextButtonDisabled: {
+    backgroundColor: "#ccc",
   },
-  backNavButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333",
-  },
-  nextNavButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
+  nextButtonText: {
     color: "white",
+    fontSize: 18,
+    fontWeight: "bold",
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
+  finishButton: {
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#28a745",
+    paddingVertical: 16,
+    borderRadius: 12,
+    gap: 8,
   },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: "#666",
+  finishButtonText: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "bold",
   },
-  modalOverlay: {
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  tipModalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
-  },
-  modalContent: {
-    width: "80%",
-    borderRadius: 10,
     padding: 20,
   },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 20,
+  tipModalContent: {
+    backgroundColor: "white",
+    borderRadius: 12,
+    padding: 20,
+    maxWidth: 300,
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  languageOption: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 15,
-    borderRadius: 8,
-    marginVertical: 5,
-  },
-  languageOptionText: {
+  tipText: {
     fontSize: 16,
+    color: "#333",
+    textAlign: "center",
+    marginBottom: 20,
+    lineHeight: 22,
+  },
+  tipCloseButton: {
+    backgroundColor: "#007AFF",
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  tipCloseText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

@@ -207,7 +207,7 @@ export default function HistoryScreen() {
     });
 
     const thisWeekCalories = lastWeekMeals.reduce(
-      (sum, meal) => sum + (meal.calories || meal.totalCalories || 0),
+      (sum, meal) => sum + (meal.calories || 0),
       0
     );
     const avgDailyCalories = thisWeekCalories / 7;
@@ -613,12 +613,12 @@ export default function HistoryScreen() {
             <Text style={styles.sectionTitle}>
               {t("history.health_warnings") || "Health Warnings"}
             </Text>
-            {meal.health_risk_notes.map((warning: string, index: number) => (
-              <View key={index} style={styles.warningItem}>
+            {meal.health_risk_notes && (
+              <View style={styles.warningItem}>
                 <Ionicons name="warning" size={16} color="#FF9800" />
-                <Text style={styles.warningText}>{warning}</Text>
+                <Text style={styles.warningText}>{meal.health_risk_notes}</Text>
               </View>
-            ))}
+            )}
           </View>
         )}
       </View>

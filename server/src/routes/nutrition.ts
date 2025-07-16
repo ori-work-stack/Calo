@@ -227,8 +227,33 @@ router.post("/analyze", async (req: AuthRequest, res) => {
       });
     }
 
+    // Validate image data
+    let cleanBase64 = imageBase64;
+    if (imageBase64.startsWith("data:image/")) {
+      const commaIndex = imageBase64.indexOf(",");
+      if (commaIndex !== -1) {
+        cleanBase64 = imageBase64.substring(commaIndex + 1);
+      }
+    }
+
+    // Check if base64 is valid
+    const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+    if (!base64Regex.test(cleanBase64)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid image data format",
+      });
+    }
+
+    if (cleanBase64.length < 1000) {
+      return res.status(400).json({
+        success: false,
+        error: "Image data is too small or invalid",
+      });
+    }
+
     console.log("Processing meal analysis for user:", req.user.user_id);
-    console.log("Image data length:", imageBase64.length);
+    console.log("Image data length:", cleanBase64.length);
 
     // Validate request data
     const analysisSchema = z.object({

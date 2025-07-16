@@ -70,6 +70,34 @@ export class OpenAIService {
     try {
       console.log("🤖 Starting OpenAI meal analysis...");
 
+      // Validate and clean image data
+      if (!imageBase64 || imageBase64.trim() === "") {
+        throw new Error("Image data is empty or invalid");
+      }
+
+      let cleanBase64 = imageBase64;
+      if (imageBase64.startsWith("data:image/")) {
+        const commaIndex = imageBase64.indexOf(",");
+        if (commaIndex !== -1) {
+          cleanBase64 = imageBase64.substring(commaIndex + 1);
+        }
+      }
+
+      // Validate base64 format
+      const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+      if (!base64Regex.test(cleanBase64)) {
+        throw new Error("Invalid base64 image format");
+      }
+
+      if (cleanBase64.length < 1000) {
+        throw new Error("Image data too small - likely invalid");
+      }
+
+      console.log(
+        "✅ Image validation successful, length:",
+        cleanBase64.length
+      );
+
       // Check if OpenAI API key is available
       if (!process.env.OPENAI_API_KEY || !openai) {
         console.log("⚠️ No OpenAI API key found, using mock analysis");
@@ -178,7 +206,7 @@ Language: ${language}`;
               {
                 type: "image_url",
                 image_url: {
-                  url: `data:image/jpeg;base64,${imageBase64}`,
+                  url: `data:image/jpeg;base64,${cleanBase64}`,
                   detail: "high",
                 },
               },

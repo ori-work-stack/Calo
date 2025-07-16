@@ -27,6 +27,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { t } from "i18next";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function CameraScreen() {
   const dispatch = useDispatch<AppDispatch>();
@@ -46,11 +47,6 @@ export default function CameraScreen() {
   const [editText, setEditText] = useState("");
   const [isEditingAnalysis, setIsEditingAnalysis] = useState(false);
 
-  // Legacy states (keeping for compatibility)
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedComponents, setEditedComponents] = useState<string>("");
-  const [originalAnalysis, setOriginalAnalysis] = useState<string>("");
-
   // Load pending meal on component mount
   useEffect(() => {
     dispatch(loadPendingMeal());
@@ -59,8 +55,8 @@ export default function CameraScreen() {
   // Handle errors
   useEffect(() => {
     if (error) {
-      Alert.alert("Error", error, [
-        { text: "OK", onPress: () => dispatch(clearError()) },
+      Alert.alert("שגיאה", error, [
+        { text: "אישור", onPress: () => dispatch(clearError()) },
       ]);
     }
   }, [error, dispatch]);
@@ -76,11 +72,6 @@ export default function CameraScreen() {
         }
       }
     })();
-  }, []);
-
-  // Load saved analysis on component mount
-  useEffect(() => {
-    loadSavedAnalysis();
   }, []);
 
   // Check if we have a persisted meal ID when component mounts or pendingMeal changes
@@ -101,42 +92,6 @@ export default function CameraScreen() {
     }
   }, [pendingMeal]);
 
-  const loadSavedAnalysis = async () => {
-    try {
-      const savedData = await AsyncStorage.getItem("lastImageAnalysis");
-      if (savedData) {
-        const {
-          analysis: savedAnalysis,
-          userNotes: savedNotes,
-          image: savedImage,
-        } = JSON.parse(savedData);
-      }
-    } catch (error) {
-      console.error("Error loading saved analysis:", error);
-    }
-  };
-
-  const saveAnalysisData = async (
-    analysisText: string,
-    notes: string,
-    imageUri: string
-  ) => {
-    try {
-      const dataToSave = {
-        analysis: analysisText,
-        userNotes: notes,
-        image: imageUri,
-        timestamp: new Date().toISOString(),
-      };
-      await AsyncStorage.setItem(
-        "lastImageAnalysis",
-        JSON.stringify(dataToSave)
-      );
-    } catch (error) {
-      console.error("Error saving analysis:", error);
-    }
-  };
-
   const saveMealId = async (mealId: string) => {
     try {
       await AsyncStorage.setItem("postedMealId", mealId);
@@ -153,19 +108,71 @@ export default function CameraScreen() {
     }
   };
 
+  const validateAndProcessImage = (base64Data: string): string | null => {
+    try {
+      if (!base64Data || base64Data.trim() === "") {
+        console.error("Empty base64 data");
+        return null;
+      }
+
+      // Remove data URL prefix if present
+      let cleanBase64 = base64Data;
+      if (base64Data.startsWith("data:image/")) {
+        const commaIndex = base64Data.indexOf(",");
+        if (commaIndex !== -1) {
+          cleanBase64 = base64Data.substring(commaIndex + 1);
+        }
+      }
+
+      // Validate base64 format
+      const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+      if (!base64Regex.test(cleanBase64)) {
+        console.error("Invalid base64 format");
+        return null;
+      }
+
+      // Check minimum length (should be substantial for an image)
+      if (cleanBase64.length < 1000) {
+        console.error("Base64 data too short, likely not a valid image");
+        return null;
+      }
+
+      console.log(
+        "✅ Image validation successful, length:",
+        cleanBase64.length
+      );
+      return cleanBase64;
+    } catch (error) {
+      console.error("Error validating image:", error);
+      return null;
+    }
+  };
+
   const analyzeImage = async (base64Image: string) => {
     try {
-      console.log("🔍 Analyzing image...");
-      setPostedMealId(null); // Reset posted meal ID
-      await clearMealId(); // Clear persisted meal ID
+      console.log("🔍 Starting meal analysis with base64 data...");
 
-      // Save analysis data to AsyncStorage
-      await saveAnalysisData(base64Image, "", base64Image);
+      const validatedBase64 = validateAndProcessImage(base64Image);
+      if (!validatedBase64) {
+        Alert.alert("שגיאה", "נתוני התמונה לא תקינים. אנא נסה שוב.");
+        return;
+      }
 
-      dispatch(analyzeMeal(base64Image));
+      setPostedMealId(null);
+      await clearMealId();
+
+      console.log("📤 Dispatching analyze meal action...");
+      const result = await dispatch(analyzeMeal(validatedBase64));
+
+      if (analyzeMeal.fulfilled.match(result)) {
+        console.log("✅ Analysis completed successfully");
+      } else {
+        console.error("❌ Analysis failed:", result.payload);
+        Alert.alert("שגיאה", "ניתוח התמונה נכשל. אנא נסה שוב.");
+      }
     } catch (error) {
-      console.error("💥 Analysis error:", error);
-      Alert.alert("Error", "Failed to analyze image");
+      console.error("💥 Analysis error details:", error);
+      Alert.alert("שגיאה", "שגיאה בניתוח התמונה");
     }
   };
 
@@ -177,18 +184,25 @@ export default function CameraScreen() {
       console.log("🔍 Re-analyzing image with additional text...");
       setIsEditingAnalysis(true);
 
-      // Create a prompt that includes the additional text
-      const enhancedPrompt = `${additionalText}`;
+      const validatedBase64 = validateAndProcessImage(base64Image);
+      if (!validatedBase64) {
+        Alert.alert("שגיאה", "נתוני התמונה לא תקינים.");
+        return;
+      }
 
-      // Save analysis data to AsyncStorage
-      await saveAnalysisData(base64Image, additionalText, base64Image);
+      const result = await dispatch(
+        analyzeMeal(validatedBase64, additionalText)
+      );
 
-      // You might need to modify your analyzeMeal action to accept additional text
-      // For now, we'll dispatch with the base64 image and handle the text separately
-      dispatch(analyzeMeal(base64Image, enhancedPrompt));
+      if (analyzeMeal.fulfilled.match(result)) {
+        console.log("✅ Re-analysis completed successfully");
+      } else {
+        console.error("❌ Re-analysis failed:", result.payload);
+        Alert.alert("שגיאה", "ניתוח מחדש נכשל. אנא נסה שוב.");
+      }
     } catch (error) {
-      console.error("💥 Analysis error:", error);
-      Alert.alert("Error", "Failed to re-analyze image");
+      console.error("💥 Re-analysis error:", error);
+      Alert.alert("שגיאה", "שגיאה בניתוח מחדש");
     } finally {
       setIsEditingAnalysis(false);
     }
@@ -221,108 +235,61 @@ export default function CameraScreen() {
           await analyzeImage(asset.base64);
         } else {
           console.error("❌ No base64 data in selected image");
-          Alert.alert(
-            "Error",
-            "Failed to process the selected image. Please try a different image."
-          );
+          Alert.alert("שגיאה", "לא הצלחנו לעבד את התמונה שנבחרה.");
         }
       } else {
         console.log("📱 User canceled image selection");
       }
     } catch (error) {
       console.error("💥 Error in pickImage:", error);
-      Alert.alert("Error", "Failed to open photo library. Please try again.");
+      Alert.alert("שגיאה", "שגיאה בפתיחת גלריית התמונות.");
     }
   };
-
-  console.log(pendingMeal?.analysis?.ingredients, "this are ing for this meal");
 
   const handlePost = async () => {
     if (pendingMeal && !isPosting) {
       console.log("📤 Posting meal...");
       const result = await dispatch(postMeal());
 
-      console.log("📤 Post result:", result);
-
       if (postMeal.fulfilled.match(result)) {
-        // Extract meal ID from the response - try multiple possible fields
         const mealId = result.payload?.meal_id?.toString();
-
         console.log("✅ Meal posted successfully with ID:", mealId);
-        console.log(
-          "✅ Full payload:",
-          JSON.stringify(result.payload, null, 2)
-        );
 
         if (mealId) {
           setPostedMealId(mealId);
-          await saveMealId(mealId); // Persist the meal ID
-
-          Alert.alert(
-            "Success",
-            "Meal posted successfully! You can now update it if needed."
-          );
+          await saveMealId(mealId);
+          Alert.alert("הצלחה", "הארוחה נשמרה בהצלחה!");
         } else {
-          console.warn("⚠️ Meal posted but no ID returned");
-          console.warn(
-            "⚠️ Available payload keys:",
-            Object.keys(result.payload || {})
-          );
-
-          // Set a temporary ID to allow updates to work
           const tempId = "temp_" + Date.now();
           setPostedMealId(tempId);
           await saveMealId(tempId);
-
-          Alert.alert(
-            "Success",
-            "Meal posted successfully! Update functionality is available."
-          );
+          Alert.alert("הצלחה", "הארוחה נשמרה בהצלחה!");
         }
       } else {
         console.error("❌ Meal post failed:", result.payload);
-        Alert.alert(
-          "Error",
-          "Failed to post meal: " + (result.payload || "Unknown error")
-        );
+        Alert.alert("שגיאה", "שמירת הארוחה נכשלה");
       }
     }
   };
 
   const handleUpdate = () => {
-    console.log("🔄 Update button pressed. Posted meal ID:", postedMealId);
-    console.log("🔄 Pending meal exists:", !!pendingMeal);
-
     if (!postedMealId) {
-      console.log("❌ No posted meal ID found");
-      Alert.alert(
-        "Post Required",
-        "Please post the meal first before updating it.",
-        [{ text: "OK" }]
-      );
+      Alert.alert("נדרש שמירה", "אנא שמור את הארוחה לפני עדכון.", [
+        { text: "אישור" },
+      ]);
       return;
     }
-
-    console.log("✅ Opening update modal");
     setShowUpdateModal(true);
-    setUpdateText(""); // Reset update text when opening modal
+    setUpdateText("");
   };
 
   const handleUpdateSubmit = async () => {
-    if (!postedMealId) {
-      Alert.alert("Error", "Cannot update - no meal ID found");
-      return;
-    }
-
-    if (!updateText.trim()) {
-      Alert.alert("Error", "Please enter update text");
+    if (!postedMealId || !updateText.trim()) {
+      Alert.alert("שגיאה", "אנא הכנס טקסט עדכון");
       return;
     }
 
     try {
-      console.log("🔄 Submitting update with text:", updateText.trim());
-      console.log("🆔 Meal ID:", postedMealId);
-
       const result = await dispatch(
         updateMeal({
           meal_id: postedMealId,
@@ -331,141 +298,60 @@ export default function CameraScreen() {
       );
 
       if (updateMeal.fulfilled.match(result)) {
-        console.log("✅ Update successful:", result.payload);
-
-        Alert.alert("Success", "Meal updated successfully!");
-
-        // Close modal and reset state
+        Alert.alert("הצלחה", "הארוחה עודכנה בהצלחה!");
         setShowUpdateModal(false);
         setUpdateText("");
-
-        // Clear the pending meal and posted meal ID
         dispatch(clearPendingMeal());
         setPostedMealId(null);
         await clearMealId();
       } else {
-        console.error("❌ Update failed:", result.payload);
-        const errorMessage =
-          result.payload?.message ||
-          result.payload?.error ||
-          result.payload ||
-          "Unknown error";
-
-        Alert.alert("Error", "Failed to update meal: " + errorMessage);
+        Alert.alert("שגיאה", "עדכון הארוחה נכשל");
       }
     } catch (error) {
       console.error("💥 Update error:", error);
-      Alert.alert(
-        "Error",
-        "An unexpected error occurred while updating the meal"
-      );
+      Alert.alert("שגיאה", "שגיאה בעדכון הארוחה");
     }
   };
 
-  const handleUpdateCancel = () => {
-    setShowUpdateModal(false);
-    setUpdateText("");
-  };
-
   const handleDiscard = async () => {
-    Alert.alert(
-      "Discard Analysis",
-      "Are you sure you want to discard this analysis?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Discard",
-          style: "destructive",
-          onPress: async () => {
-            dispatch(clearPendingMeal());
-            setPostedMealId(null);
-            await clearMealId();
-          },
+    Alert.alert("מחיקת ניתוח", "האם אתה בטוח שברצונך למחוק את הניתוח?", [
+      { text: "ביטול", style: "cancel" },
+      {
+        text: "מחק",
+        style: "destructive",
+        onPress: async () => {
+          dispatch(clearPendingMeal());
+          setPostedMealId(null);
+          await clearMealId();
         },
-      ]
-    );
+      },
+    ]);
   };
 
-  const resetCamera = async () => {
-    dispatch(clearPendingMeal());
-    setPostedMealId(null);
-    await clearMealId();
-    await AsyncStorage.removeItem("lastImageAnalysis");
-  };
-
-  // Fixed handleEditAnalysis function
   const handleEditAnalysis = () => {
-    console.log("🔄 Edit analysis button pressed");
-    setEditText(""); // Reset edit text
+    setEditText("");
     setShowEditModal(true);
   };
 
-  // Handle edit analysis submission
   const handleEditSubmit = async () => {
     if (!editText.trim()) {
-      Alert.alert("Error", "Please enter correction text");
+      Alert.alert("שגיאה", "אנא הכנס טקסט תיקון");
       return;
     }
 
     if (!pendingMeal?.image_base_64) {
-      Alert.alert("Error", "No image found to re-analyze");
+      Alert.alert("שגיאה", "לא נמצאה תמונה לניתוח מחדש");
       return;
     }
 
     try {
-      console.log("🔄 Submitting edit with text:", editText.trim());
-
-      // Close modal first
       setShowEditModal(false);
-
-      // Re-analyze the image with the additional text
       await analyzeImageWithText(pendingMeal.image_base_64, editText.trim());
-
-      // Reset edit text
       setEditText("");
     } catch (error) {
       console.error("💥 Edit analysis error:", error);
-      Alert.alert("Error", "Failed to re-analyze image");
+      Alert.alert("שגיאה", "ניתוח מחדש נכשל");
     }
-  };
-
-  const handleEditCancel = () => {
-    setShowEditModal(false);
-    setEditText("");
-  };
-
-  // Legacy confirmEdit function (keeping for compatibility)
-  const confirmEdit = async () => {
-    try {
-      if (editedComponents.trim() && originalAnalysis) {
-        // Create updated prompt for re-analysis
-        const updatePrompt = `התמונה נותחה בעבר וכללה: ${originalAnalysis}. המשתמש עדכן את הרכב המנה ל: ${editedComponents}. אנא בצע ניתוח קלורי מחדש.`;
-
-        // Save updated analysis data
-        await saveAnalysisData(
-          originalAnalysis,
-          editedComponents,
-          pendingMeal?.image_base_64 || ""
-        );
-
-        Alert.alert("הצלחה", "הניתוח עודכן בהצלחה");
-      }
-      setShowEditModal(false);
-    } catch (error) {
-      console.error("Error updating analysis:", error);
-      Alert.alert("שגיאה", "לא הצלחנו לעדכן את הניתוח");
-    }
-  };
-
-  const deleteAndRetake = () => {
-    Alert.alert(
-      "מחיקת תמונה",
-      "האם אתה בטוח שברצונך למחוק את התמונה ולצלם מחדש?",
-      [
-        { text: "ביטול", style: "cancel" },
-        { text: "מחק וצלם מחדש", onPress: resetCamera },
-      ]
-    );
   };
 
   if (!permission) {
@@ -474,12 +360,18 @@ export default function CameraScreen() {
 
   if (!permission.granted) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.message}>{t(`camera.permission`)}</Text>
-        <TouchableOpacity style={styles.button} onPress={requestPermission}>
-          <Text style={styles.buttonText}>Grant Permission</Text>
-        </TouchableOpacity>
-      </View>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.permissionContainer}>
+          <Ionicons name="camera" size={80} color="#666" />
+          <Text style={styles.permissionText}>נדרשת הרשאה למצלמה</Text>
+          <TouchableOpacity
+            style={styles.permissionButton}
+            onPress={requestPermission}
+          >
+            <Text style={styles.permissionButtonText}>מתן הרשאה</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -498,11 +390,11 @@ export default function CameraScreen() {
           await analyzeImage(photo.base64);
         } else {
           console.error("❌ No base64 data in photo");
-          Alert.alert("Error", "Failed to capture image data");
+          Alert.alert("שגיאה", "לא הצלחנו לצלם תמונה");
         }
       } catch (error) {
         console.error("💥 Camera error:", error);
-        Alert.alert("Error", "Failed to take picture");
+        Alert.alert("שגיאה", "שגיאה בצילום");
       }
     }
   };
@@ -513,19 +405,17 @@ export default function CameraScreen() {
         <CameraView style={styles.camera} facing={facing} ref={cameraRef}>
           <View style={styles.cameraControls}>
             <TouchableOpacity
-              style={styles.closeButton}
+              style={styles.cameraButton}
               onPress={() => setShowCamera(false)}
-              activeOpacity={0.7}
             >
               <Ionicons name="close" size={30} color="white" />
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.flipButton}
+              style={styles.cameraButton}
               onPress={() =>
                 setFacing((current) => (current === "back" ? "front" : "back"))
               }
-              activeOpacity={0.7}
             >
               <Ionicons name="camera-reverse" size={30} color="white" />
             </TouchableOpacity>
@@ -534,7 +424,6 @@ export default function CameraScreen() {
               style={styles.captureButton}
               onPress={takePicture}
               disabled={isAnalyzing}
-              activeOpacity={0.7}
             >
               <View
                 style={[
@@ -551,307 +440,304 @@ export default function CameraScreen() {
 
   if (pendingMeal) {
     const isPosted = !!postedMealId;
-    console.log(
-      "🔍 Rendering pending meal. Posted:",
-      isPosted,
-      "ID:",
-      postedMealId
-    );
 
     return (
-      <ScrollView style={styles.container}>
-        <View style={styles.analysisContainer}>
-          <Image
-            source={{
-              uri: `data:image/jpeg;base64,${pendingMeal.image_base_64}`,
-            }}
-            style={styles.analyzedImage}
-            onError={(error) => {
-              console.error("💥 Image display error:", error);
-              console.error(
-                "💥 Image URI:",
-                `data:image/jpeg;base64,${pendingMeal.image_base_64?.substring(
-                  0,
-                  50
-                )}...`
-              );
-            }}
-            onLoad={() => {
-              console.log("✅ Image loaded successfully");
-            }}
-          />
+      <SafeAreaView style={styles.container}>
+        <ScrollView style={styles.scrollContainer}>
+          <View style={styles.analysisContainer}>
+            <Image
+              source={{
+                uri: `data:image/jpeg;base64,${pendingMeal.image_base_64}`,
+              }}
+              style={styles.analyzedImage}
+              onError={(error) => {
+                console.error("💥 Image display error:", error);
+              }}
+            />
 
-          <View style={styles.analysisResults}>
-            <Text style={styles.analysisTitle}>
-              {isPosted ? "Posted Meal" : "Analysis Results"}
-            </Text>
-
-            <Text style={styles.mealName}>
-              {pendingMeal.analysis?.meal_name ||
-                pendingMeal.analysis?.description ||
-                "Unknown Meal"}
-            </Text>
-
-            {pendingMeal.analysis?.description && (
-              <Text style={styles.mealDescription}>
-                {pendingMeal.analysis.description}
+            <View style={styles.analysisResults}>
+              <Text style={styles.analysisTitle}>
+                {isPosted ? "ארוחה שמורה" : "תוצאות ניתוח"}
               </Text>
-            )}
 
-            <View style={styles.nutritionGrid}>
-              <View style={styles.nutritionItem}>
-                <Text style={styles.nutritionValue}>
-                  {Math.round(pendingMeal.analysis?.calories || 0)}
-                </Text>
-                <Text style={styles.nutritionLabel}>Calories</Text>
-              </View>
-              <View style={styles.nutritionItem}>
-                <Text style={styles.nutritionValue}>
-                  {Math.round(pendingMeal.analysis?.protein_g || 0)}g
-                </Text>
-                <Text style={styles.nutritionLabel}>Protein</Text>
-              </View>
-              <View style={styles.nutritionItem}>
-                <Text style={styles.nutritionValue}>
-                  {Math.round(pendingMeal.analysis?.carbs_g || 0)}g
-                </Text>
-                <Text style={styles.nutritionLabel}>Carbs</Text>
-              </View>
-              <View style={styles.nutritionItem}>
-                <Text style={styles.nutritionValue}>
-                  {Math.round(pendingMeal.analysis?.fats_g || 0)}g
-                </Text>
-                <Text style={styles.nutritionLabel}>Fat</Text>
-              </View>
-            </View>
+              <Text style={styles.mealName}>
+                {pendingMeal.analysis?.meal_name ||
+                  pendingMeal.analysis?.description ||
+                  "ארוחה לא ידועה"}
+              </Text>
 
-            {pendingMeal.analysis?.ingredients &&
-              pendingMeal.analysis.ingredients.length > 0 && (
-                <View style={styles.ingredientsContainer}>
-                  <Text style={styles.ingredientsTitle}>
-                    Ingredients Breakdown
+              {pendingMeal.analysis?.description && (
+                <Text style={styles.mealDescription}>
+                  {pendingMeal.analysis.description}
+                </Text>
+              )}
+
+              <View style={styles.nutritionGrid}>
+                <View style={styles.nutritionItem}>
+                  <Text style={styles.nutritionValue}>
+                    {Math.round(pendingMeal.analysis?.calories || 0)}
                   </Text>
-                  {pendingMeal.analysis.ingredients.map((ingredient, index) => (
-                    <View key={index} style={styles.ingredientItem}>
-                      <Text style={styles.ingredientName}>
-                        🥗 {ingredient.name}
-                      </Text>
-                      <View style={styles.ingredientNutrition}>
-                        <Text style={styles.ingredientDetail}>
-                          Calories: {Math.round(ingredient.calories)}
-                        </Text>
-                        <Text style={styles.ingredientDetail}>
-                          Protein: {Math.round(ingredient.protein)}g
-                        </Text>
-                        <Text style={styles.ingredientDetail}>
-                          Carbs: {Math.round(ingredient.carbs)}g
-                        </Text>
-                        <Text style={styles.ingredientDetail}>
-                          Fat: {Math.round(ingredient.fat)}g
-                        </Text>
-                        {ingredient.fiber && (
-                          <Text style={styles.ingredientDetail}>
-                            Fiber: {Math.round(ingredient.fiber)}g
+                  <Text style={styles.nutritionLabel}>קלוריות</Text>
+                </View>
+                <View style={styles.nutritionItem}>
+                  <Text style={styles.nutritionValue}>
+                    {Math.round(pendingMeal.analysis?.protein_g || 0)}g
+                  </Text>
+                  <Text style={styles.nutritionLabel}>חלבון</Text>
+                </View>
+                <View style={styles.nutritionItem}>
+                  <Text style={styles.nutritionValue}>
+                    {Math.round(pendingMeal.analysis?.carbs_g || 0)}g
+                  </Text>
+                  <Text style={styles.nutritionLabel}>פחמימות</Text>
+                </View>
+                <View style={styles.nutritionItem}>
+                  <Text style={styles.nutritionValue}>
+                    {Math.round(pendingMeal.analysis?.fats_g || 0)}g
+                  </Text>
+                  <Text style={styles.nutritionLabel}>שומן</Text>
+                </View>
+              </View>
+
+              {/* Enhanced Ingredients Display */}
+              {pendingMeal.analysis?.ingredients &&
+                pendingMeal.analysis.ingredients.length > 0 && (
+                  <View style={styles.ingredientsContainer}>
+                    <Text style={styles.ingredientsTitle}>פירוט רכיבים</Text>
+                    {pendingMeal.analysis.ingredients.map(
+                      (ingredient, index) => (
+                        <View key={index} style={styles.ingredientItem}>
+                          <Text style={styles.ingredientName}>
+                            🥗 {ingredient.name}
                           </Text>
-                        )}
-                      </View>
-                    </View>
-                  ))}
+                          <View style={styles.ingredientNutrition}>
+                            <Text style={styles.ingredientDetail}>
+                              קלוריות: {Math.round(ingredient.calories || 0)}
+                            </Text>
+                            <Text style={styles.ingredientDetail}>
+                              חלבון: {Math.round(ingredient.protein || 0)}g
+                            </Text>
+                            <Text style={styles.ingredientDetail}>
+                              פחמימות: {Math.round(ingredient.carbs || 0)}g
+                            </Text>
+                            <Text style={styles.ingredientDetail}>
+                              שומן: {Math.round(ingredient.fat || 0)}g
+                            </Text>
+                            {ingredient.fiber && (
+                              <Text style={styles.ingredientDetail}>
+                                סיבים: {Math.round(ingredient.fiber)}g
+                              </Text>
+                            )}
+                            {ingredient.sugar && (
+                              <Text style={styles.ingredientDetail}>
+                                סוכר: {Math.round(ingredient.sugar)}g
+                              </Text>
+                            )}
+                          </View>
+                        </View>
+                      )
+                    )}
+                  </View>
+                )}
+
+              {/* Additional Nutritional Information */}
+              {(pendingMeal.analysis?.fiber_g ||
+                pendingMeal.analysis?.sugar_g ||
+                pendingMeal.analysis?.sodium_g) && (
+                <View style={styles.additionalNutrition}>
+                  <Text style={styles.additionalNutritionTitle}>
+                    מידע תזונתי נוסף
+                  </Text>
+                  <View style={styles.nutritionRow}>
+                    {pendingMeal.analysis.fiber_g && (
+                      <Text style={styles.nutritionInfo}>
+                        סיבים: {Math.round(pendingMeal.analysis.fiber_g)}g
+                      </Text>
+                    )}
+                    {pendingMeal.analysis.sugar_g && (
+                      <Text style={styles.nutritionInfo}>
+                        סוכר: {Math.round(pendingMeal.analysis.sugar_g)}g
+                      </Text>
+                    )}
+                    {pendingMeal.analysis.sodium_g && (
+                      <Text style={styles.nutritionInfo}>
+                        נתרן: {Math.round(pendingMeal.analysis.sodium_g)}mg
+                      </Text>
+                    )}
+                  </View>
                 </View>
               )}
 
-            {isPosted && (
-              <View style={styles.statusContainer}>
-                <Ionicons name="checkmark-circle" size={20} color="#28a745" />
-                <Text style={styles.statusText}>Meal saved successfully!</Text>
-              </View>
-            )}
-          </View>
-
-          <View style={styles.actionButtons}>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.discardButton]}
-              onPress={handleDiscard}
-              disabled={isPosting || isUpdating || isEditingAnalysis}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.discardButtonText}>
-                {isPosted ? "Clear" : "Discard"}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: "#FF9500" }]}
-              onPress={handleEditAnalysis}
-              disabled={isPosting || isUpdating || isEditingAnalysis}
-              activeOpacity={0.7}
-            >
-              {isEditingAnalysis ? (
-                <ActivityIndicator color="white" size="small" />
-              ) : (
-                <Text style={[styles.actionButtonText, { color: "white" }]}>
-                  ערוך ניתוח
-                </Text>
+              {isPosted && (
+                <View style={styles.statusContainer}>
+                  <Ionicons name="checkmark-circle" size={20} color="#28a745" />
+                  <Text style={styles.statusText}>הארוחה נשמרה בהצלחה!</Text>
+                </View>
               )}
-            </TouchableOpacity>
+            </View>
 
-            <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: "#FF3B30" }]}
-              onPress={deleteAndRetake}
-              disabled={isPosting || isUpdating || isEditingAnalysis}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.actionButtonText, { color: "white" }]}>
-                מחק וצלם מחדש
-              </Text>
-            </TouchableOpacity>
-
-            {!isPosted ? (
+            <View style={styles.actionButtons}>
               <TouchableOpacity
-                style={[styles.actionButton, styles.postButton]}
-                onPress={handlePost}
+                style={[styles.actionButton, styles.discardButton]}
+                onPress={handleDiscard}
                 disabled={isPosting || isUpdating || isEditingAnalysis}
-                activeOpacity={0.7}
               >
-                {isPosting ? (
-                  <ActivityIndicator color="white" />
-                ) : (
-                  <Text style={styles.postButtonText}>Post Meal</Text>
-                )}
+                <Text style={styles.discardButtonText}>
+                  {isPosted ? "נקה" : "מחק"}
+                </Text>
               </TouchableOpacity>
-            ) : (
+
               <TouchableOpacity
-                style={[styles.actionButton, styles.updateButton]}
-                onPress={() => {
-                  handleUpdate();
-                }}
+                style={[styles.actionButton, styles.editButton]}
+                onPress={handleEditAnalysis}
                 disabled={isPosting || isUpdating || isEditingAnalysis}
-                activeOpacity={0.7}
               >
-                {isUpdating ? (
+                {isEditingAnalysis ? (
                   <ActivityIndicator color="white" size="small" />
                 ) : (
-                  <Text style={styles.updateButtonText}>Update Analysis</Text>
+                  <Text style={styles.editButtonText}>ערוך ניתוח</Text>
                 )}
               </TouchableOpacity>
-            )}
-          </View>
-        </View>
 
-        {/* Update Modal */}
-        <Modal
-          visible={showUpdateModal}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={handleUpdateCancel}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Update Meal</Text>
-              <Text style={styles.modalSubtitle}>
-                Add additional information about your meal (e.g., "I also ate 2
-                pieces of bread")
-              </Text>
-
-              <TextInput
-                style={styles.updateInput}
-                placeholder="Enter additional meal information..."
-                value={updateText}
-                onChangeText={setUpdateText}
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-                autoFocus={true}
-              />
-
-              <View style={styles.modalButtons}>
+              {!isPosted ? (
                 <TouchableOpacity
-                  style={[styles.modalButton, styles.cancelButton]}
-                  onPress={handleUpdateCancel}
-                  disabled={isUpdating}
-                  activeOpacity={0.7}
+                  style={[styles.actionButton, styles.postButton]}
+                  onPress={handlePost}
+                  disabled={isPosting || isUpdating || isEditingAnalysis}
                 >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                  {isPosting ? (
+                    <ActivityIndicator color="white" />
+                  ) : (
+                    <Text style={styles.postButtonText}>שמור ארוחה</Text>
+                  )}
                 </TouchableOpacity>
-
+              ) : (
                 <TouchableOpacity
-                  style={[styles.modalButton, styles.submitButton]}
-                  onPress={handleUpdateSubmit}
-                  disabled={!updateText.trim() || isUpdating}
-                  activeOpacity={0.7}
+                  style={[styles.actionButton, styles.updateButton]}
+                  onPress={handleUpdate}
+                  disabled={isPosting || isUpdating || isEditingAnalysis}
                 >
                   {isUpdating ? (
                     <ActivityIndicator color="white" size="small" />
                   ) : (
-                    <Text style={styles.submitButtonText}>Update</Text>
+                    <Text style={styles.updateButtonText}>עדכן ניתוח</Text>
                   )}
                 </TouchableOpacity>
-              </View>
+              )}
             </View>
           </View>
-        </Modal>
 
-        {/* Edit Analysis Modal */}
-        <Modal
-          visible={showEditModal}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={handleEditCancel}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>ערוך ניתוח</Text>
-              <Text style={styles.modalSubtitle}>
-                הוסף מידע או תיקון לגבי הארוחה (לדוגמה: "יש גם 2 פרוסות לחם" או
-                "בלי אורז")
-              </Text>
+          {/* Update Modal */}
+          <Modal
+            visible={showUpdateModal}
+            animationType="slide"
+            transparent={true}
+            onRequestClose={() => setShowUpdateModal(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>עדכן ארוחה</Text>
+                <Text style={styles.modalSubtitle}>
+                  הוסף מידע נוסף על הארוחה שלך
+                </Text>
 
-              <TextInput
-                style={styles.updateInput}
-                placeholder="הזן תיקון או מידע נוסף על הארוחה..."
-                value={editText}
-                onChangeText={setEditText}
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-                autoFocus={true}
-              />
+                <TextInput
+                  style={styles.updateInput}
+                  placeholder="הכנס מידע נוסף על הארוחה..."
+                  value={updateText}
+                  onChangeText={setUpdateText}
+                  multiline
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                  autoFocus={true}
+                />
 
-              <View style={styles.modalButtons}>
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.cancelButton]}
-                  onPress={handleEditCancel}
-                  disabled={isEditingAnalysis}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.cancelButtonText}>ביטול</Text>
-                </TouchableOpacity>
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.cancelButton]}
+                    onPress={() => setShowUpdateModal(false)}
+                    disabled={isUpdating}
+                  >
+                    <Text style={styles.cancelButtonText}>ביטול</Text>
+                  </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.submitButton]}
-                  onPress={handleEditSubmit}
-                  disabled={!editText.trim() || isEditingAnalysis}
-                  activeOpacity={0.7}
-                >
-                  {isEditingAnalysis ? (
-                    <ActivityIndicator color="white" size="small" />
-                  ) : (
-                    <Text style={styles.submitButtonText}>נתח מחדש</Text>
-                  )}
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.submitButton]}
+                    onPress={handleUpdateSubmit}
+                    disabled={!updateText.trim() || isUpdating}
+                  >
+                    {isUpdating ? (
+                      <ActivityIndicator color="white" size="small" />
+                    ) : (
+                      <Text style={styles.submitButtonText}>עדכן</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
-          </View>
-        </Modal>
-      </ScrollView>
+          </Modal>
+
+          {/* Edit Analysis Modal */}
+          <Modal
+            visible={showEditModal}
+            animationType="slide"
+            transparent={true}
+            onRequestClose={() => setShowEditModal(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>ערוך ניתוח</Text>
+                <Text style={styles.modalSubtitle}>
+                  הוסף מידע או תיקון לגבי הארוחה
+                </Text>
+
+                <TextInput
+                  style={styles.updateInput}
+                  placeholder="הזן תיקון או מידע נוסף על הארוחה..."
+                  value={editText}
+                  onChangeText={setEditText}
+                  multiline
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                  autoFocus={true}
+                />
+
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.cancelButton]}
+                    onPress={() => setShowEditModal(false)}
+                    disabled={isEditingAnalysis}
+                  >
+                    <Text style={styles.cancelButtonText}>ביטול</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.submitButton]}
+                    onPress={handleEditSubmit}
+                    disabled={!editText.trim() || isEditingAnalysis}
+                  >
+                    {isEditingAnalysis ? (
+                      <ActivityIndicator color="white" size="small" />
+                    ) : (
+                      <Text style={styles.submitButtonText}>נתח מחדש</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+        </ScrollView>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.headerSection}>
-        <Text style={styles.title}>{t(`camera.analyze_photo`)}</Text>
-        <Text style={styles.subtitle}>{t(`camera.description`)}</Text>
+        <Text style={styles.title}>ניתוח תזונתי</Text>
+        <Text style={styles.subtitle}>
+          צלם או בחר תמונה לניתוח תזונתי מדויק
+        </Text>
       </View>
 
       {(isAnalyzing || isEditingAnalysis) && (
@@ -869,37 +755,30 @@ export default function CameraScreen() {
       <View style={styles.buttonContainer}>
         <TouchableOpacity
           style={[
-            styles.cameraButton,
+            styles.mainButton,
             (isAnalyzing || isEditingAnalysis) && styles.buttonDisabled,
           ]}
           onPress={() => setShowCamera(true)}
           disabled={isAnalyzing || isEditingAnalysis}
-          activeOpacity={0.7}
         >
           <View style={styles.buttonIconContainer}>
             <Ionicons name="camera" size={32} color="white" />
           </View>
-          <Text style={styles.buttonText}>{t(`camera.take_photo`)}</Text>
+          <Text style={styles.buttonText}>צלם תמונה</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[
-            styles.galleryButton,
+            styles.secondaryButton,
             (isAnalyzing || isEditingAnalysis) && styles.buttonDisabled,
           ]}
-          onPress={() => {
-            console.log("🔘 Gallery button pressed!");
-            pickImage();
-          }}
+          onPress={pickImage}
           disabled={isAnalyzing || isEditingAnalysis}
-          activeOpacity={0.7}
         >
           <View style={styles.buttonIconContainer}>
             <Ionicons name="images" size={32} color="#007AFF" />
           </View>
-          <Text style={styles.galleryButtonText}>
-            {t(`camera.choose_from_gallery`)}
-          </Text>
+          <Text style={styles.secondaryButtonText}>בחר מהגלריה</Text>
         </TouchableOpacity>
 
         <View style={styles.tipCard}>
@@ -909,48 +788,17 @@ export default function CameraScreen() {
           </Text>
         </View>
       </View>
-
-      {/* Edit Modal */}
-      <Modal
-        visible={showEditModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setShowEditModal(false)}>
-              <Text style={styles.modalCancelButton}>ביטול</Text>
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>ערוך רכיבי המנה</Text>
-            <TouchableOpacity onPress={confirmEdit}>
-              <Text style={styles.modalConfirmButton}>אשר</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.modalContent}>
-            <Text style={styles.modalLabel}>ניתוח מקורי:</Text>
-            <Text style={styles.originalAnalysisText}>{originalAnalysis}</Text>
-
-            <Text style={styles.modalLabel}>רכיבים מעודכנים:</Text>
-            <TextInput
-              style={styles.modalTextInput}
-              value={editedComponents}
-              onChangeText={setEditedComponents}
-              multiline
-              placeholder="ערוך את רכיבי המנה..."
-              textAlignVertical="top"
-            />
-          </View>
-        </View>
-      </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#f8f9fa",
+  },
+  scrollContainer: {
+    flex: 1,
   },
   cameraContainer: {
     flex: 1,
@@ -965,11 +813,13 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     padding: 20,
   },
-  closeButton: {
-    padding: 10,
-  },
-  flipButton: {
-    padding: 10,
+  cameraButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   captureButton: {
     width: 70,
@@ -988,31 +838,54 @@ const styles = StyleSheet.create({
   captureButtonDisabled: {
     backgroundColor: "rgba(255,255,255,0.5)",
   },
+  permissionContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  permissionText: {
+    fontSize: 18,
+    textAlign: "center",
+    marginVertical: 20,
+    color: "#666",
+  },
+  permissionButton: {
+    backgroundColor: "#007AFF",
+    paddingHorizontal: 30,
+    paddingVertical: 15,
+    borderRadius: 25,
+  },
+  permissionButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
   headerSection: {
     paddingTop: 20,
     paddingHorizontal: 20,
     paddingBottom: 30,
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "white",
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: "bold",
     textAlign: "center",
     marginBottom: 10,
     color: "#1a1a1a",
   },
   subtitle: {
-    fontSize: 17,
+    fontSize: 16,
     textAlign: "center",
     color: "#666",
-    lineHeight: 24,
-    paddingHorizontal: 10,
-  },
-  message: {
-    textAlign: "center",
-    paddingBottom: 10,
+    lineHeight: 22,
   },
   buttonContainer: {
     flex: 1,
@@ -1020,38 +893,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 40,
   },
-  button: {
+  mainButton: {
     backgroundColor: "#007AFF",
-    padding: 15,
-    borderRadius: 8,
-    alignItems: "center",
-    margin: 20,
-  },
-  cameraButton: {
-    backgroundColor: "#007AFF",
-    padding: 24,
+    padding: 20,
     borderRadius: 16,
     alignItems: "center",
     marginBottom: 16,
-    flexDirection: "column",
-    justifyContent: "center",
-    minHeight: 100,
     shadowColor: "#007AFF",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
   },
-  galleryButton: {
+  secondaryButton: {
     borderWidth: 2,
     borderColor: "#007AFF",
     backgroundColor: "white",
-    padding: 24,
+    padding: 20,
     borderRadius: 16,
     alignItems: "center",
-    flexDirection: "column",
-    justifyContent: "center",
-    minHeight: 100,
     marginBottom: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -1069,13 +929,11 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
     fontWeight: "bold",
-    textAlign: "center",
   },
-  galleryButtonText: {
+  secondaryButtonText: {
     color: "#007AFF",
     fontSize: 16,
     fontWeight: "bold",
-    textAlign: "center",
   },
   tipCard: {
     backgroundColor: "#fff8e1",
@@ -1085,7 +943,6 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     borderLeftWidth: 4,
     borderLeftColor: "#FF9500",
-    marginTop: 10,
   },
   tipText: {
     flex: 1,
@@ -1132,48 +989,60 @@ const styles = StyleSheet.create({
   },
   analyzedImage: {
     width: "100%",
-    height: 200,
-    borderRadius: 12,
+    height: 250,
+    borderRadius: 16,
     marginBottom: 20,
   },
   analysisResults: {
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "white",
     padding: 20,
-    borderRadius: 12,
+    borderRadius: 16,
     marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   analysisTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: "bold",
     marginBottom: 15,
     color: "#333",
+    textAlign: "center",
   },
   mealName: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "600",
-    marginBottom: 5,
+    marginBottom: 8,
     color: "#333",
+    textAlign: "center",
   },
   mealDescription: {
     fontSize: 14,
     color: "#666",
-    marginBottom: 15,
+    marginBottom: 20,
+    textAlign: "center",
+    lineHeight: 20,
   },
   nutritionGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
+    marginBottom: 20,
   },
   nutritionItem: {
     width: "48%",
-    backgroundColor: "white",
+    backgroundColor: "#f8f9fa",
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: "center",
     marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#e9ecef",
   },
   nutritionValue: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: "bold",
     color: "#007AFF",
   },
@@ -1181,13 +1050,90 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#666",
     marginTop: 5,
+    fontWeight: "500",
+  },
+  ingredientsContainer: {
+    marginTop: 20,
+    padding: 16,
+    backgroundColor: "#f8f9fa",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e9ecef",
+  },
+  ingredientsTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 15,
+    color: "#333",
+    textAlign: "center",
+  },
+  ingredientItem: {
+    marginBottom: 15,
+    padding: 12,
+    backgroundColor: "white",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#e9ecef",
+  },
+  ingredientName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 8,
+    textAlign: "right",
+  },
+  ingredientNutrition: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  ingredientDetail: {
+    fontSize: 12,
+    color: "#666",
+    backgroundColor: "#f8f9fa",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#e9ecef",
+  },
+  additionalNutrition: {
+    marginTop: 20,
+    padding: 16,
+    backgroundColor: "#f8f9fa",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e9ecef",
+  },
+  additionalNutritionTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 10,
+    color: "#333",
+    textAlign: "center",
+  },
+  nutritionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-around",
+  },
+  nutritionInfo: {
+    fontSize: 14,
+    color: "#666",
+    backgroundColor: "white",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    margin: 4,
+    borderWidth: 1,
+    borderColor: "#e9ecef",
   },
   statusContainer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     marginTop: 15,
-    padding: 10,
+    padding: 12,
     backgroundColor: "#d4edda",
     borderRadius: 8,
   },
@@ -1201,25 +1147,24 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    gap: 8,
+    gap: 10,
   },
   actionButton: {
     flex: 1,
     minWidth: "45%",
-    padding: 12,
-    borderRadius: 8,
+    padding: 14,
+    borderRadius: 12,
     alignItems: "center",
-    minHeight: 45,
+    minHeight: 50,
     justifyContent: "center",
-  },
-  actionButtonText: {
-    fontSize: 14,
-    fontWeight: "bold",
   },
   discardButton: {
     backgroundColor: "#f8f9fa",
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: "#dc3545",
+  },
+  editButton: {
+    backgroundColor: "#FF9500",
   },
   updateButton: {
     backgroundColor: "#ffc107",
@@ -1229,6 +1174,11 @@ const styles = StyleSheet.create({
   },
   discardButtonText: {
     color: "#dc3545",
+    fontSize: 14,
+    fontWeight: "bold",
+  },
+  editButtonText: {
+    color: "white",
     fontSize: 14,
     fontWeight: "bold",
   },
@@ -1252,29 +1202,34 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     margin: 20,
     padding: 20,
-    borderRadius: 12,
+    borderRadius: 16,
     width: "90%",
+    maxHeight: "80%",
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: "bold",
     marginBottom: 10,
     textAlign: "center",
+    color: "#333",
   },
   modalSubtitle: {
     fontSize: 14,
     color: "#666",
     marginBottom: 20,
     textAlign: "center",
+    lineHeight: 20,
   },
   updateInput: {
     borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
+    borderColor: "#e9ecef",
+    borderRadius: 12,
     padding: 15,
     fontSize: 16,
-    minHeight: 100,
+    minHeight: 120,
     marginBottom: 20,
+    textAlignVertical: "top",
+    backgroundColor: "#f8f9fa",
   },
   modalButtons: {
     flexDirection: "row",
@@ -1283,7 +1238,7 @@ const styles = StyleSheet.create({
   modalButton: {
     flex: 1,
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: "center",
     marginHorizontal: 5,
     minHeight: 50,
@@ -1306,89 +1261,5 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
     fontWeight: "bold",
-  },
-  ingredientsContainer: {
-    marginTop: 20,
-    padding: 15,
-    backgroundColor: "white",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
-  },
-  ingredientsTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    marginBottom: 10,
-    color: "#333",
-  },
-  ingredientItem: {
-    marginBottom: 12,
-    padding: 10,
-    backgroundColor: "#f8f9fa",
-    borderRadius: 8,
-  },
-  ingredientName: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 5,
-  },
-  ingredientNutrition: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  ingredientDetail: {
-    fontSize: 12,
-    color: "#666",
-    backgroundColor: "white",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    overflow: "hidden",
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-  },
-  modalCancelButton: {
-    color: "#007AFF",
-    fontSize: 16,
-  },
-  modalConfirmButton: {
-    color: "#007AFF",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  modalLabel: {
-    fontSize: 16,
-    fontWeight: "bold",
-    marginBottom: 10,
-    marginTop: 20,
-  },
-  originalAnalysisText: {
-    fontSize: 14,
-    color: "#666",
-    backgroundColor: "#f5f5f5",
-    padding: 15,
-    borderRadius: 10,
-    lineHeight: 20,
-  },
-  modalTextInput: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 10,
-    padding: 15,
-    minHeight: 200,
-    fontSize: 16,
-    textAlignVertical: "top",
   },
 });
