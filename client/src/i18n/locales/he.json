@@ -46,7 +46,9 @@
     "quick_actions": "פעולות מהירות",
     "scan_meal": "סריקת ארוחה",
     "add_meal": "הוספת ארוחה",
-    "view_statistics": "צפייה בסטטיסטיקות"
+    "view_statistics": "צפייה בסטטיסטיקות",
+    "nutrition_breakdown": "פירוט תזונתי",
+    "water_intake":"צריכת מים יומית"
   },
   "meals": {
     "title": "הארוחות שלי",

@@ -278,7 +278,6 @@ Language: ${language}`;
       ],
       max_tokens: 3000,
       temperature: 0.1,
-      timeout: 60000, // 1 minute timeout
     });
 
     const content = response?.choices[0]?.message?.content;

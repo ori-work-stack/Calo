@@ -2,11 +2,7 @@ import { OpenAIService } from "./openai";
 import { prisma } from "../lib/database";
 import { MealAnalysisInput, MealUpdateInput } from "../types/nutrition";
 import { AuthService } from "./auth";
-import {
-  asJsonObject,
-  mapExistingMealToPrismaInput,
-  mapMealDataToPrismaFields,
-} from "../utils/nutrition";
+import { asJsonObject, mapExistingMealToPrismaInput } from "../utils/nutrition";
 
 function transformMealForClient(meal: any) {
   const additives = meal.additives_json || {};
@@ -87,19 +83,101 @@ export class NutritionService {
       protein:
         typeof ingredient === "string"
           ? "0"
-          : (ingredient.protein_g || 0).toString(),
+          : (ingredient.protein_g || ingredient.protein || 0).toString(),
+      protein_g:
+        typeof ingredient === "string"
+          ? 0
+          : Number(ingredient.protein_g || ingredient.protein || 0),
       carbs:
         typeof ingredient === "string"
           ? "0"
-          : (ingredient.carbs_g || 0).toString(),
+          : (ingredient.carbs_g || ingredient.carbs || 0).toString(),
+      carbs_g:
+        typeof ingredient === "string"
+          ? 0
+          : Number(ingredient.carbs_g || ingredient.carbs || 0),
       fat:
         typeof ingredient === "string"
           ? "0"
-          : (ingredient.fats_g || 0).toString(),
+          : (ingredient.fats_g || ingredient.fat || 0).toString(),
+      fats_g:
+        typeof ingredient === "string"
+          ? 0
+          : Number(ingredient.fats_g || ingredient.fat || 0),
       fiber:
+        typeof ingredient === "string" ? 0 : Number(ingredient.fiber_g ?? 0),
+      fiber_g:
         typeof ingredient === "string" ? 0 : Number(ingredient.fiber_g ?? 0),
       sugar:
         typeof ingredient === "string" ? 0 : Number(ingredient.sugar_g ?? 0),
+      sugar_g:
+        typeof ingredient === "string" ? 0 : Number(ingredient.sugar_g ?? 0),
+      sodium_mg:
+        typeof ingredient === "string" ? 0 : Number(ingredient.sodium_mg ?? 0),
+      cholesterol_mg:
+        typeof ingredient === "string"
+          ? 0
+          : Number(ingredient.cholesterol_mg ?? 0),
+
+      // Detailed fats
+      saturated_fats_g:
+        typeof ingredient === "string"
+          ? 0
+          : Number(ingredient.saturated_fats_g ?? 0),
+      polyunsaturated_fats_g:
+        typeof ingredient === "string"
+          ? 0
+          : Number(ingredient.polyunsaturated_fats_g ?? 0),
+      monounsaturated_fats_g:
+        typeof ingredient === "string"
+          ? 0
+          : Number(ingredient.monounsaturated_fats_g ?? 0),
+      omega_3_g:
+        typeof ingredient === "string" ? 0 : Number(ingredient.omega_3_g ?? 0),
+      omega_6_g:
+        typeof ingredient === "string" ? 0 : Number(ingredient.omega_6_g ?? 0),
+
+      // Detailed fiber
+      soluble_fiber_g:
+        typeof ingredient === "string"
+          ? 0
+          : Number(ingredient.soluble_fiber_g ?? 0),
+      insoluble_fiber_g:
+        typeof ingredient === "string"
+          ? 0
+          : Number(ingredient.insoluble_fiber_g ?? 0),
+
+      // Additional nutrients
+      alcohol_g:
+        typeof ingredient === "string" ? 0 : Number(ingredient.alcohol_g ?? 0),
+      caffeine_mg:
+        typeof ingredient === "string"
+          ? 0
+          : Number(ingredient.caffeine_mg ?? 0),
+      serving_size_g:
+        typeof ingredient === "string"
+          ? 0
+          : Number(ingredient.serving_size_g ?? 0),
+
+      // Analysis data
+      glycemic_index:
+        typeof ingredient === "string"
+          ? null
+          : ingredient.glycemic_index ?? null,
+      insulin_index:
+        typeof ingredient === "string"
+          ? null
+          : ingredient.insulin_index ?? null,
+
+      // JSON fields
+      vitamins_json:
+        typeof ingredient === "string" ? {} : ingredient.vitamins_json ?? {},
+      micronutrients_json:
+        typeof ingredient === "string"
+          ? {}
+          : ingredient.micronutrients_json ?? {},
+      allergens_json:
+        typeof ingredient === "string" ? {} : ingredient.allergens_json ?? {},
     }));
 
     const mappedMeal = mapMealDataToPrismaFields(
@@ -617,4 +695,65 @@ export class NutritionService {
 
     return transformMealForClient(duplicatedMeal);
   }
+}
+
+function mapMealDataToPrismaFields(
+  mealData: any,
+  user_id: string,
+  imageBase64?: string
+) {
+  const ingredients = Array.isArray(mealData.ingredients)
+    ? mealData.ingredients
+    : [];
+
+  return {
+    user_id,
+    image_url: imageBase64 ? `data:image/jpeg;base64,${imageBase64}` : null,
+    upload_time: new Date(),
+    analysis_status: "COMPLETED",
+    meal_name: mealData.meal_name || mealData.name || "Unknown Meal",
+    calories: mealData.calories || 0,
+    protein_g: mealData.protein_g || mealData.protein || 0,
+    carbs_g: mealData.carbs_g || mealData.carbs || 0,
+    fats_g: mealData.fats_g || mealData.fat || 0,
+    fiber_g: mealData.fiber_g || mealData.fiber || 0,
+    sugar_g: mealData.sugar_g || mealData.sugar || 0,
+    sodium_mg: mealData.sodium_mg || mealData.sodium || 0,
+
+    // Detailed fats
+    saturated_fats_g: mealData.saturated_fats_g || 0,
+    polyunsaturated_fats_g: mealData.polyunsaturated_fats_g || 0,
+    monounsaturated_fats_g: mealData.monounsaturated_fats_g || 0,
+    omega_3_g: mealData.omega_3_g || 0,
+    omega_6_g: mealData.omega_6_g || 0,
+
+    // Detailed fiber
+    soluble_fiber_g: mealData.soluble_fiber_g || 0,
+    insoluble_fiber_g: mealData.insoluble_fiber_g || 0,
+
+    // Other nutrients
+    cholesterol_mg: mealData.cholesterol_mg || 0,
+    alcohol_g: mealData.alcohol_g || 0,
+    caffeine_mg: mealData.caffeine_mg || 0,
+    liquids_ml: mealData.liquids_ml || 0,
+    serving_size_g: mealData.serving_size_g || 0,
+
+    // JSON fields
+    allergens_json: mealData.allergens_json || {},
+    vitamins_json: mealData.vitamins_json || {},
+    micronutrients_json: mealData.micronutrients_json || {},
+    additives_json: mealData.additives_json || {},
+
+    // Analysis fields
+    glycemic_index: mealData.glycemic_index || 0,
+    insulin_index: mealData.insulin_index || 0,
+    food_category: mealData.food_category || "",
+    processing_level: mealData.processing_level || "",
+    cooking_method: mealData.cooking_method || "",
+    health_risk_notes: mealData.health_risk_notes || "",
+
+    // System fields
+    ingredients: ingredients,
+    created_at: new Date(),
+  };
 }

@@ -74,9 +74,24 @@ export default function CameraScreen() {
       if (error.includes("quota") || error.includes("429")) {
         title = t("camera.quota_exceeded_title");
         message = t("camera.quota_exceeded_message");
-      } else if (error.includes("network") || error.includes("connection")) {
+      } else if (
+        error.includes("timeout") ||
+        error.includes("Request timeout")
+      ) {
+        title = "Request Timeout";
+        message =
+          "The image analysis is taking too long. Please try with a smaller image or check your connection.";
+      } else if (
+        error.includes("network") ||
+        error.includes("connection") ||
+        error.includes("Cannot connect")
+      ) {
         title = t("camera.connection_error_title");
         message = t("camera.connection_error_message");
+      } else if (error.includes("Server error")) {
+        title = "Server Error";
+        message =
+          "There was an issue processing your request. Please try again.";
       }
 
       Alert.alert(title, message, [
@@ -225,6 +240,12 @@ export default function CameraScreen() {
       if (cleanBase64.length < 1000) {
         console.error("Base64 data too short, likely not a valid image");
         return null;
+      }
+
+      // Check maximum length to prevent timeout issues
+      if (cleanBase64.length > 1000000) {
+        // 1MB limit
+        console.warn("Image is very large, this might cause timeout issues");
       }
 
       console.log(
@@ -735,7 +756,7 @@ export default function CameraScreen() {
                   </View>
                 </View>
 
-                {/* Enhanced Ingredients Display */}
+                {/* Enhanced Ingredients Display with Full Nutritional Information */}
                 {pendingMeal.analysis?.ingredients &&
                   pendingMeal.analysis.ingredients.length > 0 && (
                     <View style={styles.ingredientsContainer}>
@@ -763,21 +784,18 @@ export default function CameraScreen() {
                           </Text>
                         </TouchableOpacity>
                       </View>
-                      <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        style={styles.ingredientsScrollView}
-                      >
+
+                      <View style={styles.ingredientsListContainer}>
                         {pendingMeal.analysis.ingredients.map(
                           (ingredient, index) => (
-                            <View key={index} style={styles.ingredientCard}>
-                              <View style={styles.ingredientIconWrapper}>
+                            <View key={index} style={styles.ingredientFullCard}>
+                              <View style={styles.ingredientHeader}>
                                 <View style={styles.ingredientIconContainer}>
                                   <Ionicons
                                     name={
                                       getIngredientIcon(ingredient.name) as any
                                     }
-                                    size={24}
+                                    size={20}
                                     color="#4CAF50"
                                   />
                                 </View>
@@ -788,112 +806,683 @@ export default function CameraScreen() {
                                   {ingredient.name}
                                 </Text>
                               </View>
-                              <View style={styles.ingredientNutritionGrid}>
-                                <View style={styles.nutritionItem}>
-                                  <Text style={styles.nutritionValue}>
+
+                              {/* Main Macros Row */}
+                              <View style={styles.macroRow}>
+                                <View style={styles.macroItem}>
+                                  <Text style={styles.macroValue}>
                                     {Math.round(ingredient.calories || 0)}
                                   </Text>
-                                  <Text style={styles.nutritionUnit}>cal</Text>
+                                  <Text style={styles.macroLabel}>cal</Text>
                                 </View>
-                                <View style={styles.nutritionItem}>
-                                  <Text style={styles.nutritionValue}>
+                                <View style={styles.macroItem}>
+                                  <Text style={styles.macroValue}>
                                     {Math.round(
-                                      ingredient.protein ||
+                                      ingredient.protein_g ||
                                         ingredient.protein ||
                                         0
                                     )}
                                     g
                                   </Text>
-                                  <Text style={styles.nutritionUnit}>
-                                    protein
-                                  </Text>
+                                  <Text style={styles.macroLabel}>protein</Text>
                                 </View>
-                                <View style={styles.nutritionItem}>
-                                  <Text style={styles.nutritionValue}>
+                                <View style={styles.macroItem}>
+                                  <Text style={styles.macroValue}>
                                     {Math.round(
-                                      ingredient.carbs || ingredient.carbs || 0
+                                      ingredient.carbs_g ||
+                                        ingredient.carbs ||
+                                        0
                                     )}
                                     g
                                   </Text>
-                                  <Text style={styles.nutritionUnit}>
-                                    carbs
-                                  </Text>
+                                  <Text style={styles.macroLabel}>carbs</Text>
                                 </View>
-                                <View style={styles.nutritionItem}>
-                                  <Text style={styles.nutritionValue}>
+                                <View style={styles.macroItem}>
+                                  <Text style={styles.macroValue}>
                                     {Math.round(
-                                      ingredient.fat || ingredient.fat || 0
+                                      ingredient.fats_g || ingredient.fat || 0
                                     )}
                                     g
                                   </Text>
-                                  <Text style={styles.nutritionUnit}>fat</Text>
+                                  <Text style={styles.macroLabel}>fat</Text>
                                 </View>
                               </View>
+
+                              {/* Additional Nutrition Row */}
+                              <View style={styles.additionalNutritionRow}>
+                                {(ingredient.fiber_g || ingredient.fiber) && (
+                                  <View style={styles.nutritionDetail}>
+                                    <Text style={styles.nutritionDetailValue}>
+                                      {Math.round(
+                                        ingredient.fiber_g ||
+                                          ingredient.fiber ||
+                                          0
+                                      )}
+                                      g
+                                    </Text>
+                                    <Text style={styles.nutritionDetailLabel}>
+                                      fiber
+                                    </Text>
+                                  </View>
+                                )}
+                                {(ingredient.sugar_g || ingredient.sugar) && (
+                                  <View style={styles.nutritionDetail}>
+                                    <Text style={styles.nutritionDetailValue}>
+                                      {Math.round(
+                                        ingredient.sugar_g ||
+                                          ingredient.sugar ||
+                                          0
+                                      )}
+                                      g
+                                    </Text>
+                                    <Text style={styles.nutritionDetailLabel}>
+                                      sugar
+                                    </Text>
+                                  </View>
+                                )}
+                                {(ingredient.sodium_mg ||
+                                  ingredient.sodium) && (
+                                  <View style={styles.nutritionDetail}>
+                                    <Text style={styles.nutritionDetailValue}>
+                                      {Math.round(
+                                        ingredient.sodium_mg ||
+                                          ingredient.sodium ||
+                                          0
+                                      )}
+                                      mg
+                                    </Text>
+                                    <Text style={styles.nutritionDetailLabel}>
+                                      sodium
+                                    </Text>
+                                  </View>
+                                )}
+                                {(ingredient.cholesterol_mg ||
+                                  ingredient.cholesterol) && (
+                                  <View style={styles.nutritionDetail}>
+                                    <Text style={styles.nutritionDetailValue}>
+                                      {Math.round(
+                                        ingredient.cholesterol_mg ||
+                                          ingredient.cholesterol ||
+                                          0
+                                      )}
+                                      mg
+                                    </Text>
+                                    <Text style={styles.nutritionDetailLabel}>
+                                      cholesterol
+                                    </Text>
+                                  </View>
+                                )}
+                              </View>
+
+                              {/* Detailed Fats Row */}
+                              {(ingredient.saturated_fats_g ||
+                                ingredient.polyunsaturated_fats_g ||
+                                ingredient.monounsaturated_fats_g ||
+                                ingredient.omega_3_g ||
+                                ingredient.omega_6_g) && (
+                                <View style={styles.detailedFatsRow}>
+                                  {ingredient.saturated_fats_g && (
+                                    <View style={styles.nutritionDetail}>
+                                      <Text style={styles.nutritionDetailValue}>
+                                        {Math.round(
+                                          ingredient.saturated_fats_g
+                                        )}
+                                        g
+                                      </Text>
+                                      <Text style={styles.nutritionDetailLabel}>
+                                        sat fat
+                                      </Text>
+                                    </View>
+                                  )}
+                                  {ingredient.polyunsaturated_fats_g && (
+                                    <View style={styles.nutritionDetail}>
+                                      <Text style={styles.nutritionDetailValue}>
+                                        {Math.round(
+                                          ingredient.polyunsaturated_fats_g
+                                        )}
+                                        g
+                                      </Text>
+                                      <Text style={styles.nutritionDetailLabel}>
+                                        poly fat
+                                      </Text>
+                                    </View>
+                                  )}
+                                  {ingredient.monounsaturated_fats_g && (
+                                    <View style={styles.nutritionDetail}>
+                                      <Text style={styles.nutritionDetailValue}>
+                                        {Math.round(
+                                          ingredient.monounsaturated_fats_g
+                                        )}
+                                        g
+                                      </Text>
+                                      <Text style={styles.nutritionDetailLabel}>
+                                        mono fat
+                                      </Text>
+                                    </View>
+                                  )}
+                                  {ingredient.omega_3_g && (
+                                    <View style={styles.nutritionDetail}>
+                                      <Text style={styles.nutritionDetailValue}>
+                                        {ingredient.omega_3_g}g
+                                      </Text>
+                                      <Text style={styles.nutritionDetailLabel}>
+                                        omega-3
+                                      </Text>
+                                    </View>
+                                  )}
+                                  {ingredient.omega_6_g && (
+                                    <View style={styles.nutritionDetail}>
+                                      <Text style={styles.nutritionDetailValue}>
+                                        {ingredient.omega_6_g}g
+                                      </Text>
+                                      <Text style={styles.nutritionDetailLabel}>
+                                        omega-6
+                                      </Text>
+                                    </View>
+                                  )}
+                                </View>
+                              )}
+
+                              {/* Vitamins and Minerals Row */}
+                              {(ingredient.vitamins_json ||
+                                ingredient.micronutrients_json) && (
+                                <View style={styles.vitaminsRow}>
+                                  {ingredient.vitamins_json &&
+                                    Object.keys(ingredient.vitamins_json)
+                                      .length > 0 && (
+                                      <>
+                                        {Object.entries(
+                                          ingredient.vitamins_json
+                                        )
+                                          .slice(0, 3)
+                                          .map(([key, value]) => (
+                                            <View
+                                              key={key}
+                                              style={styles.nutritionDetail}
+                                            >
+                                              <Text
+                                                style={
+                                                  styles.nutritionDetailValue
+                                                }
+                                              >
+                                                {value}
+                                              </Text>
+                                              <Text
+                                                style={
+                                                  styles.nutritionDetailLabel
+                                                }
+                                              >
+                                                {key
+                                                  .replace(/_/g, " ")
+                                                  .substring(0, 8)}
+                                              </Text>
+                                            </View>
+                                          ))}
+                                      </>
+                                    )}
+                                  {ingredient.micronutrients_json &&
+                                    Object.keys(ingredient.micronutrients_json)
+                                      .length > 0 && (
+                                      <>
+                                        {Object.entries(
+                                          ingredient.micronutrients_json
+                                        )
+                                          .slice(0, 2)
+                                          .map(([key, value]) => (
+                                            <View
+                                              key={key}
+                                              style={styles.nutritionDetail}
+                                            >
+                                              <Text
+                                                style={
+                                                  styles.nutritionDetailValue
+                                                }
+                                              >
+                                                {value}
+                                              </Text>
+                                              <Text
+                                                style={
+                                                  styles.nutritionDetailLabel
+                                                }
+                                              >
+                                                {key
+                                                  .replace(/_/g, " ")
+                                                  .substring(0, 8)}
+                                              </Text>
+                                            </View>
+                                          ))}
+                                      </>
+                                    )}
+                                </View>
+                              )}
+
+                              {/* Additional Properties Row */}
+                              {(ingredient.serving_size_g ||
+                                ingredient.glycemic_index ||
+                                ingredient.caffeine_mg ||
+                                ingredient.alcohol_g) && (
+                                <View style={styles.additionalPropsRow}>
+                                  {ingredient.serving_size_g && (
+                                    <View style={styles.nutritionDetail}>
+                                      <Text style={styles.nutritionDetailValue}>
+                                        {Math.round(ingredient.serving_size_g)}g
+                                      </Text>
+                                      <Text style={styles.nutritionDetailLabel}>
+                                        serving
+                                      </Text>
+                                    </View>
+                                  )}
+                                  {ingredient.glycemic_index && (
+                                    <View style={styles.nutritionDetail}>
+                                      <Text style={styles.nutritionDetailValue}>
+                                        {ingredient.glycemic_index}
+                                      </Text>
+                                      <Text style={styles.nutritionDetailLabel}>
+                                        GI
+                                      </Text>
+                                    </View>
+                                  )}
+                                  {ingredient.caffeine_mg && (
+                                    <View style={styles.nutritionDetail}>
+                                      <Text style={styles.nutritionDetailValue}>
+                                        {Math.round(ingredient.caffeine_mg)}mg
+                                      </Text>
+                                      <Text style={styles.nutritionDetailLabel}>
+                                        caffeine
+                                      </Text>
+                                    </View>
+                                  )}
+                                  {ingredient.alcohol_g && (
+                                    <View style={styles.nutritionDetail}>
+                                      <Text style={styles.nutritionDetailValue}>
+                                        {Math.round(ingredient.alcohol_g)}g
+                                      </Text>
+                                      <Text style={styles.nutritionDetailLabel}>
+                                        alcohol
+                                      </Text>
+                                    </View>
+                                  )}
+                                </View>
+                              )}
                             </View>
                           )
                         )}
-                      </ScrollView>
+                      </View>
                     </View>
                   )}
 
-                {/* Additional Nutritional Information */}
-                {(pendingMeal.analysis?.fiber_g ||
-                  pendingMeal.analysis?.sugar_g ||
-                  pendingMeal.analysis?.sodium_g) && (
-                  <View style={styles.additionalNutrition}>
-                    <View style={styles.additionalNutritionHeader}>
+                {/* Comprehensive Nutritional Information - Mobile Optimized */}
+
+                {/* Main Nutrition Grid - Secondary nutrients */}
+                <View style={styles.nutritionContainer}>
+                  <Text style={styles.nutritionTitle}>Secondary Nutrition</Text>
+                  <View style={styles.nutritionGrid}>
+                    <View style={styles.nutritionItem}>
+                      <Ionicons name="cafe-outline" size={20} color="#FF9800" />
+                      <Text style={styles.nutritionValue}>
+                        {Math.round(pendingMeal.analysis?.sugar_g || 0)}g
+                      </Text>
+                      <Text style={styles.nutritionLabel}>Sugar</Text>
+                    </View>
+                    <View style={styles.nutritionItem}>
+                      <Ionicons name="leaf-outline" size={20} color="#4CAF50" />
+                      <Text style={styles.nutritionValue}>
+                        {Math.round(pendingMeal.analysis?.fiber_g || 0)}g
+                      </Text>
+                      <Text style={styles.nutritionLabel}>Fiber</Text>
+                    </View>
+                    <View style={styles.nutritionItem}>
+                      <Ionicons
+                        name="water-outline"
+                        size={20}
+                        color="#2196F3"
+                      />
+                      <Text style={styles.nutritionValue}>
+                        {Math.round(pendingMeal.analysis?.sodium_mg || 0)}mg
+                      </Text>
+                      <Text style={styles.nutritionLabel}>Sodium</Text>
+                    </View>
+                    <View style={styles.nutritionItem}>
+                      <Ionicons
+                        name="heart-outline"
+                        size={20}
+                        color="#E91E63"
+                      />
+                      <Text style={styles.nutritionValue}>
+                        {Math.round(pendingMeal.analysis?.cholesterol_mg || 0)}
+                        mg
+                      </Text>
+                      <Text style={styles.nutritionLabel}>Cholesterol</Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Detailed Fats Information */}
+                {(pendingMeal.analysis?.saturated_fats_g ||
+                  pendingMeal.analysis?.polyunsaturated_fats_g ||
+                  pendingMeal.analysis?.monounsaturated_fats_g ||
+                  pendingMeal.analysis?.omega_3_g ||
+                  pendingMeal.analysis?.omega_6_g) && (
+                  <View style={styles.nutritionContainer}>
+                    <View style={styles.sectionHeader}>
+                      <Ionicons
+                        name="water-outline"
+                        size={20}
+                        color="#FFC107"
+                      />
+                      <Text style={styles.nutritionTitle}>Fat Breakdown</Text>
+                    </View>
+                    <View style={styles.nutritionGrid}>
+                      {pendingMeal.analysis.saturated_fats_g && (
+                        <View style={styles.nutritionItem}>
+                          <Text style={styles.nutritionValue}>
+                            {Math.round(pendingMeal.analysis.saturated_fats_g)}g
+                          </Text>
+                          <Text style={styles.nutritionLabel}>Saturated</Text>
+                        </View>
+                      )}
+                      {pendingMeal.analysis.polyunsaturated_fats_g && (
+                        <View style={styles.nutritionItem}>
+                          <Text style={styles.nutritionValue}>
+                            {Math.round(
+                              pendingMeal.analysis.polyunsaturated_fats_g
+                            )}
+                            g
+                          </Text>
+                          <Text style={styles.nutritionLabel}>
+                            Polyunsaturated
+                          </Text>
+                        </View>
+                      )}
+                      {pendingMeal.analysis.monounsaturated_fats_g && (
+                        <View style={styles.nutritionItem}>
+                          <Text style={styles.nutritionValue}>
+                            {Math.round(
+                              pendingMeal.analysis.monounsaturated_fats_g
+                            )}
+                            g
+                          </Text>
+                          <Text style={styles.nutritionLabel}>
+                            Monounsaturated
+                          </Text>
+                        </View>
+                      )}
+                      {pendingMeal.analysis.omega_3_g && (
+                        <View style={styles.nutritionItem}>
+                          <Text style={styles.nutritionValue}>
+                            {pendingMeal.analysis.omega_3_g}g
+                          </Text>
+                          <Text style={styles.nutritionLabel}>Omega-3</Text>
+                        </View>
+                      )}
+                      {pendingMeal.analysis.omega_6_g && (
+                        <View style={styles.nutritionItem}>
+                          <Text style={styles.nutritionValue}>
+                            {pendingMeal.analysis.omega_6_g}g
+                          </Text>
+                          <Text style={styles.nutritionLabel}>Omega-6</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                )}
+
+                {/* Detailed Fiber Information */}
+                {(pendingMeal.analysis?.soluble_fiber_g ||
+                  pendingMeal.analysis?.insoluble_fiber_g) && (
+                  <View style={styles.nutritionContainer}>
+                    <View style={styles.sectionHeader}>
+                      <Ionicons name="leaf-outline" size={20} color="#4CAF50" />
+                      <Text style={styles.nutritionTitle}>Fiber Breakdown</Text>
+                    </View>
+                    <View style={styles.nutritionGrid}>
+                      {pendingMeal.analysis.soluble_fiber_g && (
+                        <View style={styles.nutritionItem}>
+                          <Text style={styles.nutritionValue}>
+                            {pendingMeal.analysis.soluble_fiber_g}g
+                          </Text>
+                          <Text style={styles.nutritionLabel}>Soluble</Text>
+                        </View>
+                      )}
+                      {pendingMeal.analysis.insoluble_fiber_g && (
+                        <View style={styles.nutritionItem}>
+                          <Text style={styles.nutritionValue}>
+                            {pendingMeal.analysis.insoluble_fiber_g}g
+                          </Text>
+                          <Text style={styles.nutritionLabel}>Insoluble</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                )}
+
+                {/* Vitamins Information */}
+                {pendingMeal.analysis?.vitamins_json &&
+                  Object.keys(pendingMeal.analysis.vitamins_json).length >
+                    0 && (
+                    <View style={styles.nutritionContainer}>
+                      <View style={styles.sectionHeader}>
+                        <Ionicons
+                          name="nutrition-outline"
+                          size={20}
+                          color="#FF9800"
+                        />
+                        <Text style={styles.nutritionTitle}>Vitamins</Text>
+                      </View>
+                      <View style={styles.nutritionGrid}>
+                        {Object.entries(pendingMeal.analysis.vitamins_json).map(
+                          ([key, value]) => (
+                            <View key={key} style={styles.nutritionItem}>
+                              <Text style={styles.nutritionValue}>{value}</Text>
+                              <Text style={styles.nutritionLabel}>
+                                {key
+                                  .replace(/_/g, " ")
+                                  .replace(/\b\w/g, (l) => l.toUpperCase())}
+                              </Text>
+                            </View>
+                          )
+                        )}
+                      </View>
+                    </View>
+                  )}
+
+                {/* Micronutrients Information */}
+                {pendingMeal.analysis?.micronutrients_json &&
+                  Object.keys(pendingMeal.analysis.micronutrients_json).length >
+                    0 && (
+                    <View style={styles.nutritionContainer}>
+                      <View style={styles.sectionHeader}>
+                        <Ionicons
+                          name="fitness-outline"
+                          size={20}
+                          color="#2196F3"
+                        />
+                        <Text style={styles.nutritionTitle}>Minerals</Text>
+                      </View>
+                      <View style={styles.nutritionGrid}>
+                        {Object.entries(
+                          pendingMeal.analysis.micronutrients_json
+                        ).map(([key, value]) => (
+                          <View key={key} style={styles.nutritionItem}>
+                            <Text style={styles.nutritionValue}>{value}</Text>
+                            <Text style={styles.nutritionLabel}>
+                              {key
+                                .replace(/_/g, " ")
+                                .replace(/\b\w/g, (l) => l.toUpperCase())}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+
+                {/* Additional Nutrients */}
+                {(pendingMeal.analysis?.alcohol_g ||
+                  pendingMeal.analysis?.caffeine_mg ||
+                  pendingMeal.analysis?.liquids_ml ||
+                  pendingMeal.analysis?.serving_size_g) && (
+                  <View style={styles.nutritionContainer}>
+                    <View style={styles.sectionHeader}>
                       <Ionicons
                         name="analytics-outline"
                         size={20}
-                        color="#4CAF50"
+                        color="#9C27B0"
                       />
-                      <Text style={styles.additionalNutritionTitle}>
-                        {t("camera.additional_info")}
-                      </Text>
+                      <Text style={styles.nutritionTitle}>Additional Info</Text>
                     </View>
-                    <View style={styles.additionalNutritionGrid}>
-                      {pendingMeal.analysis.fiber_g && (
-                        <View style={styles.additionalNutritionItem}>
-                          <Ionicons
-                            name="leaf-outline"
-                            size={16}
-                            color="#4CAF50"
-                          />
-                          <Text style={styles.additionalNutritionText}>
-                            {t("camera.fiber")}:{" "}
-                            {Math.round(pendingMeal.analysis.fiber_g)}g
+                    <View style={styles.nutritionGrid}>
+                      {pendingMeal.analysis.alcohol_g && (
+                        <View style={styles.nutritionItem}>
+                          <Text style={styles.nutritionValue}>
+                            {Math.round(pendingMeal.analysis.alcohol_g)}g
                           </Text>
+                          <Text style={styles.nutritionLabel}>Alcohol</Text>
                         </View>
                       )}
-                      {pendingMeal.analysis.sugar_g && (
-                        <View style={styles.additionalNutritionItem}>
-                          <Ionicons
-                            name="cafe-outline"
-                            size={16}
-                            color="#FF9800"
-                          />
-                          <Text style={styles.additionalNutritionText}>
-                            {t("camera.sugar")}:{" "}
-                            {Math.round(pendingMeal.analysis.sugar_g)}g
+                      {pendingMeal.analysis.caffeine_mg && (
+                        <View style={styles.nutritionItem}>
+                          <Text style={styles.nutritionValue}>
+                            {Math.round(pendingMeal.analysis.caffeine_mg)}mg
                           </Text>
+                          <Text style={styles.nutritionLabel}>Caffeine</Text>
                         </View>
                       )}
-                      {pendingMeal.analysis.sodium_g && (
-                        <View style={styles.additionalNutritionItem}>
-                          <Ionicons
-                            name="water-outline"
-                            size={16}
-                            color="#2196F3"
-                          />
-                          <Text style={styles.additionalNutritionText}>
-                            {t("camera.sodium")}:{" "}
-                            {Math.round(pendingMeal.analysis.sodium_g)}mg
+                      {pendingMeal.analysis.liquids_ml && (
+                        <View style={styles.nutritionItem}>
+                          <Text style={styles.nutritionValue}>
+                            {Math.round(pendingMeal.analysis.liquids_ml)}ml
+                          </Text>
+                          <Text style={styles.nutritionLabel}>Liquids</Text>
+                        </View>
+                      )}
+                      {pendingMeal.analysis.serving_size_g && (
+                        <View style={styles.nutritionItem}>
+                          <Text style={styles.nutritionValue}>
+                            {Math.round(pendingMeal.analysis.serving_size_g)}g
+                          </Text>
+                          <Text style={styles.nutritionLabel}>
+                            Serving Size
                           </Text>
                         </View>
                       )}
                     </View>
                   </View>
                 )}
+
+                {/* Food Analysis */}
+                {(pendingMeal.analysis?.food_category ||
+                  pendingMeal.analysis?.processing_level ||
+                  pendingMeal.analysis?.cooking_method ||
+                  pendingMeal.analysis?.glycemic_index ||
+                  pendingMeal.analysis?.insulin_index) && (
+                  <View style={styles.analysisSection}>
+                    <View style={styles.sectionHeader}>
+                      <Ionicons
+                        name="information-circle-outline"
+                        size={20}
+                        color="#9C27B0"
+                      />
+                      <Text style={styles.nutritionTitle}>Food Analysis</Text>
+                    </View>
+                    <View style={styles.analysisGrid}>
+                      {pendingMeal.analysis.food_category && (
+                        <View style={styles.analysisItem}>
+                          <Text style={styles.analysisLabel}>Category</Text>
+                          <Text style={styles.analysisValue}>
+                            {pendingMeal.analysis.food_category}
+                          </Text>
+                        </View>
+                      )}
+                      {pendingMeal.analysis.processing_level && (
+                        <View style={styles.analysisItem}>
+                          <Text style={styles.analysisLabel}>Processing</Text>
+                          <Text style={styles.analysisValue}>
+                            {pendingMeal.analysis.processing_level}
+                          </Text>
+                        </View>
+                      )}
+                      {pendingMeal.analysis.cooking_method && (
+                        <View style={styles.analysisItem}>
+                          <Text style={styles.analysisLabel}>Method</Text>
+                          <Text style={styles.analysisValue}>
+                            {pendingMeal.analysis.cooking_method}
+                          </Text>
+                        </View>
+                      )}
+                      {pendingMeal.analysis.glycemic_index && (
+                        <View style={styles.analysisItem}>
+                          <Text style={styles.analysisLabel}>
+                            Glycemic Index
+                          </Text>
+                          <Text style={styles.analysisValue}>
+                            {pendingMeal.analysis.glycemic_index}
+                          </Text>
+                        </View>
+                      )}
+                      {pendingMeal.analysis.insulin_index && (
+                        <View style={styles.analysisItem}>
+                          <Text style={styles.analysisLabel}>
+                            Insulin Index
+                          </Text>
+                          <Text style={styles.analysisValue}>
+                            {pendingMeal.analysis.insulin_index}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                )}
+
+                {/* Health Notes */}
+                {pendingMeal.analysis?.health_risk_notes && (
+                  <View style={styles.healthSection}>
+                    <View style={styles.sectionHeader}>
+                      <Ionicons
+                        name="shield-checkmark-outline"
+                        size={20}
+                        color="#4CAF50"
+                      />
+                      <Text style={styles.nutritionTitle}>Health Notes</Text>
+                    </View>
+                    <Text style={styles.healthNotesText}>
+                      {pendingMeal.analysis.health_risk_notes}
+                    </Text>
+                  </View>
+                )}
+
+                {/* Allergens Information */}
+                {pendingMeal.analysis?.allergens_json?.possible_allergens &&
+                  pendingMeal.analysis.allergens_json.possible_allergens
+                    .length > 0 && (
+                    <View style={styles.allergenSection}>
+                      <View style={styles.sectionHeader}>
+                        <Ionicons
+                          name="warning-outline"
+                          size={20}
+                          color="#F44336"
+                        />
+                        <Text style={styles.nutritionTitle}>
+                          Possible Allergens
+                        </Text>
+                      </View>
+                      <View style={styles.allergenGrid}>
+                        {pendingMeal.analysis.allergens_json.possible_allergens.map(
+                          (allergen, index) => (
+                            <View key={index} style={styles.allergenItem}>
+                              <Ionicons
+                                name="alert-circle"
+                                size={16}
+                                color="#F44336"
+                              />
+                              <Text style={styles.allergenText}>
+                                {allergen}
+                              </Text>
+                            </View>
+                          )
+                        )}
+                      </View>
+                    </View>
+                  )}
               </View>
 
               <View style={styles.actionButtons}>
@@ -1821,47 +2410,84 @@ const styles = StyleSheet.create({
     color: "#81C784",
     marginTop: 2,
   },
-  additionalNutrition: {
-    backgroundColor: "#E8F5E8",
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: "#C8E6C9",
-  },
-  additionalNutritionHeader: {
+  sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 15,
     justifyContent: "center",
   },
-  additionalNutritionTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#2E7D32",
-    marginLeft: 8,
+  analysisSection: {
+    backgroundColor: "#E8F5E8",
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: "#C8E6C9",
   },
-  additionalNutritionGrid: {
+  analysisGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
   },
-  additionalNutritionItem: {
-    flexDirection: "row",
-    alignItems: "center",
+  analysisItem: {
     backgroundColor: "white",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
-    flex: 1,
-    marginHorizontal: 4,
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 10,
+    width: "48%",
     borderWidth: 1,
     borderColor: "#E8F5E8",
+    alignItems: "center",
   },
-  additionalNutritionText: {
+  analysisLabel: {
     fontSize: 12,
+    color: "#666",
+    marginBottom: 5,
+    textAlign: "center",
+  },
+  analysisValue: {
+    fontSize: 14,
+    fontWeight: "bold",
     color: "#2E7D32",
-    marginLeft: 8,
-    fontWeight: "500",
+    textAlign: "center",
+  },
+  healthSection: {
+    backgroundColor: "#E8F5E8",
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: "#C8E6C9",
+  },
+  allergenSection: {
+    backgroundColor: "#FFE8E8",
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: "#FFCDD2",
+  },
+  allergenGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "flex-start",
+    gap: 8,
+  },
+  allergenItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(244, 67, 54, 0.1)",
+    borderRadius: 12,
+    padding: 8,
+    marginBottom: 5,
+    borderWidth: 1,
+    borderColor: "rgba(244, 67, 54, 0.3)",
+  },
+  allergenText: {
+    color: "#D32F2F",
+    fontWeight: "600",
+    fontSize: 12,
+    marginLeft: 5,
   },
   actionButtons: {
     flexDirection: "row",
@@ -2057,5 +2683,95 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: "#4CAF50",
     marginTop: 1,
+  },
+  ingredientsListContainer: {
+    marginTop: 10,
+  },
+  ingredientFullCard: {
+    backgroundColor: "white",
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: "#E8F5E8",
+  },
+  macroRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  macroItem: {
+    alignItems: "center",
+    flex: 1,
+  },
+  macroValue: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#2E7D32",
+  },
+  macroLabel: {
+    fontSize: 11,
+    color: "#4CAF50",
+    marginTop: 2,
+  },
+  additionalNutritionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    marginBottom: 6,
+    paddingHorizontal: 4,
+  },
+  detailedFatsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    marginBottom: 6,
+    paddingHorizontal: 4,
+  },
+  vitaminsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    marginBottom: 6,
+    paddingHorizontal: 4,
+  },
+  additionalPropsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    paddingHorizontal: 4,
+  },
+  nutritionDetail: {
+    alignItems: "center",
+    minWidth: "22%",
+    marginBottom: 4,
+  },
+  nutritionDetailValue: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#2E7D32",
+  },
+  nutritionDetailLabel: {
+    fontSize: 9,
+    color: "#81C784",
+    marginTop: 1,
+    textAlign: "center",
+  },
+  healthNotesText: {
+    fontSize: 14,
+    color: "#2E7D32",
+    lineHeight: 20,
+    padding: 15,
+    backgroundColor: "white",
+    borderRadius: 8,
+    marginTop: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: "#4CAF50",
   },
 });

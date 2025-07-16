@@ -1,4 +1,23 @@
 type Ingredient = {
+  protein: number;
+  carbs: number;
+  fat: number;
+  cholesterol_mg: number;
+  saturated_fats_g: number;
+  polyunsaturated_fats_g: number;
+  monounsaturated_fats_g: number;
+  omega_3_g: number;
+  omega_6_g: number;
+  soluble_fiber_g: number;
+  insoluble_fiber_g: number;
+  alcohol_g: number;
+  caffeine_mg: number;
+  serving_size_g: number;
+  glycemic_index: null;
+  insulin_index: null;
+  vitamins_json: {};
+  micronutrients_json: {};
+  allergens_json: {};
   name: string;
   calories: number;
   protein_g: number;

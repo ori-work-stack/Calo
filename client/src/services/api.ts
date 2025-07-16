@@ -25,7 +25,7 @@ console.log("📱 Platform:", Platform.OS);
 // Create axios instance with optimizations
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: 60000, // Increased timeout for image analysis
   headers: {
     "Content-Type": "application/json",
   },
@@ -255,6 +255,7 @@ api.interceptors.response.use(
       url: error.config?.url,
       method: error.config?.method,
       message: error.message,
+      code: error.code,
     });
 
     // Clean up pending request on error
@@ -268,6 +269,14 @@ api.interceptors.response.use(
       console.error("🌐 Network connectivity issue detected");
       console.error("💡 Check if your server is running and accessible");
       console.error("💡 Verify your IP address in the API configuration");
+    }
+
+    // Handle timeout errors specifically
+    if (error.code === "ECONNABORTED" || error.message.includes("timeout")) {
+      console.error("⏰ Request timeout detected");
+      console.error(
+        "💡 Consider reducing image size or check network stability"
+      );
     }
 
     if (error.response?.status === 401) {
@@ -426,21 +435,32 @@ export const nutritionAPI = {
   ): Promise<{ success: boolean; data?: MealAnalysisData; error?: string }> => {
     try {
       console.log("🔍 Making analyze meal API request...");
-      console.log("📊 Data URL length:", imageBase64.length);
+      console.log("📊 Base64 length:", imageBase64.length);
 
-      // Ensure we're sending the complete data URL
-      if (!imageBase64.startsWith("data:image/")) {
-        console.warn(
-          "⚠️ Image base64 doesn't start with data URL prefix, adding it"
-        );
-        imageBase64 = `data:image/jpeg;base64,${imageBase64}`;
+      // Clean base64 - remove data URL prefix if present
+      let cleanBase64 = imageBase64;
+      if (imageBase64.startsWith("data:image/")) {
+        const commaIndex = imageBase64.indexOf(",");
+        if (commaIndex !== -1) {
+          cleanBase64 = imageBase64.substring(commaIndex + 1);
+        }
       }
 
-      const response = await api.post("/nutrition/analyze", {
-        imageBase64: imageBase64,
+      console.log("📊 Clean base64 length:", cleanBase64.length);
+
+      const requestData = {
+        imageBase64: cleanBase64, // Send clean base64 without data URL prefix
         language: language === "he" ? "hebrew" : "english",
         date: new Date().toISOString().split("T")[0],
         updateText: updateText,
+      };
+
+      // Create a custom timeout for this specific request
+      const response = await api.post("/nutrition/analyze", requestData, {
+        timeout: 90000, // 90 seconds for image analysis
+        headers: {
+          "Content-Type": "application/json",
+        },
       });
 
       console.log("🎯 RAW ANALYZE API RESPONSE:");
@@ -456,6 +476,15 @@ export const nutritionAPI = {
     } catch (error: any) {
       console.error("💥 Analyze meal API error:", error);
 
+      // Handle different types of errors
+      if (error.code === "ECONNABORTED" || error.message.includes("timeout")) {
+        console.error("⏰ Request timeout - server may be processing");
+        return {
+          success: false,
+          error: "Request timeout - please try again with a smaller image",
+        };
+      }
+
       if (error.response) {
         console.error("Error response status:", error.response.status);
         console.error("Error response data:", error.response.data);
@@ -464,10 +493,24 @@ export const nutritionAPI = {
           error: error.response.data?.error || "Server error occurred",
         };
       } else if (error.request) {
-        console.error("Network error:", error.request);
+        console.error("Network error details:", {
+          status: error.request.status,
+          statusText: error.request.statusText,
+          response: error.request.response,
+        });
+
+        // Check if server is responding
+        if (error.request.status === 0) {
+          return {
+            success: false,
+            error:
+              "Cannot connect to server - please check your internet connection",
+          };
+        }
+
         return {
           success: false,
-          error: "Network error - please check your connection and server IP",
+          error: "Network error - please check your connection",
         };
       } else {
         console.error("Request setup error:", error.message);

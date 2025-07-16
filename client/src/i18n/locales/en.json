@@ -45,7 +45,9 @@
     "quick_actions": "Quick Actions",
     "scan_meal": "Scan Meal",
     "add_meal": "Add Meal",
-    "view_statistics": "View Statistics"
+    "view_statistics": "View Statistics",
+    "nutrition_breakdown": "Nutrition Breakdown",
+    "water_intake": "Daily water intake"
   },
   "meals": {
     "title": "My Meals",
